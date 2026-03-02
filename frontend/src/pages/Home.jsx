@@ -8,6 +8,7 @@ import {
   Coins, 
   Calendar, 
   ArrowRight,
+  Building2,
   Users,
   CheckCircle2
 } from 'lucide-react';
