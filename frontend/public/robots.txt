@@ -11,4 +11,4 @@ Disallow: /profile
 Disallow: /buy-tokens
 Disallow: /payment/
 
-Sitemap: https://www.rentora.com/sitemap.xml
+Sitemap: https://www.rentora.com.ng/sitemap.xml
