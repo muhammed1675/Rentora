@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import hmac
 import hashlib
 import json
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -27,7 +28,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_UR
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if SUPABASE_URL and SUPABASE_SERVICE_KEY else None
 
 # Create the main app
-app = FastAPI(title="LAUTECH Rentals API")
+app = FastAPI(title="Rentora API")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -36,10 +37,173 @@ api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 KORALPAY_SECRET = os.environ.get('KORALPAY_SECRET_KEY', '')
 KORALPAY_WEBHOOK_SECRET = os.environ.get('KORALPAY_WEBHOOK_SECRET', '')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+FROM_EMAIL = 'support@rentora.com.ng'
+FROM_NAME = 'Rentora'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ============== EMAIL HELPER ==============
+
+async def send_email(to_email: str, subject: str, html: str):
+    """Send email via Resend API"""
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping email")
+        return
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "from": f"{FROM_NAME} <{FROM_EMAIL}>",
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html
+                },
+                timeout=10.0
+            )
+            if response.status_code != 200:
+                logger.error(f"Resend error: {response.status_code} {response.text}")
+            else:
+                logger.info(f"Email sent to {to_email}: {subject}")
+    except Exception as e:
+        logger.error(f"Email send failed: {e}")
+
+def base_template(content: str) -> str:
+    """Wrap content in Rentora branded email template"""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ margin: 0; padding: 0; background: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
+            .wrapper {{ max-width: 600px; margin: 32px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }}
+            .header {{ background: #2563eb; padding: 28px 32px; text-align: center; }}
+            .header img {{ height: 40px; }}
+            .header h1 {{ color: #ffffff; margin: 8px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }}
+            .body {{ padding: 32px; }}
+            .body h2 {{ color: #111827; font-size: 22px; margin: 0 0 12px; }}
+            .body p {{ color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 16px; }}
+            .card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+            .card-row {{ display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }}
+            .card-row:last-child {{ border-bottom: none; }}
+            .card-row .label {{ color: #6b7280; }}
+            .card-row .value {{ color: #111827; font-weight: 600; }}
+            .badge {{ display: inline-block; background: #dcfce7; color: #16a34a; border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }}
+            .badge-blue {{ background: #dbeafe; color: #2563eb; }}
+            .btn {{ display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 8px 0; }}
+            .footer {{ background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; text-align: center; }}
+            .footer p {{ color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.8; }}
+            .footer a {{ color: #2563eb; text-decoration: none; }}
+        </style>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="header">
+                <h1>🏠 Rentora</h1>
+            </div>
+            <div class="body">
+                {content}
+            </div>
+            <div class="footer">
+                <p>Rentora — Student Housing Made Easy, Ogbomosho</p>
+                <p><a href="https://www.rentora.com.ng">www.rentora.com.ng</a> &nbsp;|&nbsp; <a href="mailto:support@rentora.com.ng">support@rentora.com.ng</a></p>
+                <p style="margin-top:8px; color:#d1d5db;">You received this email because you have an account on Rentora.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+# ── Email Templates ──────────────────────────────────────────
+
+def email_welcome(full_name: str) -> str:
+    return base_template(f"""
+        <span class="badge badge-blue">Welcome to Rentora 🎉</span>
+        <h2>Hello, {full_name}!</h2>
+        <p>Your account has been created successfully. You can now browse verified student accommodation near LAUTECH, Ogbomosho.</p>
+        <p>Here's what you can do:</p>
+        <div class="card">
+            <div class="card-row"><span class="label">🔍 Browse</span><span class="value">Find verified properties</span></div>
+            <div class="card-row"><span class="label">🪙 Tokens</span><span class="value">Buy tokens to unlock contacts</span></div>
+            <div class="card-row"><span class="label">📅 Inspect</span><span class="value">Book physical inspections</span></div>
+        </div>
+        <a href="https://www.rentora.com.ng/browse" class="btn">Browse Properties</a>
+        <p>If you have any questions, reply to this email or visit our <a href="https://www.rentora.com.ng/contact">contact page</a>.</p>
+    """)
+
+def email_token_receipt(full_name: str, tokens: int, amount: int, new_balance: int, reference: str) -> str:
+    formatted_amount = f"₦{amount:,}"
+    return base_template(f"""
+        <span class="badge">Payment Successful ✓</span>
+        <h2>Token Purchase Receipt</h2>
+        <p>Hi {full_name}, your token purchase was successful. Your wallet has been credited.</p>
+        <div class="card">
+            <div class="card-row"><span class="label">Tokens Purchased</span><span class="value">{tokens} token{'s' if tokens > 1 else ''}</span></div>
+            <div class="card-row"><span class="label">Amount Paid</span><span class="value">{formatted_amount}</span></div>
+            <div class="card-row"><span class="label">New Token Balance</span><span class="value">{new_balance} token{'s' if new_balance != 1 else ''}</span></div>
+            <div class="card-row"><span class="label">Reference</span><span class="value" style="font-size:12px">{reference}</span></div>
+            <div class="card-row"><span class="label">Date</span><span class="value">{datetime.now().strftime('%d %b %Y, %I:%M %p')}</span></div>
+        </div>
+        <p>Each token unlocks one property's owner contact details. Start browsing now!</p>
+        <a href="https://www.rentora.com.ng/browse" class="btn">Browse Properties</a>
+    """)
+
+def email_inspection_booked(full_name: str, property_title: str, inspection_date: str, reference: str, amount: int) -> str:
+    formatted_amount = f"₦{amount:,}"
+    return base_template(f"""
+        <span class="badge">Inspection Confirmed ✓</span>
+        <h2>Inspection Booking Confirmed</h2>
+        <p>Hi {full_name}, your inspection has been booked and payment received. An agent will be in touch with you before the inspection date.</p>
+        <div class="card">
+            <div class="card-row"><span class="label">Property</span><span class="value">{property_title}</span></div>
+            <div class="card-row"><span class="label">Inspection Date</span><span class="value">{inspection_date}</span></div>
+            <div class="card-row"><span class="label">Inspection Fee</span><span class="value">{formatted_amount}</span></div>
+            <div class="card-row"><span class="label">Reference</span><span class="value" style="font-size:12px">{reference}</span></div>
+            <div class="card-row"><span class="label">Status</span><span class="value">Confirmed — Agent Assigned</span></div>
+        </div>
+        <p>Please be available on your inspection date. If you need to reschedule, contact us at <a href="mailto:support@rentora.com.ng">support@rentora.com.ng</a>.</p>
+        <a href="https://www.rentora.com.ng/profile" class="btn">View My Inspections</a>
+    """)
+
+def email_verification_approved(full_name: str) -> str:
+    return base_template(f"""
+        <span class="badge">Agent Approved ✓</span>
+        <h2>Congratulations, {full_name}!</h2>
+        <p>Your agent verification has been approved. You are now a verified Rentora agent and can start listing properties.</p>
+        <div class="card">
+            <div class="card-row"><span class="label">Status</span><span class="value">✅ Verified Agent</span></div>
+            <div class="card-row"><span class="label">Can List Properties</span><span class="value">Yes</span></div>
+            <div class="card-row"><span class="label">Can Conduct Inspections</span><span class="value">Yes</span></div>
+        </div>
+        <p>Log in now to start adding your property listings. Make sure all listings are accurate and up to date.</p>
+        <a href="https://www.rentora.com.ng/agent" class="btn">Go to Agent Dashboard</a>
+        <p>Thank you for joining the Rentora agent network!</p>
+    """)
+
+def email_verification_rejected(full_name: str) -> str:
+    return base_template(f"""
+        <span class="badge" style="background:#fee2e2;color:#dc2626;">Verification Unsuccessful</span>
+        <h2>Hi {full_name},</h2>
+        <p>Unfortunately, we were unable to approve your agent verification application at this time.</p>
+        <p>This may be due to:</p>
+        <div class="card">
+            <div class="card-row"><span class="label">📄 Documents</span><span class="value">Unclear or incomplete ID/selfie</span></div>
+            <div class="card-row"><span class="label">📋 Information</span><span class="value">Details could not be verified</span></div>
+        </div>
+        <p>You are welcome to reapply with clearer documents. If you believe this is a mistake, please contact us.</p>
+        <a href="https://www.rentora.com.ng/become-agent" class="btn" style="background:#6b7280;">Reapply</a>
+        &nbsp;&nbsp;
+        <a href="mailto:support@rentora.com.ng" class="btn">Contact Support</a>
+    """)
 
 # ============== MODELS ==============
 
@@ -180,6 +344,13 @@ async def register(data: UserCreate):
         }
         supabase_admin.table('wallets').insert(wallet).execute()
         
+        # Send welcome email
+        await send_email(
+            to_email=data.email,
+            subject="Welcome to Rentora 🏠",
+            html=email_welcome(data.full_name)
+        )
+
         return {
             "token": auth_response.session.access_token if auth_response.session else None,
             "user": {
@@ -316,7 +487,18 @@ async def review_verification(request_id: str, data: ApprovalRequest, user: dict
     # If approved, update user role to agent
     if data.status == "approved":
         supabase_admin.table('users').update({"role": "agent"}).eq('id', verification['user_id']).execute()
-    
+        await send_email(
+            to_email=verification['user_email'],
+            subject="🎉 Your Rentora Agent Verification is Approved!",
+            html=email_verification_approved(verification['user_name'])
+        )
+    elif data.status == "rejected":
+        await send_email(
+            to_email=verification['user_email'],
+            subject="Rentora Agent Verification Update",
+            html=email_verification_rejected(verification['user_name'])
+        )
+
     return {"message": f"Verification {data.status}"}
 
 # ============== PROPERTY ROUTES ==============
@@ -819,6 +1001,21 @@ async def handle_koralpay_webhook(request: Request):
             new_balance = (wallet_result.data.get('token_balance', 0) if wallet_result.data else 0) + token_tx['tokens_added']
             supabase_admin.table('wallets').update({"token_balance": new_balance}).eq('user_id', token_tx['user_id']).execute()
             logger.info(f"Token purchase completed: {reference}")
+
+            # Send token receipt email
+            user_result = supabase_admin.table('users').select('email, full_name').eq('id', token_tx['user_id']).single().execute()
+            if user_result.data:
+                await send_email(
+                    to_email=user_result.data['email'],
+                    subject=f"Receipt: {token_tx['tokens_added']} Token{'s' if token_tx['tokens_added'] > 1 else ''} Added to Your Wallet",
+                    html=email_token_receipt(
+                        full_name=user_result.data['full_name'],
+                        tokens=token_tx['tokens_added'],
+                        amount=token_tx['amount'],
+                        new_balance=new_balance,
+                        reference=reference
+                    )
+                )
         
         # Check if inspection transaction
         insp_result = supabase_admin.table('inspection_transactions').select('*').eq('reference', reference).single().execute()
@@ -835,6 +1032,22 @@ async def handle_koralpay_webhook(request: Request):
                 "status": "assigned"
             }).eq('id', insp_tx['inspection_id']).execute()
             logger.info(f"Inspection payment completed: {reference}")
+
+            # Send inspection confirmation email
+            insp_detail = supabase_admin.table('inspections').select('*').eq('id', insp_tx['inspection_id']).single().execute()
+            if insp_detail.data:
+                insp = insp_detail.data
+                await send_email(
+                    to_email=insp['user_email'],
+                    subject="Inspection Booking Confirmed — Rentora",
+                    html=email_inspection_booked(
+                        full_name=insp['user_name'],
+                        property_title=insp['property_title'],
+                        inspection_date=insp['inspection_date'],
+                        reference=reference,
+                        amount=insp_tx['amount']
+                    )
+                )
     
     elif event == "charge.failed":
         supabase_admin.table('transactions').update({"status": "failed"}).eq('reference', reference).execute()
@@ -913,7 +1126,7 @@ async def get_upload_url(user: dict = Depends(get_current_user)):
 
 @api_router.get("/")
 async def root():
-    return {"message": "LAUTECH Rentals API", "version": "1.0.0", "database": "Supabase"}
+    return {"message": "Rentora API", "version": "1.0.0", "database": "Supabase"}
 
 @api_router.get("/health")
 async def health():
