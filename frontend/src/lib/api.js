@@ -758,16 +758,87 @@ export const paymentAPI = {
   }
 };
 
+// ============== CONTACT APIs ==============
+
+export const contactAPI = {
+  submit: async (data) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .insert({
+        name: data.name,
+        email: data.email,
+        subject: data.subject,
+        message: data.message,
+        status: 'unread',
+      });
+    if (error) throw error;
+    return { data: { message: 'Message submitted' } };
+  },
+
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data };
+  },
+
+  markRead: async (id) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .update({ status: 'read' })
+      .eq('id', id);
+    if (error) throw error;
+    return { data: { message: 'Marked as read' } };
+  },
+
+  delete: async (id) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return { data: { message: 'Message deleted' } };
+  },
+};
+
+// ============== STORAGE APIs ==============
+
 export const storageAPI = {
+  uploadFile: async (file, folder = 'verification') => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${folder}/${uuidv4()}.${fileExt}`;
+    const bucket = 'property-images';
+    
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+    
+    if (error) throw new Error(error.message || 'Upload failed');
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName);
+    
+    return { data: { url: publicUrl, path: data.path } };
+  },
+
   uploadImage: async (file, bucket = 'property-images') => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
     
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file);
+      .upload(fileName, file, {
+        contentType: file.type,
+        upsert: false,
+      });
     
-    if (error) throw error;
+    if (error) throw new Error(error.message || 'Upload failed');
     
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
