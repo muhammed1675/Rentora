@@ -1,6 +1,25 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 
+// ── Email helper via Supabase Edge Function ──
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+async function sendEmail(type, to, data) {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ type, to, data }),
+    });
+  } catch (e) {
+    console.warn('Email send failed (non-critical):', e.message);
+  }
+}
+
 // Helper to generate payment reference
 const generateReference = (prefix) => {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -11,10 +30,9 @@ const generateReference = (prefix) => {
 
 export const propertyAPI = {
   getAll: async (params = {}) => {
-    // Join with users to filter out properties from suspended agents
     let query = supabase
       .from('properties')
-      .select('*, agent:users!uploaded_by_agent_id(suspended)')
+      .select('*')
       .order('created_at', { ascending: false });
     
     if (params.status) {
@@ -37,34 +55,22 @@ export const propertyAPI = {
     
     const { data, error } = await query;
     if (error) throw error;
-    
-    // Filter out properties from suspended agents, then strip the agent join field
-    const filtered = (data || [])
-      .filter(p => !p.agent?.suspended)
-      .map(({ agent, ...rest }) => rest);
-    
-    return { data: filtered };
+    return { data };
   },
 
   getPublic: async (id) => {
     const { data, error } = await supabase
       .from('properties')
-      .select('*, agent:users!uploaded_by_agent_id(suspended)')
+      .select('*')
       .eq('id', id)
       .eq('status', 'approved')
       .single();
     
     if (error) throw error;
     
-    // Block access if agent is suspended
-    if (data?.agent?.suspended) {
-      throw new Error('This property is no longer available');
-    }
-    
-    const { agent, ...property } = data;
     return {
       data: {
-        ...property,
+        ...data,
         contact_phone: '***LOCKED***',
         contact_unlocked: false
       }
@@ -72,20 +78,13 @@ export const propertyAPI = {
   },
 
   getById: async (id, userId) => {
-    const { data: propertyRaw, error } = await supabase
+    const { data: property, error } = await supabase
       .from('properties')
-      .select('*, agent:users!uploaded_by_agent_id(suspended)')
+      .select('*')
       .eq('id', id)
       .single();
     
     if (error) throw error;
-    
-    // Block access if agent is suspended
-    if (propertyRaw?.agent?.suspended) {
-      throw new Error('This property is no longer available');
-    }
-    
-    const { agent, ...property } = propertyRaw;
     
     // Check if user has unlocked
     const { data: unlock } = await supabase
@@ -123,11 +122,11 @@ export const propertyAPI = {
   update: async (id, data) => {
     const { error } = await supabase
       .from('properties')
-      .update({ ...data, status: 'pending' })
+      .update(data)
       .eq('id', id);
     
     if (error) throw error;
-    return { data: { message: 'Property submitted for re-approval' } };
+    return { data: { message: 'Property updated' } };
   },
 
   delete: async (id) => {
@@ -231,7 +230,21 @@ export const propertyAPI = {
         user_id: userId,
         property_id: propertyId
       });
-    
+
+    // Send email with contact details
+    const { data: userRow } = await supabase.from('users').select('email, full_name').eq('id', userId).single();
+    if (userRow) {
+      await sendEmail('contact_unlocked', userRow.email, {
+        name: userRow.full_name,
+        property_title: property.title,
+        property_location: property.location,
+        property_price: property.price,
+        contact_name: property.contact_name,
+        contact_phone: property.contact_phone,
+        remaining_tokens: wallet.token_balance - 1,
+      });
+    }
+
     return {
       data: {
         message: 'Contact unlocked',
@@ -287,11 +300,15 @@ export const tokenAPI = {
         status: 'pending'
       });
     
+    const koralpayPublicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY || 'pk_test_xxx';
+    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=${amount}&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${data.email}`;
+    
     return {
       data: {
         reference,
         amount,
         quantity: data.quantity,
+        checkout_url: checkoutUrl,
         payment_type: 'token_purchase'
       }
     };
@@ -376,11 +393,15 @@ export const inspectionAPI = {
         status: 'pending'
       });
     
+    const koralpayPublicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY || 'pk_test_xxx';
+    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=2000&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${data.email}`;
+    
     return {
       data: {
         inspection_id: inspectionId,
         reference,
         amount: 2000,
+        checkout_url: checkoutUrl,
         payment_type: 'inspection'
       }
     };
@@ -499,7 +520,6 @@ export const verificationAPI = {
         user_email: user.email,
         id_card_url: data.id_card_url,
         selfie_url: data.selfie_url,
-        agreement_url: data.agreement_url || null,
         address: data.address,
         status: 'pending'
       });
@@ -566,6 +586,15 @@ export const verificationAPI = {
         .eq('id', request.user_id);
     }
     
+    // Send verification result email
+    const { data: verUser } = await supabase.from('users').select('email, full_name').eq('id', request.user_id).single();
+    if (verUser) {
+      await sendEmail(
+        status === 'approved' ? 'verification_approved' : 'verification_rejected',
+        verUser.email,
+        { name: verUser.full_name }
+      );
+    }
     return { data: { message: `Verification ${status}` } };
   }
 };
@@ -601,16 +630,6 @@ export const userAPI = {
       .eq('id', userId);
     
     if (error) throw error;
-
-    // If demoting to user, reject their approved verification so profile shows correctly
-    if (role === 'user') {
-      await supabase
-        .from('agent_verification_requests')
-        .update({ status: 'rejected' })
-        .eq('user_id', userId)
-        .eq('status', 'approved');
-    }
-
     return { data: { message: `Role updated to ${role}` } };
   },
 
@@ -639,7 +658,6 @@ export const adminAPI = {
       { count: pendingInspections },
       { count: completedInspections },
       { count: pendingVerifications },
-      { count: unreadMessages },
       { data: tokenTxs },
       { data: inspTxs }
     ] = await Promise.all([
@@ -652,7 +670,6 @@ export const adminAPI = {
       supabase.from('inspections').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('inspections').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
       supabase.from('agent_verification_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('contact_messages').select('*', { count: 'exact', head: true }).eq('status', 'unread'),
       supabase.from('transactions').select('amount').eq('status', 'completed'),
       supabase.from('inspection_transactions').select('amount').eq('status', 'completed')
     ]);
@@ -671,7 +688,6 @@ export const adminAPI = {
         pending_inspections: pendingInspections || 0,
         completed_inspections: completedInspections || 0,
         pending_verifications: pendingVerifications || 0,
-        unread_messages: unreadMessages || 0,
         token_revenue: tokenRevenue,
         inspection_revenue: inspectionRevenue,
         total_revenue: tokenRevenue + inspectionRevenue
@@ -683,147 +699,135 @@ export const adminAPI = {
 // ============== PAYMENT APIs ==============
 
 export const paymentAPI = {
-  // Called from Korapay onSuccess to mark payment complete and credit user
-  confirmPayment: async (reference) => {
-    // Check token transaction first
+  verify: async (reference) => {
+    // Check token transaction
     const { data: tokenTx } = await supabase
       .from('transactions')
       .select('*')
       .eq('reference', reference)
       .single();
-
+    
     if (tokenTx) {
-      // Mark transaction completed
-      await supabase
-        .from('transactions')
-        .update({ status: 'completed' })
-        .eq('reference', reference);
-
-      // Credit tokens to wallet
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('token_balance')
-        .eq('user_id', tokenTx.user_id)
-        .single();
-
-      const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
-      await supabase
-        .from('wallets')
-        .update({ token_balance: newBalance })
-        .eq('user_id', tokenTx.user_id);
-
-      return { data: { type: 'token_purchase', tokens_added: tokenTx.tokens_added } };
+      return {
+        data: {
+          type: 'token_purchase',
+          status: tokenTx.status,
+          amount: tokenTx.amount,
+          tokens: tokenTx.tokens_added
+        }
+      };
     }
-
+    
     // Check inspection transaction
     const { data: inspTx } = await supabase
       .from('inspection_transactions')
       .select('*')
       .eq('reference', reference)
       .single();
-
+    
     if (inspTx) {
-      // Mark inspection transaction completed
+      return {
+        data: {
+          type: 'inspection',
+          status: inspTx.status,
+          amount: inspTx.amount
+        }
+      };
+    }
+    
+    throw new Error('Transaction not found');
+  },
+
+  // Simulate payment for testing
+  simulate: async (reference) => {
+    // Check token transaction
+    const { data: tokenTx } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('reference', reference)
+      .single();
+    
+    if (tokenTx) {
+      await supabase
+        .from('transactions')
+        .update({ status: 'completed' })
+        .eq('reference', reference);
+      
+      // Add tokens to wallet
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('token_balance')
+        .eq('user_id', tokenTx.user_id)
+        .single();
+      
+      const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
+      await supabase
+        .from('wallets')
+        .update({ token_balance: newBalance })
+        .eq('user_id', tokenTx.user_id);
+      
+      // Send receipt email
+      const { data: tokenUser } = await supabase.from('users').select('email, full_name').eq('id', tokenTx.user_id).single();
+      if (tokenUser) {
+        await sendEmail('token_receipt', tokenUser.email, {
+          name: tokenUser.full_name,
+          tokens: tokenTx.tokens_added,
+          amount: tokenTx.amount,
+          new_balance: newBalance,
+          reference: tokenTx.reference,
+        });
+      }
+      return { data: { message: 'Token payment simulated', tokens_added: tokenTx.tokens_added } };
+    }
+    
+    // Check inspection transaction
+    const { data: inspTx } = await supabase
+      .from('inspection_transactions')
+      .select('*')
+      .eq('reference', reference)
+      .single();
+    
+    if (inspTx) {
       await supabase
         .from('inspection_transactions')
         .update({ status: 'completed' })
         .eq('reference', reference);
-
-      // Mark inspection as assigned (ready for agent)
+      
       await supabase
         .from('inspections')
         .update({ payment_status: 'completed', status: 'assigned' })
         .eq('id', inspTx.inspection_id);
-
-      return { data: { type: 'inspection' } };
+      
+      // Send inspection confirmation email
+      const { data: inspDetail } = await supabase.from('inspections').select('*').eq('id', inspTx.inspection_id).single();
+      if (inspDetail) {
+        await sendEmail('inspection_booked', inspDetail.user_email, {
+          name: inspDetail.user_name,
+          property_title: inspDetail.property_title,
+          inspection_date: inspDetail.inspection_date,
+          reference: inspTx.reference,
+          amount: inspTx.amount,
+        });
+      }
+      return { data: { message: 'Inspection payment simulated' } };
     }
-
+    
     throw new Error('Transaction not found');
   }
-};
-
-
-// ============== CONTACT APIs ==============
-
-export const contactAPI = {
-  submit: async (data) => {
-    const { error } = await supabase
-      .from('contact_messages')
-      .insert({
-        name: data.name,
-        email: data.email,
-        subject: data.subject,
-        message: data.message,
-        status: 'unread',
-      });
-    if (error) throw error;
-    return { data: { message: 'Message submitted' } };
-  },
-
-  getAll: async () => {
-    const { data, error } = await supabase
-      .from('contact_messages')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return { data };
-  },
-
-  markRead: async (id) => {
-    const { error } = await supabase
-      .from('contact_messages')
-      .update({ status: 'read' })
-      .eq('id', id);
-    if (error) throw error;
-    return { data: { message: 'Marked as read' } };
-  },
-
-  delete: async (id) => {
-    const { error } = await supabase
-      .from('contact_messages')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-    return { data: { message: 'Message deleted' } };
-  },
 };
 
 // ============== STORAGE APIs ==============
 
 export const storageAPI = {
-  uploadFile: async (file, folder = 'verification') => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${uuidv4()}.${fileExt}`;
-    const bucket = 'property-images'; // use existing bucket
-    
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-    
-    if (error) throw new Error(error.message || 'Upload failed');
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-    
-    return { data: { url: publicUrl, path: data.path } };
-  },
-
   uploadImage: async (file, bucket = 'property-images') => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
     
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file, {
-        contentType: file.type,
-        upsert: false,
-      });
+      .upload(fileName, file);
     
-    if (error) throw new Error(error.message || 'Upload failed');
+    if (error) throw error;
     
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
@@ -835,7 +839,6 @@ export const storageAPI = {
 
 export default {
   propertyAPI,
-  contactAPI,
   walletAPI,
   tokenAPI,
   unlockAPI,
