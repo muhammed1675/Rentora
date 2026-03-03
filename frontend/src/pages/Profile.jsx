@@ -91,12 +91,10 @@ export function Profile() {
 
   const toggleShow = (field) => setShowPw(prev => ({ ...prev, [field]: !prev[field] }));
 
-  // FIX: send reset email directly instead of navigating (avoids "link expired" issue)
+  // Fixed: no options object — avoids PostHog body stream conflict
   const handleForgotPassword = async () => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email);
       if (error) throw error;
       toast.success(`Password reset email sent to ${user.email}`);
     } catch (err) {
@@ -332,7 +330,6 @@ export function Profile() {
                     <p className="text-xs text-foreground/55">Update your account password</p>
                   </div>
                 </div>
-                {/* FIX: sends reset email directly — no more "link expired" */}
                 <button
                   type="button"
                   onClick={handleForgotPassword}
