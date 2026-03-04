@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 
+// Helper to generate payment reference
 const generateReference = (prefix) => {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   return `${prefix}-${date}-${uuidv4().slice(0, 8).toUpperCase()}`;
@@ -24,6 +25,7 @@ async function sendEmail(type, to, data) {
     console.warn('Email send failed (non-critical):', e.message);
   }
 }
+
 // ============== PROPERTY APIs ==============
 
 export const propertyAPI = {
@@ -228,21 +230,7 @@ export const propertyAPI = {
         user_id: userId,
         property_id: propertyId
       });
-
-    // Send contact details email
-    const { data: userRow } = await supabase.from('users').select('email, full_name').eq('id', userId).single();
-    if (userRow) {
-      await sendEmail('contact_unlocked', userRow.email, {
-        name: userRow.full_name,
-        property_title: property.title,
-        property_location: property.location,
-        property_price: property.price,
-        contact_name: property.contact_name,
-        contact_phone: property.contact_phone,
-        remaining_tokens: wallet.token_balance - 1,
-      });
-    }
-
+    
     return {
       data: {
         message: 'Contact unlocked',
@@ -699,10 +687,9 @@ export const adminAPI = {
 
 // ============== PAYMENT APIs ==============
 
-// ============== PAYMENT APIs ==============
-
 export const paymentAPI = {
   confirmPayment: async (reference) => {
+    // Check token transaction first
     const { data: tokenTx } = await supabase
       .from('transactions')
       .select('*')
@@ -716,6 +703,7 @@ export const paymentAPI = {
       const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
       await supabase.from('wallets').update({ token_balance: newBalance }).eq('user_id', tokenTx.user_id);
 
+      // Send receipt email to user
       const { data: tokenUser } = await supabase.from('users').select('email, full_name').eq('id', tokenTx.user_id).single();
       if (tokenUser) {
         await sendEmail('token_receipt', tokenUser.email, {
@@ -730,6 +718,7 @@ export const paymentAPI = {
       return { data: { type: 'token_purchase', tokens_added: tokenTx.tokens_added } };
     }
 
+    // Check inspection transaction
     const { data: inspTx } = await supabase
       .from('inspection_transactions')
       .select('*')
@@ -742,6 +731,7 @@ export const paymentAPI = {
 
       const { data: inspDetail } = await supabase.from('inspections').select('*').eq('id', inspTx.inspection_id).single();
       if (inspDetail) {
+        // Email to user — booking confirmed
         await sendEmail('inspection_booked', inspDetail.user_email, {
           name: inspDetail.user_name,
           property_title: inspDetail.property_title,
@@ -749,6 +739,21 @@ export const paymentAPI = {
           reference: inspTx.reference,
           amount: inspTx.amount,
         });
+
+        // Email to agent — user details
+        if (inspDetail.agent_id) {
+          const { data: agentRow } = await supabase.from('users').select('email, full_name').eq('id', inspDetail.agent_id).single();
+          if (agentRow) {
+            await sendEmail('inspection_assigned', agentRow.email, {
+              agent_name: agentRow.full_name,
+              user_name: inspDetail.user_name,
+              user_email: inspDetail.user_email,
+              property_title: inspDetail.property_title,
+              inspection_date: inspDetail.inspection_date,
+              reference: inspTx.reference,
+            });
+          }
+        }
       }
 
       return { data: { type: 'inspection' } };
@@ -764,40 +769,22 @@ export const contactAPI = {
   submit: async (data) => {
     const { error } = await supabase
       .from('contact_messages')
-      .insert({
-        name: data.name,
-        email: data.email,
-        subject: data.subject,
-        message: data.message,
-        status: 'unread',
-      });
+      .insert({ name: data.name, email: data.email, subject: data.subject, message: data.message, status: 'unread' });
     if (error) throw error;
     return { data: { message: 'Message submitted' } };
   },
-
   getAll: async () => {
-    const { data, error } = await supabase
-      .from('contact_messages')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('contact_messages').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     return { data };
   },
-
   markRead: async (id) => {
-    const { error } = await supabase
-      .from('contact_messages')
-      .update({ status: 'read' })
-      .eq('id', id);
+    const { error } = await supabase.from('contact_messages').update({ status: 'read' }).eq('id', id);
     if (error) throw error;
     return { data: { message: 'Marked as read' } };
   },
-
   delete: async (id) => {
-    const { error } = await supabase
-      .from('contact_messages')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('contact_messages').delete().eq('id', id);
     if (error) throw error;
     return { data: { message: 'Message deleted' } };
   },
@@ -806,39 +793,15 @@ export const contactAPI = {
 // ============== STORAGE APIs ==============
 
 export const storageAPI = {
-  uploadFile: async (file, folder = 'verification') => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${uuidv4()}.${fileExt}`;
-    const bucket = 'property-images';
-    
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file, {
-        contentType: file.type,
-        upsert: false,
-      });
-    
-    if (error) throw new Error(error.message || 'Upload failed');
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-    
-    return { data: { url: publicUrl, path: data.path } };
-  },
-
   uploadImage: async (file, bucket = 'property-images') => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
     
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file, {
-        contentType: file.type,
-        upsert: false,
-      });
+      .upload(fileName, file);
     
-    if (error) throw new Error(error.message || 'Upload failed');
+    if (error) throw error;
     
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
