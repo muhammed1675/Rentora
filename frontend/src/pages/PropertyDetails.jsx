@@ -1,20 +1,33 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { propertyAPI } from '../lib/api';
-import { PropertyCard, PropertyCardSkeleton } from '../components/PropertyCard';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
+import { propertyAPI, inspectionAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Slider } from '../components/ui/slider';
 import { Card } from '../components/ui/card';
-import { Search, SlidersHorizontal, X, Home, Building, RefreshCw, Heart, Clock, ChevronRight, MapPin } from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
+import { 
+  MapPin, 
+  Phone, 
+  User, 
+  Lock, 
+  Unlock, 
+  Calendar as CalendarIcon, 
+  ArrowLeft,
+  Home,
+  Building,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Heart,
+  Share2,
+  Check,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
-// ── localStorage helpers ─────────────────────────────────────────────────
-function getRecentlyViewed() {
-  try { return JSON.parse(localStorage.getItem('rentora_recently_viewed') || '[]'); }
-  catch { return []; }
-}
+
+// ── Favourites helpers (localStorage) ──────────────────────────────────────
 function getFavourites() {
   try { return JSON.parse(localStorage.getItem('rentora_favourites') || '[]'); }
   catch { return []; }
@@ -27,230 +40,496 @@ function toggleFavourite(id) {
   return idx === -1;
 }
 
-// ── Mini card for recently viewed ───────────────────────────────────────
-function RecentCard({ item, isFav, onToggleFav }) {
-  const navigate = useNavigate();
-  const formatPrice = (p) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(p);
-  const TypeIcon = item.property_type === 'hostel' ? Home : Building;
-  return (
-    <div
-      onClick={() => navigate(`/property/${item.id}`)}
-      className="shrink-0 w-48 rounded-xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-md transition-shadow group"
-    >
-      <div className="relative h-28 bg-muted overflow-hidden">
-        {item.image ? (
-          <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted">
-            <Building className="w-8 h-8 text-muted-foreground/40" />
-          </div>
-        )}
-        {/* Fav button */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleFav(item.id); }}
-          className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${isFav ? 'bg-red-500 text-white' : 'bg-black/30 text-white hover:bg-black/50'}`}
-        >
-          <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-white' : ''}`} />
-        </button>
-      </div>
-      <div className="p-3">
-        <p className="font-semibold text-xs line-clamp-1">{item.title}</p>
-        <div className="flex items-center gap-1 mt-0.5 text-muted-foreground">
-          <MapPin className="w-3 h-3" />
-          <span className="text-xs line-clamp-1">{item.location}</span>
-        </div>
-        <p className="text-primary font-bold text-xs mt-1">{formatPrice(item.price)}/yr</p>
-      </div>
-    </div>
-  );
+// ── Recently viewed helpers (localStorage, max 10) ─────────────────────────
+function trackRecentlyViewed(property) {
+  try {
+    const key = 'rentora_recently_viewed';
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    const filtered = existing.filter(p => p.id !== property.id);
+    const updated = [{
+      id: property.id,
+      title: property.title,
+      location: property.location,
+      price: property.price,
+      image: property.images?.[0] || null,
+      property_type: property.property_type,
+    }, ...filtered].slice(0, 10);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch {}
 }
 
-export function Browse() {
-  const [properties, setProperties] = useState([]);
+export function PropertyDetails() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, refreshUser } = useAuth();
+  
+  const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
-  const [propertyType, setPropertyType] = useState('all');
-  const [priceRange, setPriceRange] = useState([0, 500000]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [recentlyViewed, setRecentlyViewed] = useState([]);
-  const [favourites, setFavourites] = useState([]);
-  const [showFavsOnly, setShowFavsOnly] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const [isFavourited, setIsFavourited] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  // Inspection dialog
+  const [showInspectionDialog, setShowInspectionDialog] = useState(false);
+  const [inspectionDate, setInspectionDate] = useState(null);
+  const [inspectionEmail, setInspectionEmail] = useState('');
+  const [inspectionPhone, setInspectionPhone] = useState('');
+  const [requestingInspection, setRequestingInspection] = useState(false);
 
-  const fetchProperties = async () => {
+  useEffect(() => {
+    fetchProperty();
+    setIsFavourited(getFavourites().includes(id));
+  }, [id, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchProperty = async () => {
     setLoading(true);
     try {
-      const params = { status: 'approved' };
-      if (propertyType && propertyType !== 'all') params.property_type = propertyType;
-      if (priceRange[0] > 0) params.min_price = priceRange[0];
-      if (priceRange[1] < 500000) params.max_price = priceRange[1];
-      const response = await propertyAPI.getAll(params);
-      setProperties(response.data);
+      let response;
+      if (isAuthenticated && user) {
+        response = await propertyAPI.getById(id, user.id);
+      } else {
+        response = await propertyAPI.getPublic(id);
+      }
+      setProperty(response.data);
+      trackRecentlyViewed(response.data);
     } catch (error) {
-      console.error('Failed to fetch properties:', error);
-      toast.error('Failed to load properties');
+      console.error('Failed to fetch property:', error);
+      toast.error('Property not found');
+      navigate('/browse');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchProperties();
-    setRecentlyViewed(getRecentlyViewed());
-    setFavourites(getFavourites());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleUnlock = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to unlock contact');
+      navigate('/login');
+      return;
+    }
 
-  const handleToggleFav = (id) => {
-    toggleFavourite(id);
-    setFavourites(getFavourites());
+    if ((user?.token_balance || 0) < 1) {
+      toast.error('Insufficient tokens. Please buy more tokens.');
+      navigate('/buy-tokens');
+      return;
+    }
+
+    setUnlocking(true);
+    try {
+      const response = await propertyAPI.unlock(id, user.id);
+      toast.success('Contact unlocked successfully!');
+      setProperty({
+        ...property,
+        contact_unlocked: true,
+        contact_phone: response.data.contact_phone,
+      });
+      await refreshUser();
+    } catch (error) {
+      toast.error(error.message || 'Failed to unlock contact');
+    } finally {
+      setUnlocking(false);
+    }
   };
 
-  const handleApplyFilters = () => { fetchProperties(); setShowFilters(false); };
-  const handleResetFilters = () => { setPropertyType('all'); setPriceRange([0, 500000]); setSearchTerm(''); setShowFavsOnly(false); fetchProperties(); };
+  const handleFavourite = () => {
+    const added = toggleFavourite(id);
+    setIsFavourited(added);
+    toast.success(added ? '❤️ Added to favourites' : 'Removed from favourites');
+  };
 
-  const filteredProperties = properties.filter(p => {
-    if (showFavsOnly && !favourites.includes(p.id)) return false;
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return p.title.toLowerCase().includes(term) || p.location.toLowerCase().includes(term) || (p.description || '').toLowerCase().includes(term);
-  });
+  const handleShare = async () => {
+    const url = window.location.href;
+    const text = `Check out this property on Rentora: ${property?.title} — ${property?.location}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: property?.title, text, url }); } catch {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        toast.success('Link copied to clipboard!');
+        setTimeout(() => setCopied(false), 2000);
+      } catch { toast.error('Could not copy link'); }
+    }
+  };
 
-  const formatPrice = (price) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
+  const handleRequestInspection = async () => {
+    if (!inspectionDate || inspectionDate === '') {
+      toast.error('Please select an inspection date');
+      return;
+    }
+    if (!inspectionEmail || !inspectionPhone) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setRequestingInspection(true);
+    try {
+      const response = await inspectionAPI.request({
+        property_id: id,
+        inspection_date: inspectionDate,
+        email: inspectionEmail,
+        phone_number: inspectionPhone,
+      }, user);
+      
+      toast.success('Redirecting to payment...');
+      setShowInspectionDialog(false);
+      
+      // Open checkout URL
+      if (response.data.checkout_url) {
+        window.open(response.data.checkout_url, '_blank');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to request inspection');
+    } finally {
+      setRequestingInspection(false);
+    }
+  };
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const nextImage = () => {
+    if (property?.images?.length > 1) {
+      setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (property?.images?.length > 1) {
+      setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
+    }
+  };
+
+  const tomorrow = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+  })();
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-muted rounded w-32" />
+          <div className="aspect-video bg-muted rounded-xl" />
+          <div className="h-10 bg-muted rounded w-2/3" />
+          <div className="h-6 bg-muted rounded w-1/3" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!property) return null;
+
+  const TypeIcon = property.property_type === 'hostel' ? Home : Building;
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="browse-page">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Browse Properties</h1>
-        <p className="text-foreground/60 mt-1">Find verified hostels and apartments near LAUTECH</p>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
-          <Input
-            placeholder="Search by title, location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-12 bg-white border-border/60"
-            data-testid="search-input"
-          />
-        </div>
-        {/* Favourites toggle */}
+    <div className="container mx-auto px-4 py-6" data-testid="property-details-page">
+      {/* Back Button + Actions */}
+      <div className="flex items-center justify-between mb-4">
         <Button
-          variant={showFavsOnly ? 'default' : 'outline'}
-          onClick={() => setShowFavsOnly(!showFavsOnly)}
-          className={`h-12 gap-2 border-border/60 ${showFavsOnly ? '' : ''}`}
-          title="Show saved properties"
+          variant="ghost"
+          onClick={() => navigate('/browse')}
+          className="gap-2"
+          data-testid="back-btn"
         >
-          <Heart className={`w-4 h-4 ${showFavsOnly ? 'fill-white' : ''}`} />
-          <span className="hidden sm:inline">Saved</span>
-          {favourites.length > 0 && (
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${showFavsOnly ? 'bg-white/20' : 'bg-primary/10 text-primary'}`}>
-              {favourites.length}
-            </span>
-          )}
+          <ArrowLeft className="w-4 h-4" />
+          Back to Browse
         </Button>
-        <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="h-12 gap-2 border-border/60" data-testid="filter-toggle">
-          <SlidersHorizontal className="w-5 h-5" />
-          Filters
-        </Button>
-        <Button variant="ghost" onClick={fetchProperties} className="h-12" data-testid="refresh-btn">
-          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handleShare} className="rounded-full h-9 w-9" title="Share property">
+            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
+          </Button>
+          <Button
+            variant="outline" size="icon" onClick={handleFavourite}
+            className={`rounded-full h-9 w-9 transition-all ${isFavourited ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}
+            title={isFavourited ? 'Remove from favourites' : 'Save to favourites'}
+          >
+            <Heart className={`w-4 h-4 ${isFavourited ? 'fill-red-500 text-red-500' : ''}`} />
+          </Button>
+        </div>
       </div>
 
-      {/* Filters Panel */}
-      {showFilters && (
-        <Card className="p-6 mb-6 animate-fade-in border-border/60 bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground">Filters</h3>
-            <Button variant="ghost" size="sm" onClick={() => setShowFilters(false)}><X className="w-4 h-4" /></Button>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Property Type</label>
-              <Select value={propertyType} onValueChange={setPropertyType}>
-                <SelectTrigger data-testid="type-filter"><SelectValue placeholder="All Types" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="hostel"><div className="flex items-center gap-2"><Home className="w-4 h-4" />Hostel</div></SelectItem>
-                  <SelectItem value="apartment"><div className="flex items-center gap-2"><Building className="w-4 h-4" />Apartment</div></SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Price Range (per year)</label>
-                <span className="text-sm font-medium text-primary">{formatPrice(priceRange[0])} – {formatPrice(priceRange[1])}</span>
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Image Gallery */}
+          <div className="relative aspect-video rounded-xl overflow-hidden group">
+            <img
+              src={property.images?.[currentImageIndex] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+              alt={property.title}
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Navigation Arrows */}
+            {property.images?.length > 1 && (
+              <>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={prevImage}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-testid="prev-image"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-testid="next-image"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </>
+            )}
+
+            {/* Image Counter */}
+            {property.images?.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                {currentImageIndex + 1} / {property.images.length}
               </div>
-              <Slider value={priceRange} onValueChange={setPriceRange} min={0} max={500000} step={10000} className="py-2" data-testid="price-slider" />
+            )}
+
+            {/* Type Badge */}
+            <Badge className="absolute top-4 left-4 gap-1">
+              <TypeIcon className="w-3 h-3" />
+              {property.property_type}
+            </Badge>
+            {isFavourited && (
+              <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                <Heart className="w-3 h-3 fill-white" /> Saved
+              </div>
+            )}
+          </div>
+
+          {/* Thumbnail Strip */}
+          {property.images?.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+              {property.images.map((img, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                    index === currentImageIndex ? 'border-primary' : 'border-transparent opacity-60'
+                  }`}
+                >
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Property Info */}
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{property.title}</h1>
+            <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+              <MapPin className="w-5 h-5" />
+              <span>{property.location}</span>
             </div>
           </div>
-          <div className="flex gap-3 mt-6">
-            <Button onClick={handleApplyFilters} className="flex-1" data-testid="apply-filters">Apply Filters</Button>
-            <Button variant="outline" onClick={handleResetFilters} data-testid="reset-filters">Reset</Button>
-          </div>
-        </Card>
-      )}
 
-      {/* Recently Viewed */}
-      {recentlyViewed.length > 0 && !showFavsOnly && !searchTerm && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-sm flex items-center gap-2 text-muted-foreground">
-              <Clock className="w-4 h-4" />
-              Recently Viewed
-            </h2>
-            <button
-              onClick={() => { localStorage.removeItem('rentora_recently_viewed'); setRecentlyViewed([]); }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          {/* Description */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Description</h2>
+            <p className="text-muted-foreground whitespace-pre-wrap">{property.description}</p>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Price Card */}
+          <Card className="p-6">
+            <p className="text-sm text-muted-foreground">Annual Rent</p>
+            <p className="text-4xl font-bold text-primary mt-1">{formatPrice(property.price)}</p>
+            <p className="text-sm text-muted-foreground">/year</p>
+          </Card>
+
+          {/* Contact Card */}
+          <Card className="p-6">
+            <h3 className="font-semibold mb-4">Owner Contact</h3>
+            
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">{property.contact_name}</p>
+                  <p className="text-sm text-muted-foreground">Property Owner</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  {property.contact_unlocked || property.contact_phone !== '***LOCKED***' ? (
+                    <a 
+                      href={`tel:${property.contact_phone}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {property.contact_phone}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">***LOCKED***</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Unlock Button */}
+            {(!property.contact_unlocked && property.contact_phone === '***LOCKED***') && (
+              <Button
+                onClick={handleUnlock}
+                disabled={unlocking}
+                className="w-full mt-4 gap-2"
+                data-testid="unlock-btn"
+              >
+                {unlocking ? (
+                  'Unlocking...'
+                ) : (
+                  <>
+                    <Unlock className="w-4 h-4" />
+                    Unlock Contact (1 Token)
+                  </>
+                )}
+              </Button>
+            )}
+
+            {property.contact_unlocked && (
+              <div className="flex items-center gap-2 mt-4 text-secondary">
+                <Unlock className="w-4 h-4" />
+                <span className="text-sm">Contact Unlocked</span>
+              </div>
+            )}
+          </Card>
+
+          {/* Inspection Card */}
+          <Card className="p-6">
+            <h3 className="font-semibold mb-2">Request Inspection</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Schedule a physical visit with our verified agent for ₦2,000
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!isAuthenticated) {
+                  toast.error('Please login to request inspection');
+                  navigate('/login');
+                  return;
+                }
+                setInspectionEmail(user?.email || '');
+                setShowInspectionDialog(true);
+              }}
+              className="w-full gap-2"
+              data-testid="request-inspection-btn"
             >
-              Clear
-            </button>
-          </div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-            {recentlyViewed.map(item => (
-              <RecentCard
-                key={item.id}
-                item={item}
-                isFav={favourites.includes(item.id)}
-                onToggleFav={handleToggleFav}
+              <CalendarIcon className="w-4 h-4" />
+              Schedule Inspection
+            </Button>
+          </Card>
+
+          {/* Agent Info */}
+          {property.uploaded_by_agent_name && (
+            <Card className="p-6">
+              <h3 className="font-semibold mb-2">Listed By</h3>
+              <p className="text-muted-foreground">{property.uploaded_by_agent_name}</p>
+              <p className="text-xs text-muted-foreground mt-1">Verified Agent</p>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Inspection Dialog */}
+      <Dialog open={showInspectionDialog} onOpenChange={setShowInspectionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Property Inspection</DialogTitle>
+            <DialogDescription>
+              Schedule a physical inspection with our verified agent. Payment of ₦2,000 is required.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Date</label>
+              <input
+                type="date"
+                value={inspectionDate || ''}
+                min={tomorrow}
+                onChange={(e) => setInspectionDate(e.target.value)}
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                data-testid="inspection-date-picker"
               />
-            ))}
-          </div>
-        </div>
-      )}
+              {inspectionDate && (
+                <p className="text-xs text-primary font-medium">
+                  ✓ {new Date(inspectionDate + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              )}
+            </div>
 
-      <p className="text-sm text-foreground/55 font-medium mb-4">
-        {loading ? 'Loading...' : showFavsOnly ? `${filteredProperties.length} saved properties` : `${filteredProperties.length} properties found`}
-      </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                value={inspectionEmail}
+                onChange={(e) => setInspectionEmail(e.target.value)}
+                placeholder="your@email.com"
+                data-testid="inspection-email"
+              />
+            </div>
 
-      {loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[...Array(8)].map((_, i) => <PropertyCardSkeleton key={i} />)}
-        </div>
-      ) : filteredProperties.length > 0 ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProperties.map((property) => <PropertyCard key={property.id} property={property} />)}
-        </div>
-      ) : (
-        <Card className="p-12 text-center border-border/60">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-            {showFavsOnly ? <Heart className="w-8 h-8 text-foreground/40" /> : <Search className="w-8 h-8 text-foreground/40" />}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone Number</label>
+              <Input
+                type="tel"
+                value={inspectionPhone}
+                onChange={(e) => setInspectionPhone(e.target.value)}
+                placeholder="+234..."
+                data-testid="inspection-phone"
+              />
+            </div>
+
+            <Card className="p-4 bg-muted/50">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Inspection Fee</span>
+                <span className="text-xl font-bold text-primary">₦2,000</span>
+              </div>
+            </Card>
           </div>
-          <h3 className="text-lg font-semibold text-foreground">
-            {showFavsOnly ? 'No Saved Properties' : 'No Properties Found'}
-          </h3>
-          <p className="text-foreground/55 mt-2">
-            {showFavsOnly ? 'Tap the ❤️ on any property to save it here' : 'Try adjusting your filters or search term'}
-          </p>
-          <Button variant="outline" onClick={handleResetFilters} className="mt-4">
-            {showFavsOnly ? 'Browse All Properties' : 'Reset Filters'}
-          </Button>
-        </Card>
-      )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInspectionDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRequestInspection} 
+              disabled={requestingInspection}
+              className="gap-2"
+              data-testid="confirm-inspection-btn"
+            >
+              {requestingInspection ? 'Processing...' : (
+                <>
+                  <ExternalLink className="w-4 h-4" />
+                  Pay & Schedule
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-export default Browse;
+export default PropertyDetails;
