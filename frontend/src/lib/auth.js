@@ -224,6 +224,27 @@ export function AuthProvider({ children }) {
       const profile = await loadUserProfile(data.user);
       setUser(profile);
       setSession(data.session);
+
+      // Send welcome email (non-blocking)
+      try {
+        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'welcome',
+            to: email,
+            data: { name: profile?.full_name || fullName }
+          }),
+        });
+      } catch (e) {
+        console.warn('Welcome email failed (non-critical):', e.message);
+      }
+
       return profile;
     } catch (err) {
       if (err.message && err.message.length < 120) throw err;
