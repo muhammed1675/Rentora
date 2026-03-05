@@ -54,7 +54,7 @@ function AppRoutes() {
       <Route path="/register" element={<Layout><Register /></Layout>} />
       <Route path="/payment/callback" element={<Layout><PaymentCallback /></Layout>} />
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
-      <Route path="/compare" element={<Compare />} />
+      <Route path="/compare" element={<Layout><Compare /></Layout>} />
 
       {/* Protected Routes - Any authenticated user */}
       <Route
