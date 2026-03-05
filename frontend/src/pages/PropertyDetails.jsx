@@ -23,11 +23,13 @@ import {
   Heart,
   Share2,
   Check,
+  Eye,
+  GitCompare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 
-// ── Favourites helpers (localStorage) ──────────────────────────────────────
+// ── Favourites helpers ───────────────────────────────────────────────────────
 function getFavourites() {
   try { return JSON.parse(localStorage.getItem('rentora_favourites') || '[]'); }
   catch { return []; }
@@ -40,22 +42,38 @@ function toggleFavourite(id) {
   return idx === -1;
 }
 
-// ── Recently viewed helpers (localStorage, max 10) ─────────────────────────
+// ── Recently viewed tracker ──────────────────────────────────────────────────
 function trackRecentlyViewed(property) {
   try {
     const key = 'rentora_recently_viewed';
     const existing = JSON.parse(localStorage.getItem(key) || '[]');
     const filtered = existing.filter(p => p.id !== property.id);
     const updated = [{
-      id: property.id,
-      title: property.title,
-      location: property.location,
-      price: property.price,
-      image: property.images?.[0] || null,
+      id: property.id, title: property.title, location: property.location,
+      price: property.price, image: property.images?.[0] || null,
       property_type: property.property_type,
     }, ...filtered].slice(0, 10);
     localStorage.setItem(key, JSON.stringify(updated));
   } catch {}
+}
+
+// ── Compare helpers (max 2) ──────────────────────────────────────────────────
+function getCompareList() {
+  try { return JSON.parse(localStorage.getItem('rentora_compare') || '[]'); }
+  catch { return []; }
+}
+function toggleCompare(property) {
+  const list = getCompareList();
+  const idx = list.findIndex(p => p.id === property.id);
+  if (idx !== -1) {
+    list.splice(idx, 1);
+    localStorage.setItem('rentora_compare', JSON.stringify(list));
+    return { added: false, full: false };
+  }
+  if (list.length >= 2) return { added: false, full: true };
+  list.push({ id: property.id, title: property.title, location: property.location, price: property.price, image: property.images?.[0] || null, property_type: property.property_type });
+  localStorage.setItem('rentora_compare', JSON.stringify(list));
+  return { added: true, full: false };
 }
 
 export function PropertyDetails() {
@@ -67,8 +85,6 @@ export function PropertyDetails() {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
-  const [isFavourited, setIsFavourited] = useState(false);
-  const [copied, setCopied] = useState(false);
   
   // Inspection dialog
   const [showInspectionDialog, setShowInspectionDialog] = useState(false);
@@ -79,7 +95,6 @@ export function PropertyDetails() {
 
   useEffect(() => {
     fetchProperty();
-    setIsFavourited(getFavourites().includes(id));
   }, [id, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProperty = async () => {
@@ -93,6 +108,11 @@ export function PropertyDetails() {
       }
       setProperty(response.data);
       trackRecentlyViewed(response.data);
+      // Load similar properties
+      try {
+        const sim = await propertyAPI.getSimilar(id, response.data.property_type, response.data.location);
+        setSimilarProperties(sim.data || []);
+      } catch {}
     } catch (error) {
       console.error('Failed to fetch property:', error);
       toast.error('Property not found');
@@ -150,6 +170,27 @@ export function PropertyDetails() {
         toast.success('Link copied to clipboard!');
         setTimeout(() => setCopied(false), 2000);
       } catch { toast.error('Could not copy link'); }
+    }
+  };
+
+  const handleCompare = () => {
+    const result = toggleCompare(property);
+    if (result.full) {
+      toast.error('You can only compare 2 properties. Remove one first.');
+      return;
+    }
+    setInCompare(result.added);
+    if (result.added) {
+      const list = getCompareList();
+      if (list.length === 2) {
+        toast.success('2 properties selected! Click Compare to view side by side.', {
+          action: { label: 'Compare Now', onClick: () => navigate('/compare') }
+        });
+      } else {
+        toast.success('Added to compare. Select one more property.');
+      }
+    } else {
+      toast.success('Removed from compare');
     }
   };
 
@@ -234,19 +275,26 @@ export function PropertyDetails() {
     <div className="container mx-auto px-4 py-6" data-testid="property-details-page">
       {/* Back Button + Actions */}
       <div className="flex items-center justify-between mb-4">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/browse')}
-          className="gap-2"
-          data-testid="back-btn"
-        >
+        <Button variant="ghost" onClick={() => navigate('/browse')} className="gap-2" data-testid="back-btn">
           <ArrowLeft className="w-4 h-4" />
           Back to Browse
         </Button>
         <div className="flex items-center gap-2">
+          {/* Compare button */}
+          <Button
+            variant="outline" size="sm"
+            onClick={handleCompare}
+            className={`gap-1.5 h-9 text-xs ${inCompare ? 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100' : ''}`}
+            title="Add to compare"
+          >
+            <GitCompare className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{inCompare ? 'In Compare' : 'Compare'}</span>
+          </Button>
+          {/* Share button */}
           <Button variant="outline" size="icon" onClick={handleShare} className="rounded-full h-9 w-9" title="Share property">
             {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
           </Button>
+          {/* Favourite button */}
           <Button
             variant="outline" size="icon" onClick={handleFavourite}
             className={`rounded-full h-9 w-9 transition-all ${isFavourited ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}
@@ -304,6 +352,14 @@ export function PropertyDetails() {
               <TypeIcon className="w-3 h-3" />
               {property.property_type}
             </Badge>
+            {/* View count */}
+            {property.views > 0 && (
+              <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                <Eye className="w-3 h-3" />
+                {property.views} {property.views === 1 ? 'view' : 'views'}
+              </div>
+            )}
+            {/* Saved badge */}
             {isFavourited && (
               <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
                 <Heart className="w-3 h-3 fill-white" /> Saved
@@ -342,6 +398,38 @@ export function PropertyDetails() {
             <h2 className="text-xl font-semibold mb-4">Description</h2>
             <p className="text-muted-foreground whitespace-pre-wrap">{property.description}</p>
           </Card>
+
+          {/* Similar Properties */}
+          {similarProperties.length > 0 && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Similar Properties</h2>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {similarProperties.map(sim => (
+                  <div
+                    key={sim.id}
+                    onClick={() => navigate(`/property/${sim.id}`)}
+                    className="flex gap-3 p-3 rounded-xl border border-border bg-card hover:shadow-md transition-shadow cursor-pointer group"
+                  >
+                    <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
+                      <img
+                        src={sim.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+                        alt={sim.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm line-clamp-1">{sim.title}</p>
+                      <div className="flex items-center gap-1 mt-0.5 text-muted-foreground">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span className="text-xs line-clamp-1">{sim.location}</span>
+                      </div>
+                      <p className="text-primary font-bold text-sm mt-1">{formatPrice(sim.price)}<span className="text-xs text-muted-foreground font-normal">/yr</span></p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
