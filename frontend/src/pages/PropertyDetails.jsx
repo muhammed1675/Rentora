@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { propertyAPI, inspectionAPI } from '../lib/api';
+import { propertyAPI, inspectionAPI, reviewAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -25,6 +25,8 @@ import {
   Check,
   Eye,
   GitCompare,
+  Star,
+  Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -89,6 +91,11 @@ export function PropertyDetails() {
   const [copied, setCopied] = useState(false);
   const [inCompare, setInCompare] = useState(false);
   const [similarProperties, setSimilarProperties] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [hoverRating, setHoverRating] = useState(0);
   
   // Inspection dialog
   const [showInspectionDialog, setShowInspectionDialog] = useState(false);
@@ -116,6 +123,11 @@ export function PropertyDetails() {
       try {
         const sim = await propertyAPI.getSimilar(id, response.data.property_type, response.data.location);
         setSimilarProperties(sim.data || []);
+      } catch {}
+      // Load reviews
+      try {
+        const rev = await reviewAPI.getByProperty(id);
+        setReviews(rev.data || []);
       } catch {}
     } catch (error) {
       console.error('Failed to fetch property:', error);
@@ -195,6 +207,40 @@ export function PropertyDetails() {
       }
     } else {
       toast.success('Removed from compare');
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to leave a review');
+      navigate('/login');
+      return;
+    }
+    if (reviewRating === 0) {
+      toast.error('Please select a star rating');
+      return;
+    }
+    if (!reviewComment.trim()) {
+      toast.error('Please write a comment');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      await reviewAPI.submit({
+        property_id: id,
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      }, user);
+      toast.success('Review submitted!');
+      setReviewRating(0);
+      setReviewComment('');
+      // Reload reviews
+      const rev = await reviewAPI.getByProperty(id);
+      setReviews(rev.data || []);
+    } catch (error) {
+      toast.error(error.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -434,6 +480,92 @@ export function PropertyDetails() {
               </div>
             </div>
           )}
+        {/* Reviews */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">
+              Student Reviews
+              {reviews.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'} · {(reviews.reduce((s,r) => s + r.rating, 0) / reviews.length).toFixed(1)} ★)
+                </span>
+              )}
+            </h2>
+
+            {/* Star input */}
+            {isAuthenticated && (
+              <Card className="p-4 mb-4">
+                <p className="text-sm font-medium mb-2">Leave a Review</p>
+                {/* Stars */}
+                <div className="flex gap-1 mb-3">
+                  {[1,2,3,4,5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      onMouseEnter={() => setHoverRating(star)}
+                      onMouseLeave={() => setHoverRating(0)}
+                      className="transition-transform hover:scale-110"
+                    >
+                      <Star className={`w-7 h-7 ${(hoverRating || reviewRating) >= star ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`} />
+                    </button>
+                  ))}
+                  {reviewRating > 0 && (
+                    <span className="text-sm text-muted-foreground ml-2 self-center">
+                      {['','Poor','Fair','Good','Very Good','Excellent'][reviewRating]}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Share your experience..."
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitReview()}
+                    className="flex-1"
+                  />
+                  <Button size="icon" onClick={handleSubmitReview} disabled={submittingReview}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
+            )}
+
+            {/* Review list */}
+            {reviews.length > 0 ? (
+              <div className="space-y-3">
+                {reviews.map(review => (
+                  <Card key={review.id} className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-primary">
+                            {(review.user_name || 'A').charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{review.user_name || 'Anonymous'}</p>
+                          <div className="flex gap-0.5 mt-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} className={`w-3 h-3 ${review.rating >= s ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/20'}`} />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {new Date(review.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{review.comment}</p>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="p-6 text-center border-dashed">
+                <Star className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No reviews yet. Be the first to review!</p>
+              </Card>
+            )}
+          </div>
         </div>
 
         {/* Sidebar */}
