@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent } from '../components/ui/dialog';
 import { Card } from '../components/ui/card';
 import { 
   Search, 
