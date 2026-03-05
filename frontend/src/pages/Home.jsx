@@ -12,7 +12,8 @@ import {
   ArrowRight,
   Building2,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 
 export function Home() {
