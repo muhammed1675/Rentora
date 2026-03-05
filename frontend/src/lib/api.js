@@ -7,6 +7,28 @@ const generateReference = (prefix) => {
   return `${prefix}-${date}-${uuidv4().slice(0, 8).toUpperCase()}`;
 };
 
+
+// ── Backend API helper ────────────────────────────────────────────────────────
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+
+const backendFetch = async (path, options = {}) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || '';
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || err.message || `Request failed: ${res.status}`);
+  }
+  return res.json();
+};
+
 // ============== PROPERTY APIs ==============
 
 export const propertyAPI = {
@@ -252,48 +274,12 @@ export const walletAPI = {
 
 export const tokenAPI = {
   purchase: async (data, userId) => {
-    const reference = generateReference('TOKEN');
-    const amount = data.quantity * 1000;
-    
-    // Create transaction record
-    await supabase
-      .from('transactions')
-      .insert({
-        id: uuidv4(),
-        user_id: userId,
-        reference,
-        amount,
-        tokens_added: data.quantity,
-        status: 'pending'
-      });
-    
-    const callbackUrl = `${window.location.origin}/payment/callback`;
-
-    // Call our Vercel serverless function (keeps secret key server-side)
-    const koraRes = await fetch('/api/korapay-init', {
+    // Call Python backend — it calls Korapay server-side with secret key
+    const result = await backendFetch('/api/tokens/purchase', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        reference,
-        amount,
-        currency: 'NGN',
-        customer: { email: data.email },
-        redirect_url: callbackUrl,
-        channels: ['card', 'bank_transfer'],
-      }),
+      body: JSON.stringify({ quantity: data.quantity, email: data.email }),
     });
-    const koraJson = await koraRes.json();
-    const checkoutUrl = koraJson?.data?.checkout_url || '';
-
-    return {
-      data: {
-        reference,
-        amount,
-        quantity: data.quantity,
-        checkout_url: checkoutUrl,
-        payment_type: 'token_purchase'
-      }
-    };
+    return { data: result };
   }
 };
 
@@ -330,78 +316,16 @@ export const unlockAPI = {
 
 export const inspectionAPI = {
   request: async (data, user) => {
-    // Get property
-    const { data: property, error: propError } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('id', data.property_id)
-      .eq('status', 'approved')
-      .single();
-    
-    if (propError || !property) {
-      throw new Error('Property not found');
-    }
-    
-    const reference = generateReference('INSP');
-    const inspectionId = uuidv4();
-    
-    // Create inspection
-    await supabase
-      .from('inspections')
-      .insert({
-        id: inspectionId,
-        user_id: user.id,
-        user_name: user.full_name,
-        user_email: user.email,
-        property_id: data.property_id,
-        property_title: property.title,
-        agent_id: property.uploaded_by_agent_id,
-        agent_name: property.uploaded_by_agent_name,
-        inspection_date: data.inspection_date,
-        status: 'pending',
-        payment_status: 'pending',
-        payment_reference: reference
-      });
-    
-    // Create inspection transaction
-    await supabase
-      .from('inspection_transactions')
-      .insert({
-        id: uuidv4(),
-        inspection_id: inspectionId,
-        user_id: user.id,
-        reference,
-        amount: 2000,
-        status: 'pending'
-      });
-    
-    const callbackUrl = `${window.location.origin}/payment/callback`;
-
-    // Call our Vercel serverless function (keeps secret key server-side)
-    const koraRes = await fetch('/api/korapay-init', {
+    // Call Python backend — it creates inspection record + calls Korapay server-side
+    const result = await backendFetch('/api/inspections', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        reference,
-        amount: 2000,
-        currency: 'NGN',
-        customer: { email: data.email },
-        redirect_url: callbackUrl,
-        channels: ['card', 'bank_transfer'],
+        property_id: data.property_id,
+        inspection_date: data.inspection_date,
+        phone_number: data.phone_number || '',
       }),
     });
-    const koraJson = await koraRes.json();
-    const checkoutUrl = koraJson?.data?.checkout_url || '';
-    
-    return {
-      data: {
-        inspection_id: inspectionId,
-        reference,
-        amount: 2000,
-        checkout_url: checkoutUrl,
-        payment_type: 'inspection'
-      }
-    };
+    return { data: result };
   },
 
   getMyInspections: async (userId) => {
@@ -688,95 +612,11 @@ export const adminAPI = {
 
 export const paymentAPI = {
   verify: async (reference) => {
-    // ── 1. Verify with Korapay API ───────────────────────────────────────────
-    let korapayStatus = null;
-    try {
-      const res = await fetch(`/api/korapay-verify?reference=${reference}`);
-      const json = await res.json();
-      if (json?.data?.status === 'success') {
-        korapayStatus = 'completed';
-      } else if (json?.data?.status === 'pending') {
-        korapayStatus = 'pending';
-      } else {
-        korapayStatus = 'failed';
-      }
-    } catch (e) {
-      console.error('Korapay verify error:', e);
-    }
-
-    // ── 2. Check token transaction ───────────────────────────────────────────
-    const { data: tokenTx } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-
-    if (tokenTx) {
-      if (korapayStatus === 'completed' && tokenTx.status !== 'completed') {
-        await supabase
-          .from('transactions')
-          .update({ status: 'completed' })
-          .eq('reference', reference);
-
-        const { data: wallet } = await supabase
-          .from('wallets')
-          .select('token_balance')
-          .eq('user_id', tokenTx.user_id)
-          .single();
-
-        const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
-        await supabase
-          .from('wallets')
-          .update({ token_balance: newBalance })
-          .eq('user_id', tokenTx.user_id);
-      }
-
-      const finalStatus = korapayStatus === 'completed' ? 'completed'
-        : (korapayStatus === 'pending' ? 'pending' : tokenTx.status);
-
-      return {
-        data: {
-          type: 'token_purchase',
-          status: finalStatus,
-          amount: tokenTx.amount,
-          tokens: tokenTx.tokens_added
-        }
-      };
-    }
-
-    // ── 3. Check inspection transaction ─────────────────────────────────────
-    const { data: inspTx } = await supabase
-      .from('inspection_transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-
-    if (inspTx) {
-      if (korapayStatus === 'completed' && inspTx.status !== 'completed') {
-        await supabase
-          .from('inspection_transactions')
-          .update({ status: 'completed' })
-          .eq('reference', reference);
-
-        await supabase
-          .from('inspections')
-          .update({ payment_status: 'completed', status: 'assigned' })
-          .eq('id', inspTx.inspection_id);
-      }
-
-      const finalStatus = korapayStatus === 'completed' ? 'completed'
-        : (korapayStatus === 'pending' ? 'pending' : inspTx.status);
-
-      return {
-        data: {
-          type: 'inspection',
-          status: finalStatus,
-          amount: inspTx.amount
-        }
-      };
-    }
-
-    throw new Error('Transaction not found');
+    // Call Python backend — it checks Korapay + updates DB
+    const result = await backendFetch(`/api/payments/verify/${reference}`, {
+      method: 'POST',
+    });
+    return { data: result };
   },
 
   // Simulate payment for testing
