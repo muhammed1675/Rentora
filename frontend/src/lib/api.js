@@ -788,6 +788,34 @@ export const paymentAPI = {
   }
 };
 
+
+// ============== CONTACT APIs ==============
+
+export const contactAPI = {
+  submit: async (data) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .insert({ name: data.name, email: data.email, subject: data.subject, message: data.message, status: 'unread' });
+    if (error) throw error;
+    return { data: { message: 'Message submitted' } };
+  },
+  getAll: async () => {
+    const { data, error } = await supabase.from('contact_messages').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data };
+  },
+  markRead: async (id) => {
+    const { error } = await supabase.from('contact_messages').update({ status: 'read' }).eq('id', id);
+    if (error) throw error;
+    return { data: { message: 'Marked as read' } };
+  },
+  delete: async (id) => {
+    const { error } = await supabase.from('contact_messages').delete().eq('id', id);
+    if (error) throw error;
+    return { data: { message: 'Message deleted' } };
+  },
+};
+
 // ============== STORAGE APIs ==============
 
 export const storageAPI = {
@@ -811,6 +839,7 @@ export const storageAPI = {
 
 export default {
   propertyAPI,
+  contactAPI,
   walletAPI,
   tokenAPI,
   unlockAPI,
