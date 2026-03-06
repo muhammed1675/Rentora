@@ -414,55 +414,6 @@ export const inspectionAPI = {
     
     if (error) throw error;
     return { data: { message: 'Inspection updated' } };
-  },
-
-  // Returns agent phone number to the user after payment
-  getAgentContact: async (inspectionId) => {
-    const { data, error } = await supabase
-      .from('inspections')
-      .select('agent_id, agent_name, property_title, inspection_date, payment_status')
-      .eq('id', inspectionId)
-      .single();
-    if (error) throw error;
-    if (data.payment_status !== 'completed') throw new Error('Payment not completed');
-
-    // Get agent's phone from users table
-    const { data: agentUser, error: agentError } = await supabase
-      .from('users')
-      .select('full_name, phone')
-      .eq('id', data.agent_id)
-      .single();
-    if (agentError) throw agentError;
-
-    return {
-      data: {
-        agent_name: agentUser.full_name,
-        agent_phone: agentUser.phone || '',
-        property_title: data.property_title,
-        inspection_date: data.inspection_date,
-      }
-    };
-  },
-
-  // Returns user phone number to the agent
-  getUserContact: async (inspectionId, agentId) => {
-    const { data, error } = await supabase
-      .from('inspections')
-      .select('user_name, user_phone, property_title, inspection_date, agent_id, payment_status')
-      .eq('id', inspectionId)
-      .single();
-    if (error) throw error;
-    if (data.agent_id !== agentId) throw new Error('Not authorized');
-    if (data.payment_status !== 'completed') throw new Error('Payment not completed');
-
-    return {
-      data: {
-        user_name: data.user_name,
-        user_phone: data.user_phone || '',
-        property_title: data.property_title,
-        inspection_date: data.inspection_date,
-      }
-    };
   }
 };
 
@@ -737,8 +688,7 @@ export const paymentAPI = {
         data: {
           type: 'inspection',
           status: inspTx.status,
-          amount: inspTx.amount,
-          inspection_id: inspTx.inspection_id
+          amount: inspTx.amount
         }
       };
     }
@@ -802,6 +752,52 @@ export const paymentAPI = {
   }
 };
 
+
+// ============== CONTACT APIs ==============
+
+export const contactAPI = {
+  submit: async (data) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .insert({
+        name: data.name,
+        email: data.email,
+        subject: data.subject,
+        message: data.message,
+        status: 'unread',
+      });
+    if (error) throw error;
+    return { data: { message: 'Message submitted' } };
+  },
+
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data };
+  },
+
+  markRead: async (id) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .update({ status: 'read' })
+      .eq('id', id);
+    if (error) throw error;
+    return { data: { message: 'Marked as read' } };
+  },
+
+  delete: async (id) => {
+    const { error } = await supabase
+      .from('contact_messages')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return { data: { message: 'Message deleted' } };
+  },
+};
+
 // ============== STORAGE APIs ==============
 
 export const storageAPI = {
@@ -825,6 +821,7 @@ export const storageAPI = {
 
 export default {
   propertyAPI,
+  contactAPI,
   walletAPI,
   tokenAPI,
   unlockAPI,
