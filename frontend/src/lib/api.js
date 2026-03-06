@@ -671,17 +671,15 @@ export const paymentAPI = {
           const { data: user } = await supabase.from('users')
             .select('email, full_name').eq('id', tokenTx.user_id).single();
           if (user) {
-            await fetch('/api/send-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+            await supabase.functions.invoke('send-payment-email', {
+              body: {
                 type: 'token_receipt',
                 userEmail: user.email,
                 userName: user.full_name,
                 tokens: tokenTx.tokens_added,
                 amount: tokenTx.amount,
                 reference,
-              }),
+              },
             });
           }
         } catch (emailErr) {
@@ -715,10 +713,8 @@ export const paymentAPI = {
           const { data: agent } = await supabase.from('users')
             .select('email, full_name').eq('id', inspection?.agent_id).single();
 
-          await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          await supabase.functions.invoke('send-payment-email', {
+            body: {
               type: 'inspection_receipt',
               userName: user?.full_name || inspection?.user_name,
               userEmail: user?.email || inspection?.user_email,
@@ -731,7 +727,7 @@ export const paymentAPI = {
                 .toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
               reference,
               amount: inspTx.amount,
-            }),
+            },
           });
         } catch (emailErr) {
           console.error('Inspection email failed:', emailErr);
