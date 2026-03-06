@@ -218,7 +218,7 @@ export const propertyAPI = {
         .select('email, full_name, token_balance').eq('id', userId).single();
       if (userForEmail) {
         await fetch(
-              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-payment-email`,
+              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-email`,
               {
                 method: 'POST',
                 headers: {
@@ -707,7 +707,7 @@ export const paymentAPI = {
             const { data: walletForEmail } = await supabase.from('wallets')
               .select('token_balance').eq('user_id', tokenTx.user_id).single();
             await fetch(
-              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-payment-email`,
+              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-email`,
               {
                 method: 'POST',
                 headers: {
@@ -764,7 +764,7 @@ export const paymentAPI = {
 
           // Email to client
           await fetch(
-              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-payment-email`,
+              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-email`,
               {
                 method: 'POST',
                 headers: {
@@ -788,7 +788,7 @@ export const paymentAPI = {
           // Email to agent
           if (agentForEmail?.email) {
             await fetch(
-              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-payment-email`,
+              `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/send-email`,
               {
                 method: 'POST',
                 headers: {
