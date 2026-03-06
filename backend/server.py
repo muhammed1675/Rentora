@@ -866,7 +866,8 @@ async def verify_payment(reference: str, user: dict = Depends(get_current_user))
         return {
             "type": "inspection",
             "status": insp_result.data['status'],
-            "amount": insp_result.data['amount']
+            "amount": insp_result.data['amount'],
+            "inspection_id": insp_result.data['inspection_id']
         }
     
     raise HTTPException(status_code=404, detail="Transaction not found")
