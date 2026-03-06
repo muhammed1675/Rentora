@@ -15,9 +15,8 @@ export function PaymentCallback() {
   const [paymentDetails, setPaymentDetails] = useState(null);
 
   useEffect(() => {
-    const verifyPayment = async (attempts = 0) => {
-      // Korapay returns ?reference= on redirect
-      const reference = searchParams.get('reference') || searchParams.get('trxref');
+    const verifyPayment = async () => {
+      const reference = searchParams.get('reference');
       
       if (!reference) {
         setStatus('failed');
@@ -25,20 +24,11 @@ export function PaymentCallback() {
       }
 
       try {
-        const response = await paymentAPI.verify(reference);
+        // confirmPayment marks the transaction complete + credits wallet/inspection
+        const response = await paymentAPI.confirmPayment(reference);
         setPaymentDetails(response.data);
-        
-        if (response.data.status === 'completed') {
-          setStatus('success');
-          await refreshUser();
-        } else if (response.data.status === 'pending' && attempts < 4) {
-          // Retry up to 4 times with 2s delay
-          setTimeout(() => verifyPayment(attempts + 1), 2000);
-        } else if (response.data.status === 'pending') {
-          setStatus('pending');
-        } else {
-          setStatus('failed');
-        }
+        setStatus('success');
+        await refreshUser();
       } catch (error) {
         console.error('Payment verification failed:', error);
         setStatus('failed');
