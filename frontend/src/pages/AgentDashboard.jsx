@@ -12,7 +12,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
-import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil } from 'lucide-react';
+import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 const FALLBACK_BANKS = [
@@ -431,14 +431,33 @@ export function AgentDashboard() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h3 className="font-semibold line-clamp-1">{inspection.property_title}</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">By: {inspection.user_name}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">Tenant: {inspection.user_name}</p>
                       <p className="text-sm text-muted-foreground">Date: {inspection.inspection_date}</p>
+                      {inspection.payment_status === 'completed' && inspection.user_phone && (
+                        <a href={`tel:${inspection.user_phone}`}
+                          className="inline-flex items-center gap-1.5 mt-2 text-primary font-semibold text-sm hover:underline">
+                          <Phone className="w-3.5 h-3.5" /> {inspection.user_phone}
+                        </a>
+                      )}
+                      {inspection.payment_status === 'completed' && !inspection.user_phone && (
+                        <p className="text-xs text-muted-foreground mt-1">User phone not available</p>
+                      )}
+                      {inspection.payment_status !== 'completed' && (
+                        <p className="text-xs text-yellow-600 mt-1">⏳ Awaiting payment</p>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <Badge className={getStatusBadge(inspection.status)}>{inspection.status}</Badge>
+                      {inspection.payment_status === 'completed' && inspection.user_phone && (
+                        <a href={`tel:${inspection.user_phone}`}>
+                          <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
+                            <Phone className="w-3 h-3" /> Call User
+                          </Button>
+                        </a>
+                      )}
                       {inspection.status !== 'completed' && inspection.payment_status === 'completed' && (
                         <Button size="sm" onClick={() => handleMarkCompleted(inspection.id)} className="gap-1.5 h-7 text-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Done
                         </Button>
                       )}
                     </div>
