@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { verificationAPI, storageAPI } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -10,16 +11,11 @@ import { Label } from '../components/ui/label';
 import { Shield, Upload, ArrowLeft, CheckCircle2, FileText, Download, Loader2, X, ImageIcon, Building2, CreditCard, User } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Nigerian banks list
 const NIGERIAN_BANKS = [
   { code: '044', name: 'Access Bank' },
   { code: '063', name: 'Access Bank (Diamond)' },
   { code: '035A', name: 'ALAT by Wema' },
-  { code: '401', name: 'ASO Savings and Loans' },
-  { code: '023', name: 'Citibank Nigeria' },
   { code: '050', name: 'Ecobank Nigeria' },
-  { code: '562', name: 'Ekondo Microfinance Bank' },
-  { code: '084', name: 'Enterprise Bank' },
   { code: '070', name: 'Fidelity Bank' },
   { code: '011', name: 'First Bank of Nigeria' },
   { code: '214', name: 'First City Monument Bank' },
@@ -29,13 +25,11 @@ const NIGERIAN_BANKS = [
   { code: '082', name: 'Keystone Bank' },
   { code: '526', name: 'Kuda Bank' },
   { code: '090405', name: 'Moniepoint MFB' },
-  { code: '014', name: 'MainStreet Bank' },
   { code: '076', name: 'Polaris Bank' },
   { code: '101', name: 'Providus Bank' },
   { code: '221', name: 'Stanbic IBTC Bank' },
   { code: '068', name: 'Standard Chartered Bank' },
   { code: '232', name: 'Sterling Bank' },
-  { code: '100', name: 'Suntrust Bank' },
   { code: '032', name: 'Union Bank of Nigeria' },
   { code: '033', name: 'United Bank for Africa' },
   { code: '215', name: 'Unity Bank' },
@@ -44,7 +38,6 @@ const NIGERIAN_BANKS = [
   { code: '120001', name: 'PalmPay' },
   { code: '999992', name: 'OPay' },
   { code: '090110', name: 'VFD Microfinance Bank' },
-  { code: '090115', name: 'TCF MFB' },
 ];
 
 export function BecomeAgent() {
@@ -73,7 +66,6 @@ export function BecomeAgent() {
   const [verifyingAccount, setVerifyingAccount] = useState(false);
   const [accountVerified, setAccountVerified] = useState(false);
 
-  // Auto-verify when account number is 10 digits and bank is selected
   useEffect(() => {
     if (accountNumber.length === 10 && bankCode) {
       verifyAccountNumber();
@@ -88,24 +80,21 @@ export function BecomeAgent() {
     setAccountName('');
     setAccountVerified(false);
     try {
-      // Use Paystack's public account resolution endpoint
-      const res = await fetch(
-        `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REACT_APP_PAYSTACK_PUBLIC_KEY}`,
-          },
-        }
-      );
-      const json = await res.json();
-      if (json.status && json.data?.account_name) {
-        setAccountName(json.data.account_name);
+      const { data, error } = await supabase.functions.invoke('resolve-bank', {
+        body: { account_number: accountNumber, bank_code: bankCode },
+      });
+
+      if (error) throw new Error(error.message);
+
+      if (data?.success && data?.account_name) {
+        setAccountName(data.account_name);
         setAccountVerified(true);
         toast.success('Account verified!');
       } else {
-        toast.error('Could not verify account. Check the number and bank.');
+        toast.error(data?.message || 'Could not verify account. Check the number and bank.');
       }
-    } catch {
+    } catch (err) {
+      console.error('Bank verify error:', err);
       toast.error('Account verification failed. Please check details.');
     } finally {
       setVerifyingAccount(false);
@@ -223,7 +212,6 @@ export function BecomeAgent() {
           <p className="text-foreground/60 mt-2">Submit your verification documents to become a property agent</p>
         </div>
 
-        {/* Step 1 — Download Agreement */}
         <Card className="p-5 mb-4 border-primary/30 bg-primary/5">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0 text-white font-bold text-sm">1</div>
@@ -243,7 +231,7 @@ export function BecomeAgent() {
         <Card className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* ID Card Upload */}
+            {/* ID Card */}
             <div className="space-y-2">
               <Label>ID Card Photo <span className="text-destructive">*</span></Label>
               <p className="text-xs text-foreground/55">National ID, Voter's card, Driver's license, or International passport</p>
@@ -270,7 +258,7 @@ export function BecomeAgent() {
               )}
             </div>
 
-            {/* Selfie Upload */}
+            {/* Selfie */}
             <div className="space-y-2">
               <Label>Selfie Holding ID Card <span className="text-destructive">*</span></Label>
               <p className="text-xs text-foreground/55">A clear photo of you holding your ID card so your face and ID are both visible</p>
@@ -297,7 +285,7 @@ export function BecomeAgent() {
               )}
             </div>
 
-            {/* Signed Agreement Upload */}
+            {/* Agreement */}
             <div className="space-y-2">
               <Label>Signed Agreement PDF <span className="text-destructive">*</span></Label>
               <p className="text-xs text-foreground/55">Upload the signed agreement you downloaded in Step 1</p>
@@ -331,7 +319,7 @@ export function BecomeAgent() {
                 placeholder="Your full address in Ogbomosho..." rows={3} data-testid="address-input" />
             </div>
 
-            {/* Bank Details Section */}
+            {/* Bank Details */}
             <div className="space-y-4 pt-2">
               <div className="flex items-center gap-2 pb-1 border-b">
                 <Building2 className="w-4 h-4 text-primary" />
@@ -341,16 +329,12 @@ export function BecomeAgent() {
                 Required for receiving inspection payouts. Your account name will be verified automatically.
               </p>
 
-              {/* Bank Select */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5" /> Bank <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  value={bankCode}
-                  onChange={handleBankChange}
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
+                <select value={bankCode} onChange={handleBankChange}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                   <option value="">Select your bank...</option>
                   {NIGERIAN_BANKS.map(bank => (
                     <option key={bank.code} value={bank.code}>{bank.name}</option>
@@ -358,40 +342,27 @@ export function BecomeAgent() {
                 </select>
               </div>
 
-              {/* Account Number */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <CreditCard className="w-3.5 h-3.5" /> Account Number <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={10}
+                <Input type="text" inputMode="numeric" maxLength={10}
                   value={accountNumber}
                   onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="10-digit account number"
-                />
+                  placeholder="10-digit account number" />
                 {accountNumber.length > 0 && accountNumber.length < 10 && (
                   <p className="text-xs text-muted-foreground">{10 - accountNumber.length} more digit{10 - accountNumber.length !== 1 ? 's' : ''} needed</p>
                 )}
               </div>
 
-              {/* Account Name — auto-detected */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" /> Account Name
                 </Label>
                 <div className="relative">
-                  <Input
-                    readOnly
-                    value={accountName}
-                    placeholder={
-                      verifyingAccount ? 'Verifying...' :
-                      accountNumber.length === 10 && bankCode ? 'Verifying account...' :
-                      'Auto-detected after entering account number'
-                    }
-                    className={`pr-10 ${accountVerified ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'bg-muted/40'}`}
-                  />
+                  <Input readOnly value={accountName}
+                    placeholder={verifyingAccount ? 'Verifying...' : 'Auto-detected after entering account number'}
+                    className={`pr-10 ${accountVerified ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'bg-muted/40'}`} />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     {verifyingAccount && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
                     {accountVerified && <CheckCircle2 className="w-4 h-4 text-green-600" />}
