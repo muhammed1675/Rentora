@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { propertyAPI, inspectionAPI, storageAPI } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -11,21 +12,19 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
-import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, User, Copy, Pencil } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Fallback banks if Korapay API is unavailable
-const AGENT_FALLBACK_BANKS = [
+const FALLBACK_BANKS = [
   { code: '044', name: 'Access Bank' }, { code: '050', name: 'Ecobank Nigeria' },
   { code: '070', name: 'Fidelity Bank' }, { code: '011', name: 'First Bank of Nigeria' },
   { code: '214', name: 'FCMB' }, { code: '058', name: 'Guaranty Trust Bank' },
   { code: '082', name: 'Keystone Bank' }, { code: '526', name: 'Kuda Bank' },
   { code: '090405', name: 'Moniepoint MFB' }, { code: '999992', name: 'OPay' },
   { code: '120001', name: 'PalmPay' }, { code: '076', name: 'Polaris Bank' },
-  { code: '221', name: 'Stanbic IBTC Bank' }, { code: '232', name: 'Sterling Bank' },
-  { code: '032', name: 'Union Bank' }, { code: '033', name: 'UBA' },
-  { code: '035', name: 'Wema Bank' }, { code: '057', name: 'Zenith Bank' },
+  { code: '101', name: 'Providus Bank' }, { code: '221', name: 'Stanbic IBTC Bank' },
+  { code: '232', name: 'Sterling Bank' }, { code: '032', name: 'Union Bank' },
+  { code: '033', name: 'UBA' }, { code: '035', name: 'Wema Bank' }, { code: '057', name: 'Zenith Bank' },
 ];
 
 // ── Lightbox ────────────────────────────────────────────────────
@@ -85,6 +84,7 @@ export function AgentDashboard() {
   const { user, isAuthenticated, isAgent, isAdmin } = useAuth();
   const fileInputRef = useRef(null);
 
+  // Properties & inspections
   const [properties, setProperties] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,9 +92,13 @@ export function AgentDashboard() {
   const [editingProperty, setEditingProperty] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
+  const [formData, setFormData] = useState({
+    title: '', description: '', price: '', location: '',
+    property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
+  });
 
   // Bank details
-  const [banks, setBanks] = useState([]);
+  const [banks, setBanks] = useState(FALLBACK_BANKS);
   const [banksLoading, setBanksLoading] = useState(true);
   const [bankDetails, setBankDetails] = useState(null);
   const [editingBank, setEditingBank] = useState(false);
@@ -103,18 +107,26 @@ export function AgentDashboard() {
   const [accountVerified, setAccountVerified] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
 
-  // Banks loaded dynamically — see loadBanks()
-
-  const [formData, setFormData] = useState({
-    title: '', description: '', price: '', location: '',
-    property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
-  });
-
+  // ── Load data on mount ───────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
     if (!isAgent && !isAdmin) { toast.error('Access denied'); navigate('/'); return; }
     fetchData();
   }, [isAuthenticated, isAgent, isAdmin, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (user) {
+      fetchBankDetails();
+      loadBanks();
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-verify bank account when 10 digits + bank selected (only while editing)
+  useEffect(() => {
+    if (editingBank && bankForm.account_number?.length === 10 && bankForm.bank_code) {
+      handleVerifyAccount();
+    }
+  }, [bankForm.account_number, bankForm.bank_code]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
     if (!user) return;
@@ -133,25 +145,6 @@ export function AgentDashboard() {
     }
   };
 
-  // Load banks from Korapay (correct codes guaranteed)
-  const loadBanks = async () => {
-    setBanksLoading(true);
-    try {
-      const url = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/resolve-bank?list=true`;
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}` },
-      });
-      const json = await res.json();
-      if (json.status && Array.isArray(json.data)) {
-        setBanks(json.data.filter(b => b.name && b.code).sort((a, b) => a.name.localeCompare(b.name)));
-      } else {
-        setBanks(AGENT_FALLBACK_BANKS);
-      }
-    } catch (e) { setBanks(AGENT_FALLBACK_BANKS); }
-    finally { setBanksLoading(false); }
-  };
-
-  // Load bank details from approved verification record
   const fetchBankDetails = async () => {
     if (!user) return;
     try {
@@ -169,15 +162,19 @@ export function AgentDashboard() {
     } catch (e) { /* no approved verification yet */ }
   };
 
-  // Auto-verify when account number hits 10 digits while editing
-  useEffect(() => {
-    if (editingBank && bankForm.account_number?.length === 10 && bankForm.bank_code) {
-      handleVerifyAccount();
-    }
-  }, [bankForm.account_number, bankForm.bank_code, editingBank]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch bank details and bank list on mount
-  useEffect(() => { if (user) { fetchBankDetails(); loadBanks(); } }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadBanks = async () => {
+    try {
+      const url = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/resolve-bank?list=true`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}` },
+      });
+      const json = await res.json();
+      if (json.status && Array.isArray(json.data)) {
+        setBanks(json.data.filter(b => b.name && b.code).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    } catch (e) { /* keep fallback */ }
+    finally { setBanksLoading(false); }
+  };
 
   const handleVerifyAccount = async () => {
     setVerifyingAccount(true);
@@ -201,17 +198,6 @@ export function AgentDashboard() {
     } finally {
       setVerifyingAccount(false);
     }
-  };
-
-  const handleBankCodeChange = (code) => {
-    const selected = NIGERIAN_BANKS.find(b => b.code === code);
-    setBankForm(prev => ({ ...prev, bank_code: code, bank_name: selected?.name || '', account_name: '' }));
-    setAccountVerified(false);
-  };
-
-  const handleAccountNumberChange = (val) => {
-    setBankForm(prev => ({ ...prev, account_number: val.replace(/\D/g, ''), account_name: '' }));
-    setAccountVerified(false);
   };
 
   const handleSaveBankDetails = async () => {
@@ -239,11 +225,7 @@ export function AgentDashboard() {
     }
   };
 
-  const copyToClipboard = (text, label) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied`);
-  };
-
+  // ── Property handlers ────────────────────────────────────────
   const openLightbox = (images, index = 0) => setLightbox({ open: true, images, index });
   const closeLightbox = () => setLightbox({ open: false, images: [], index: 0 });
 
@@ -266,7 +248,6 @@ export function AgentDashboard() {
       }
     } catch (error) {
       toast.error('Failed to upload image. Please try again.');
-      console.error('Upload error:', error);
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -323,6 +304,11 @@ export function AgentDashboard() {
     }
   };
 
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied`);
+  };
+
   const formatPrice = (price) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
   const getStatusBadge = (status) => ({
     pending: 'bg-yellow-100 text-yellow-800',
@@ -346,20 +332,16 @@ export function AgentDashboard() {
         </div>
         <Button
           onClick={() => {
-            if (user?.suspended) { toast.error('Your account is suspended. You cannot add properties.'); return; }
+            if (user?.suspended) { toast.error('Your account is suspended.'); return; }
             handleOpenDialog();
           }}
-          className="gap-2"
-          disabled={user?.suspended}
-          data-testid="add-property-btn"
-        >
+          className="gap-2" disabled={user?.suspended} data-testid="add-property-btn">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Add Property</span>
           <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
-      {/* Suspended Banner */}
       {user?.suspended && (
         <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
           <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
@@ -367,7 +349,7 @@ export function AgentDashboard() {
           </div>
           <div>
             <p className="font-semibold text-red-800 text-sm">Account Suspended</p>
-            <p className="text-xs text-red-600 mt-0.5">Your account has been suspended by an admin. You cannot add or edit properties until your account is reinstated. Please contact support for more information.</p>
+            <p className="text-xs text-red-600 mt-0.5">Your account has been suspended. Contact support for more information.</p>
           </div>
         </div>
       )}
@@ -388,7 +370,7 @@ export function AgentDashboard() {
           <TabsTrigger value="bank" className="gap-2"><CreditCard className="w-4 h-4" /> Bank Details</TabsTrigger>
         </TabsList>
 
-        {/* Properties Tab */}
+        {/* ── Properties Tab ── */}
         <TabsContent value="properties">
           {loading ? (
             <div className="space-y-3">
@@ -399,7 +381,6 @@ export function AgentDashboard() {
                     <div className="flex-1 p-3 space-y-2">
                       <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
                       <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-                      <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
                     </div>
                   </div>
                 </Card>
@@ -410,31 +391,17 @@ export function AgentDashboard() {
               {properties.map((property) => (
                 <Card key={property.id} className="overflow-hidden">
                   <div className="flex">
-
-                    {/* Left: image — fixed width, fills height naturally */}
                     <div className="relative group flex-shrink-0 w-28 sm:w-32" style={{ minHeight: '110px' }}>
                       {property.images?.[0] ? (
                         <>
-                          <img
-                            src={property.images[0]}
-                            alt=""
-                            className="absolute inset-0 w-full h-full object-cover cursor-pointer"
-                            onClick={() => openLightbox(property.images, 0)}
-                          />
-                          {/* Hover overlay */}
-                          <div
-                            className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-end justify-center pb-2 transition-all cursor-pointer"
-                            onClick={() => openLightbox(property.images, 0)}
-                          >
+                          <img src={property.images[0]} alt="" className="absolute inset-0 w-full h-full object-cover cursor-pointer" onClick={() => openLightbox(property.images, 0)} />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-end justify-center pb-2 transition-all cursor-pointer" onClick={() => openLightbox(property.images, 0)}>
                             <span className="text-white text-xs font-medium bg-black/60 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                               <Expand className="w-3 h-3" /> View
                             </span>
                           </div>
-                          {/* Extra images count */}
                           {property.images.length > 1 && (
-                            <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded font-medium pointer-events-none">
-                              +{property.images.length - 1}
-                            </span>
+                            <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded font-medium pointer-events-none">+{property.images.length - 1}</span>
                           )}
                         </>
                       ) : (
@@ -443,45 +410,20 @@ export function AgentDashboard() {
                         </div>
                       )}
                     </div>
-
-                    {/* Right: content — 3-row flex column */}
                     <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '110px' }}>
-
-                      {/* Row 1: title + status badge */}
                       <div className="flex items-start gap-2">
-                        <h3 className="font-semibold text-sm leading-snug line-clamp-2 flex-1 min-w-0">
-                          {property.title}
-                        </h3>
-                        <Badge className={`${getStatusBadge(property.status)} text-xs capitalize shrink-0 whitespace-nowrap`}>
-                          {property.status}
-                        </Badge>
+                        <h3 className="font-semibold text-sm leading-snug line-clamp-2 flex-1 min-w-0">{property.title}</h3>
+                        <Badge className={`${getStatusBadge(property.status)} text-xs capitalize shrink-0 whitespace-nowrap`}>{property.status}</Badge>
                       </div>
-
-                      {/* Row 2: location */}
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {property.location}
-                      </p>
-
-                      {/* Row 3: price + edit button — always on same line, never wraps */}
+                      <p className="text-xs text-muted-foreground line-clamp-1">{property.location}</p>
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-primary font-bold text-sm truncate">
-                          {formatPrice(property.price)}
-                          <span className="text-xs font-normal text-muted-foreground">/yr</span>
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (user?.suspended) { toast.error('Your account is suspended. You cannot edit properties.'); return; }
-                            handleOpenDialog(property);
-                          }}
-                          disabled={user?.suspended}
-                          className="h-7 px-2.5 text-xs gap-1 shrink-0"
-                        >
+                        <p className="text-primary font-bold text-sm truncate">{formatPrice(property.price)}<span className="text-xs font-normal text-muted-foreground">/yr</span></p>
+                        <Button variant="outline" size="sm"
+                          onClick={() => { if (user?.suspended) { toast.error('Your account is suspended.'); return; } handleOpenDialog(property); }}
+                          disabled={user?.suspended} className="h-7 px-2.5 text-xs gap-1 shrink-0">
                           <Edit className="w-3 h-3" /> Edit
                         </Button>
                       </div>
-
                     </div>
                   </div>
                 </Card>
@@ -492,14 +434,14 @@ export function AgentDashboard() {
               <Building2 className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
               <h3 className="font-semibold">No Properties Yet</h3>
               <p className="text-sm text-muted-foreground mt-1 mb-4">Add your first property listing to get started</p>
-              <Button onClick={() => { if (user?.suspended) { toast.error('Your account is suspended.'); return; } handleOpenDialog(); }} disabled={user?.suspended} className="gap-2">
+              <Button onClick={() => { if (user?.suspended) { toast.error('Account suspended.'); return; } handleOpenDialog(); }} disabled={user?.suspended} className="gap-2">
                 <Plus className="w-4 h-4" /> Add Property
               </Button>
             </Card>
           )}
         </TabsContent>
 
-        {/* Inspections Tab */}
+        {/* ── Inspections Tab ── */}
         <TabsContent value="inspections">
           {inspections.length > 0 ? (
             <div className="space-y-3">
@@ -531,9 +473,8 @@ export function AgentDashboard() {
             </Card>
           )}
         </TabsContent>
-      </Tabs>
 
-        {/* Bank Details Tab */}
+        {/* ── Bank Details Tab ── */}
         <TabsContent value="bank">
           <Card className="p-6 max-w-lg">
             <div className="flex items-center justify-between mb-5">
@@ -554,7 +495,6 @@ export function AgentDashboard() {
             </div>
 
             {!editingBank ? (
-              /* ── View Mode ── */
               bankDetails?.bank_name ? (
                 <div className="space-y-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
                   <div className="flex items-center justify-between">
@@ -565,8 +505,7 @@ export function AgentDashboard() {
                     <span className="text-xs text-muted-foreground font-medium">Account Number</span>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-bold">{bankDetails.account_number}</span>
-                      <button onClick={() => copyToClipboard(bankDetails.account_number, 'Account number')}
-                        className="text-muted-foreground hover:text-primary transition-colors">
+                      <button onClick={() => copyToClipboard(bankDetails.account_number, 'Account number')} className="text-muted-foreground hover:text-primary transition-colors">
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -587,12 +526,21 @@ export function AgentDashboard() {
                 </div>
               )
             ) : (
-              /* ── Edit Mode ── */
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Bank <span className="text-destructive">*</span></Label>
-                  <Select value={bankForm.bank_code} onValueChange={handleBankCodeChange} disabled={banksLoading}>
-                    <SelectTrigger><SelectValue placeholder={banksLoading ? "Loading banks..." : "Select your bank..."} /></SelectTrigger>
+                  <Select
+                    value={bankForm.bank_code}
+                    onValueChange={(val) => {
+                      const selected = banks.find(b => b.code === val);
+                      setBankForm(prev => ({ ...prev, bank_code: val, bank_name: selected?.name || '', account_name: '' }));
+                      setAccountVerified(false);
+                    }}
+                    disabled={banksLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={banksLoading ? 'Loading banks...' : 'Select your bank...'} />
+                    </SelectTrigger>
                     <SelectContent>
                       {banks.map(bank => (
                         <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
@@ -604,11 +552,13 @@ export function AgentDashboard() {
                 <div className="space-y-2">
                   <Label>Account Number <span className="text-destructive">*</span></Label>
                   <Input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={10}
+                    type="text" inputMode="numeric" maxLength={10}
                     value={bankForm.account_number}
-                    onChange={(e) => handleAccountNumberChange(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setBankForm(prev => ({ ...prev, account_number: val, account_name: '' }));
+                      setAccountVerified(false);
+                    }}
                     placeholder="10-digit account number"
                   />
                   {bankForm.account_number?.length > 0 && bankForm.account_number.length < 10 && (
@@ -619,12 +569,9 @@ export function AgentDashboard() {
                 <div className="space-y-2">
                   <Label>Account Name</Label>
                   <div className="relative">
-                    <Input
-                      readOnly
-                      value={bankForm.account_name}
+                    <Input readOnly value={bankForm.account_name}
                       placeholder={verifyingAccount ? 'Verifying...' : 'Auto-detected after entering account number'}
-                      className={`pr-10 ${accountVerified ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'bg-muted/40'}`}
-                    />
+                      className={`pr-10 ${accountVerified ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'bg-muted/40'}`} />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       {verifyingAccount && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
                       {!verifyingAccount && accountVerified && <CheckCircle2 className="w-4 h-4 text-green-600" />}
@@ -641,9 +588,9 @@ export function AgentDashboard() {
                   <Button variant="outline" className="flex-1" onClick={() => {
                     setEditingBank(false);
                     if (bankDetails) { setBankForm(bankDetails); setAccountVerified(true); }
+                    else { setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' }); setAccountVerified(false); }
                   }}>Cancel</Button>
-                  <Button className="flex-1" onClick={handleSaveBankDetails}
-                    disabled={savingBank || !accountVerified}>
+                  <Button className="flex-1" onClick={handleSaveBankDetails} disabled={savingBank || !accountVerified}>
                     {savingBank ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Details'}
                   </Button>
                 </div>
@@ -651,6 +598,7 @@ export function AgentDashboard() {
             )}
           </Card>
         </TabsContent>
+      </Tabs>
 
       {/* Add/Edit Property Dialog */}
       <Dialog open={showPropertyDialog} onOpenChange={setShowPropertyDialog}>
@@ -681,39 +629,22 @@ export function AgentDashboard() {
               <div className="space-y-2"><Label>Owner Name *</Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
               <div className="space-y-2"><Label>Owner Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
             </div>
-
-            {/* Image Upload */}
             <div className="space-y-3">
               <Label>Property Images <span className="text-muted-foreground text-xs font-normal">(max 5, up to 5MB each)</span></Label>
-              <div
-                onClick={() => !uploadingImage && fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-                  ${uploadingImage ? 'opacity-50 cursor-not-allowed border-muted' : 'border-muted-foreground/25 hover:border-primary hover:bg-muted/30'}`}
-              >
+              <div onClick={() => !uploadingImage && fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed border-muted' : 'border-muted-foreground/25 hover:border-primary hover:bg-muted/30'}`}>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
                 {uploadingImage ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                    <p className="text-sm text-muted-foreground">Uploading...</p>
-                  </div>
+                  <div className="flex flex-col items-center gap-2"><Loader2 className="w-8 h-8 text-primary animate-spin" /><p className="text-sm text-muted-foreground">Uploading...</p></div>
                 ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="w-8 h-8 text-muted-foreground" />
-                    <p className="text-sm font-medium">Click to upload images</p>
-                    <p className="text-xs text-muted-foreground">JPG, PNG, WEBP supported</p>
-                  </div>
+                  <div className="flex flex-col items-center gap-2"><Upload className="w-8 h-8 text-muted-foreground" /><p className="text-sm font-medium">Click to upload images</p><p className="text-xs text-muted-foreground">JPG, PNG, WEBP supported</p></div>
                 )}
               </div>
-
               {formData.images.length > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {formData.images.map((img, index) => (
                     <div key={index} className="relative group aspect-square">
                       <img src={img} alt={`Property ${index + 1}`} className="w-full h-full rounded-lg object-cover cursor-pointer" onClick={() => openLightbox(formData.images, index)} />
-                      <button type="button" onClick={() => openLightbox(formData.images, index)}
-                        className="absolute bottom-1 right-1 bg-black/60 hover:bg-black/80 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Expand className="w-3 h-3" /> View
-                      </button>
                       <button type="button" onClick={() => handleRemoveImage(index)}
                         className="absolute top-1 right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
                         <XCircle className="w-3.5 h-3.5" />
