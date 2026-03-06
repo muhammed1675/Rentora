@@ -11,7 +11,8 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
-import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, User, Copy, Pencil } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
 // ── Lightbox ────────────────────────────────────────────────────
@@ -79,6 +80,30 @@ export function AgentDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
 
+  // Bank details
+  const [bankDetails, setBankDetails] = useState(null);
+  const [editingBank, setEditingBank] = useState(false);
+  const [bankForm, setBankForm] = useState({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
+  const [verifyingAccount, setVerifyingAccount] = useState(false);
+  const [accountVerified, setAccountVerified] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+
+  const NIGERIAN_BANKS = [
+    { code: '044', name: 'Access Bank' }, { code: '063', name: 'Access Bank (Diamond)' },
+    { code: '035A', name: 'ALAT by Wema' }, { code: '050', name: 'Ecobank Nigeria' },
+    { code: '070', name: 'Fidelity Bank' }, { code: '011', name: 'First Bank of Nigeria' },
+    { code: '214', name: 'First City Monument Bank' }, { code: '058', name: 'Guaranty Trust Bank' },
+    { code: '030', name: 'Heritage Bank' }, { code: '301', name: 'Jaiz Bank' },
+    { code: '082', name: 'Keystone Bank' }, { code: '526', name: 'Kuda Bank' },
+    { code: '090405', name: 'Moniepoint MFB' }, { code: '076', name: 'Polaris Bank' },
+    { code: '101', name: 'Providus Bank' }, { code: '221', name: 'Stanbic IBTC Bank' },
+    { code: '232', name: 'Sterling Bank' }, { code: '032', name: 'Union Bank of Nigeria' },
+    { code: '033', name: 'United Bank for Africa' }, { code: '215', name: 'Unity Bank' },
+    { code: '035', name: 'Wema Bank' }, { code: '057', name: 'Zenith Bank' },
+    { code: '120001', name: 'PalmPay' }, { code: '999992', name: 'OPay' },
+    { code: '090110', name: 'VFD Microfinance Bank' },
+  ];
+
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', location: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
@@ -105,6 +130,99 @@ export function AgentDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Load bank details from approved verification record
+  const fetchBankDetails = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('agent_verification_requests')
+        .select('bank_code, bank_name, account_number, account_name')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+        .maybeSingle();
+      if (!error && data?.bank_name) {
+        setBankDetails(data);
+        setBankForm(data);
+        setAccountVerified(true);
+      }
+    } catch (e) { /* no approved verification yet */ }
+  };
+
+  // Auto-verify when account number hits 10 digits while editing
+  useEffect(() => {
+    if (editingBank && bankForm.account_number?.length === 10 && bankForm.bank_code) {
+      handleVerifyAccount();
+    }
+  }, [bankForm.account_number, bankForm.bank_code, editingBank]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch bank details on mount
+  useEffect(() => { if (user) fetchBankDetails(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleVerifyAccount = async () => {
+    setVerifyingAccount(true);
+    setBankForm(prev => ({ ...prev, account_name: '' }));
+    setAccountVerified(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('resolve-bank', {
+        body: { account_number: bankForm.account_number, bank_code: bankForm.bank_code },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.success && data?.account_name) {
+        setBankForm(prev => ({ ...prev, account_name: data.account_name }));
+        setAccountVerified(true);
+        toast.success('Account verified!');
+      } else {
+        toast.error(data?.message || 'Could not verify account. Check number and bank.');
+      }
+    } catch (err) {
+      console.error('Bank verify error:', err);
+      toast.error('Verification failed. Check account number and bank.');
+    } finally {
+      setVerifyingAccount(false);
+    }
+  };
+
+  const handleBankCodeChange = (code) => {
+    const selected = NIGERIAN_BANKS.find(b => b.code === code);
+    setBankForm(prev => ({ ...prev, bank_code: code, bank_name: selected?.name || '', account_name: '' }));
+    setAccountVerified(false);
+  };
+
+  const handleAccountNumberChange = (val) => {
+    setBankForm(prev => ({ ...prev, account_number: val.replace(/\D/g, ''), account_name: '' }));
+    setAccountVerified(false);
+  };
+
+  const handleSaveBankDetails = async () => {
+    if (!accountVerified) { toast.error('Please verify your account first'); return; }
+    setSavingBank(true);
+    try {
+      const { error } = await supabase
+        .from('agent_verification_requests')
+        .update({
+          bank_code: bankForm.bank_code,
+          bank_name: bankForm.bank_name,
+          account_number: bankForm.account_number,
+          account_name: bankForm.account_name,
+        })
+        .eq('user_id', user.id)
+        .eq('status', 'approved');
+      if (error) throw error;
+      setBankDetails({ ...bankForm });
+      setEditingBank(false);
+      toast.success('Bank details updated!');
+    } catch (err) {
+      toast.error('Failed to save bank details');
+    } finally {
+      setSavingBank(false);
+    }
+  };
+
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied`);
   };
 
   const openLightbox = (images, index = 0) => setLightbox({ open: true, images, index });
@@ -248,6 +366,7 @@ export function AgentDashboard() {
         <TabsList className="mb-5">
           <TabsTrigger value="properties" className="gap-2"><Building2 className="w-4 h-4" /> My Properties</TabsTrigger>
           <TabsTrigger value="inspections" className="gap-2"><Calendar className="w-4 h-4" /> Assigned Inspections</TabsTrigger>
+          <TabsTrigger value="bank" className="gap-2"><CreditCard className="w-4 h-4" /> Bank Details</TabsTrigger>
         </TabsList>
 
         {/* Properties Tab */}
@@ -394,6 +513,125 @@ export function AgentDashboard() {
           )}
         </TabsContent>
       </Tabs>
+
+        {/* Bank Details Tab */}
+        <TabsContent value="bank">
+          <Card className="p-6 max-w-lg">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Payout Bank Account</h3>
+                  <p className="text-xs text-muted-foreground">Used to receive inspection fee payouts</p>
+                </div>
+              </div>
+              {!editingBank && (
+                <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => setEditingBank(true)}>
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </Button>
+              )}
+            </div>
+
+            {!editingBank ? (
+              /* ── View Mode ── */
+              bankDetails?.bank_name ? (
+                <div className="space-y-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Bank</span>
+                    <span className="text-sm font-semibold">{bankDetails.bank_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Account Number</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-bold">{bankDetails.account_number}</span>
+                      <button onClick={() => copyToClipboard(bankDetails.account_number, 'Account number')}
+                        className="text-muted-foreground hover:text-primary transition-colors">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-blue-200 pt-3">
+                    <span className="text-xs text-muted-foreground font-medium">Account Name</span>
+                    <span className="text-sm font-bold text-blue-800">{bankDetails.account_name}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <CreditCard className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="font-medium text-sm">No bank details on file</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">Add your bank account to receive inspection payouts</p>
+                  <Button size="sm" onClick={() => setEditingBank(true)} className="gap-1.5">
+                    <Plus className="w-4 h-4" /> Add Bank Account
+                  </Button>
+                </div>
+              )
+            ) : (
+              /* ── Edit Mode ── */
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Bank <span className="text-destructive">*</span></Label>
+                  <Select value={bankForm.bank_code} onValueChange={handleBankCodeChange}>
+                    <SelectTrigger><SelectValue placeholder="Select your bank..." /></SelectTrigger>
+                    <SelectContent>
+                      {NIGERIAN_BANKS.map(bank => (
+                        <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Account Number <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={bankForm.account_number}
+                    onChange={(e) => handleAccountNumberChange(e.target.value)}
+                    placeholder="10-digit account number"
+                  />
+                  {bankForm.account_number?.length > 0 && bankForm.account_number.length < 10 && (
+                    <p className="text-xs text-muted-foreground">{10 - bankForm.account_number.length} more digit{10 - bankForm.account_number.length !== 1 ? 's' : ''} needed</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Account Name</Label>
+                  <div className="relative">
+                    <Input
+                      readOnly
+                      value={bankForm.account_name}
+                      placeholder={verifyingAccount ? 'Verifying...' : 'Auto-detected after entering account number'}
+                      className={`pr-10 ${accountVerified ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'bg-muted/40'}`}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      {verifyingAccount && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                      {!verifyingAccount && accountVerified && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                    </div>
+                  </div>
+                  {accountVerified && (
+                    <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Account verified
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" className="flex-1" onClick={() => {
+                    setEditingBank(false);
+                    if (bankDetails) { setBankForm(bankDetails); setAccountVerified(true); }
+                  }}>Cancel</Button>
+                  <Button className="flex-1" onClick={handleSaveBankDetails}
+                    disabled={savingBank || !accountVerified}>
+                    {savingBank ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Details'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
 
       {/* Add/Edit Property Dialog */}
       <Dialog open={showPropertyDialog} onOpenChange={setShowPropertyDialog}>
