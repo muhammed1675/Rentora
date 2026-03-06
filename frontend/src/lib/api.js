@@ -211,6 +211,31 @@ export const propertyAPI = {
         user_id: userId,
         property_id: propertyId
       });
+
+    // Send unlock confirmation email
+    try {
+      const { data: userForEmail } = await supabase.from('users')
+        .select('email, full_name, token_balance').eq('id', userId).single();
+      if (userForEmail) {
+        await supabase.functions.invoke('send-payment-email', {
+          body: {
+            type: 'contact_unlocked',
+            to: userForEmail.email,
+            data: {
+              name: userForEmail.full_name,
+              property_title: property.title,
+              property_location: property.location,
+              property_price: property.price,
+              contact_name: property.contact_name,
+              contact_phone: property.contact_phone,
+              remaining_tokens: (userForEmail.token_balance || 1) - 1,
+            },
+          },
+        });
+      }
+    } catch (emailErr) {
+      console.error('Unlock email failed:', emailErr);
+    }
     
     return {
       data: {
@@ -668,17 +693,22 @@ export const paymentAPI = {
 
         // Get user details for receipt email
         try {
-          const { data: user } = await supabase.from('users')
+          const { data: userForEmail } = await supabase.from('users')
             .select('email, full_name').eq('id', tokenTx.user_id).single();
-          if (user) {
+          if (userForEmail) {
+            const { data: walletForEmail } = await supabase.from('wallets')
+              .select('token_balance').eq('user_id', tokenTx.user_id).single();
             await supabase.functions.invoke('send-payment-email', {
               body: {
                 type: 'token_receipt',
-                userEmail: user.email,
-                userName: user.full_name,
-                tokens: tokenTx.tokens_added,
-                amount: tokenTx.amount,
-                reference,
+                to: userForEmail.email,
+                data: {
+                  name: userForEmail.full_name,
+                  tokens: tokenTx.tokens_added,
+                  amount: tokenTx.amount,
+                  new_balance: walletForEmail?.token_balance || tokenTx.tokens_added,
+                  reference,
+                },
               },
             });
           }
@@ -708,27 +738,46 @@ export const paymentAPI = {
 
         // Send emails — client receipt + agent notification
         try {
-          const { data: user } = await supabase.from('users')
+          const { data: userForEmail } = await supabase.from('users')
             .select('email, full_name').eq('id', inspTx.user_id).single();
-          const { data: agent } = await supabase.from('users')
+          const { data: agentForEmail } = await supabase.from('users')
             .select('email, full_name').eq('id', inspection?.agent_id).single();
 
+          const inspDateFormatted = new Date(inspection?.inspection_date + 'T00:00:00')
+            .toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+          // Email to client
           await supabase.functions.invoke('send-payment-email', {
             body: {
-              type: 'inspection_receipt',
-              userName: user?.full_name || inspection?.user_name,
-              userEmail: user?.email || inspection?.user_email,
-              userPhone: inspection?.phone_number || '',
-              agentName: agent?.full_name || inspection?.agent_name,
-              agentEmail: agent?.email || '',
-              agentPhone: '',
-              propertyTitle: inspection?.property_title || 'Property',
-              inspectionDate: new Date(inspection?.inspection_date + 'T00:00:00')
-                .toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-              reference,
-              amount: inspTx.amount,
+              type: 'inspection_booked',
+              to: userForEmail?.email || inspection?.user_email,
+              data: {
+                name: userForEmail?.full_name || inspection?.user_name,
+                property_title: inspection?.property_title || 'Property',
+                inspection_date: inspDateFormatted,
+                reference,
+                amount: inspTx.amount,
+              },
             },
           });
+
+          // Email to agent
+          if (agentForEmail?.email) {
+            await supabase.functions.invoke('send-payment-email', {
+              body: {
+                type: 'inspection_agent_notify',
+                to: agentForEmail.email,
+                data: {
+                  agent_name: agentForEmail.full_name || inspection?.agent_name,
+                  user_name: userForEmail?.full_name || inspection?.user_name,
+                  user_email: userForEmail?.email || inspection?.user_email,
+                  property_title: inspection?.property_title || 'Property',
+                  inspection_date: inspDateFormatted,
+                  reference,
+                },
+              },
+            });
+          }
         } catch (emailErr) {
           console.error('Inspection email failed:', emailErr);
         }
