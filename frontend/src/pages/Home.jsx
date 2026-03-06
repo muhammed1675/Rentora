@@ -45,7 +45,7 @@ export function Home() {
     {
       icon: Calendar,
       title: 'Book an Inspection',
-      desc: 'Pay ₦2,000 to schedule a physical visit. Our verified agent will accompany you to inspect the property in person.',
+      desc: 'Pay ₦3,000 to schedule a physical visit. Our verified agent will accompany you to inspect the property in person.',
       color: 'bg-green-500',
     },
     {
