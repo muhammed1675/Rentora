@@ -100,11 +100,10 @@ export function AgentDashboard() {
   // Bank details
   const [banks, setBanks] = useState(FALLBACK_BANKS);
   const [banksLoading, setBanksLoading] = useState(true);
-  const [bankDetails, setBankDetails] = useState(null);
+  const [bankDetails, setBankDetails] = useState(null);       // approved details
+  const [pendingBankDetails, setPendingBankDetails] = useState(null); // pending change
   const [editingBank, setEditingBank] = useState(false);
   const [bankForm, setBankForm] = useState({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
-  const [verifyingAccount, setVerifyingAccount] = useState(false);
-  const [accountVerified, setAccountVerified] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
 
   // ── Load data on mount ───────────────────────────────────────
@@ -120,13 +119,6 @@ export function AgentDashboard() {
       loadBanks();
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-verify bank account when 10 digits + bank selected (only while editing)
-  useEffect(() => {
-    if (editingBank && bankForm.account_number?.length === 10 && bankForm.bank_code) {
-      handleVerifyAccount();
-    }
-  }, [bankForm.account_number, bankForm.bank_code]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
     if (!user) return;
@@ -148,18 +140,26 @@ export function AgentDashboard() {
   const fetchBankDetails = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
+      // Load approved bank details
+      const { data: approved } = await supabase
         .from('agent_verification_requests')
         .select('bank_code, bank_name, account_number, account_name')
         .eq('user_id', user.id)
         .eq('status', 'approved')
         .maybeSingle();
-      if (!error && data?.bank_name) {
-        setBankDetails(data);
-        setBankForm(data);
-        setAccountVerified(true);
-      }
-    } catch (e) { /* no approved verification yet */ }
+      if (approved?.bank_name) setBankDetails(approved);
+
+      // Load any pending bank change request
+      const { data: pending } = await supabase
+        .from('agent_bank_change_requests')
+        .select('bank_code, bank_name, account_number, account_name, created_at')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pending?.bank_name) setPendingBankDetails(pending);
+    } catch (e) { /* ignore */ }
   };
 
   const loadBanks = async () => {
@@ -176,50 +176,31 @@ export function AgentDashboard() {
     finally { setBanksLoading(false); }
   };
 
-  const handleVerifyAccount = async () => {
-    setVerifyingAccount(true);
-    setBankForm(prev => ({ ...prev, account_name: '' }));
-    setAccountVerified(false);
-    try {
-      const { data, error } = await supabase.functions.invoke('resolve-bank', {
-        body: { account_number: bankForm.account_number, bank_code: bankForm.bank_code },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.success && data?.account_name) {
-        setBankForm(prev => ({ ...prev, account_name: data.account_name }));
-        setAccountVerified(true);
-        toast.success('Account verified!');
-      } else {
-        toast.error(data?.message || 'Could not verify account. Check number and bank.');
-      }
-    } catch (err) {
-      console.error('Bank verify error:', err);
-      toast.error('Verification failed. Check account number and bank.');
-    } finally {
-      setVerifyingAccount(false);
-    }
-  };
-
   const handleSaveBankDetails = async () => {
-    if (!accountVerified) { toast.error('Please verify your account first'); return; }
+    if (!bankForm.bank_code) { toast.error('Please select your bank'); return; }
+    if (bankForm.account_number.length !== 10) { toast.error('Account number must be 10 digits'); return; }
+    if (!bankForm.account_name.trim()) { toast.error('Please enter your account name'); return; }
     setSavingBank(true);
     try {
+      // Insert a pending bank change request for admin to approve
       const { error } = await supabase
-        .from('agent_verification_requests')
-        .update({
+        .from('agent_bank_change_requests')
+        .insert({
+          user_id: user.id,
           bank_code: bankForm.bank_code,
           bank_name: bankForm.bank_name,
           account_number: bankForm.account_number,
-          account_name: bankForm.account_name,
-        })
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
+          account_name: bankForm.account_name.trim().toUpperCase(),
+          status: 'pending',
+        });
       if (error) throw error;
-      setBankDetails({ ...bankForm });
+      setPendingBankDetails({ ...bankForm, account_name: bankForm.account_name.trim().toUpperCase() });
       setEditingBank(false);
-      toast.success('Bank details updated!');
+      setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
+      toast.success('Bank details submitted — pending admin approval');
     } catch (err) {
-      toast.error('Failed to save bank details');
+      console.error(err);
+      toast.error('Failed to submit bank details. Please try again.');
     } finally {
       setSavingBank(false);
     }
@@ -364,10 +345,10 @@ export function AgentDashboard() {
 
       {/* Tabs */}
       <Tabs defaultValue="properties">
-        <TabsList className="mb-5">
-          <TabsTrigger value="properties" className="gap-2"><Building2 className="w-4 h-4" /> My Properties</TabsTrigger>
-          <TabsTrigger value="inspections" className="gap-2"><Calendar className="w-4 h-4" /> Assigned Inspections</TabsTrigger>
-          <TabsTrigger value="bank" className="gap-2"><CreditCard className="w-4 h-4" /> Bank Details</TabsTrigger>
+        <TabsList className="mb-5 w-full grid grid-cols-3">
+          <TabsTrigger value="properties" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">My </span>Properties</TabsTrigger>
+          <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned </span>Inspections</TabsTrigger>
+          <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4 shrink-0" />Bank Details</TabsTrigger>
         </TabsList>
 
         {/* ── Properties Tab ── */}
@@ -476,7 +457,7 @@ export function AgentDashboard() {
 
         {/* ── Bank Details Tab ── */}
         <TabsContent value="bank">
-          <Card className="p-6 max-w-lg">
+          <Card className="p-4 sm:p-6">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -487,16 +468,32 @@ export function AgentDashboard() {
                   <p className="text-xs text-muted-foreground">Used to receive inspection fee payouts</p>
                 </div>
               </div>
-              {!editingBank && (
-                <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => setEditingBank(true)}>
-                  <Pencil className="w-3.5 h-3.5" /> Edit
+              {!editingBank && !pendingBankDetails && (
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 shrink-0" onClick={() => {
+                  setBankForm(bankDetails || { bank_code: '', bank_name: '', account_number: '', account_name: '' });
+                  setEditingBank(true);
+                }}>
+                  <Pencil className="w-3.5 h-3.5" /> {bankDetails ? 'Edit' : 'Add'}
                 </Button>
               )}
             </div>
 
+            {/* Pending change notice */}
+            {pendingBankDetails && !editingBank && (
+              <div className="mb-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                <p className="text-xs font-semibold text-yellow-800 mb-2">⏳ Change Pending Admin Approval</p>
+                <div className="space-y-1 text-xs text-yellow-700">
+                  <p><span className="font-medium">Bank:</span> {pendingBankDetails.bank_name}</p>
+                  <p><span className="font-medium">Account:</span> {pendingBankDetails.account_number}</p>
+                  <p><span className="font-medium">Name:</span> {pendingBankDetails.account_name}</p>
+                </div>
+              </div>
+            )}
+
             {!editingBank ? (
               bankDetails?.bank_name ? (
                 <div className="space-y-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                  <p className="text-xs font-semibold text-blue-600 mb-1">Current Approved Details</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground font-medium">Bank</span>
                     <span className="text-sm font-semibold">{bankDetails.bank_name}</span>
@@ -514,27 +511,39 @@ export function AgentDashboard() {
                     <span className="text-xs text-muted-foreground font-medium">Account Name</span>
                     <span className="text-sm font-bold text-blue-800">{bankDetails.account_name}</span>
                   </div>
+                  {!pendingBankDetails && (
+                    <Button variant="outline" size="sm" className="w-full mt-2 gap-1.5" onClick={() => {
+                      setBankForm(bankDetails);
+                      setEditingBank(true);
+                    }}>
+                      <Pencil className="w-3.5 h-3.5" /> Request Change
+                    </Button>
+                  )}
                 </div>
-              ) : (
+              ) : !pendingBankDetails ? (
                 <div className="text-center py-8">
                   <CreditCard className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="font-medium text-sm">No bank details on file</p>
                   <p className="text-xs text-muted-foreground mt-1 mb-4">Add your bank account to receive inspection payouts</p>
-                  <Button size="sm" onClick={() => setEditingBank(true)} className="gap-1.5">
+                  <Button size="sm" onClick={() => { setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' }); setEditingBank(true); }} className="gap-1.5">
                     <Plus className="w-4 h-4" /> Add Bank Account
                   </Button>
                 </div>
-              )
+              ) : null
             ) : (
+              /* ── Edit Form (manual input) ── */
               <div className="space-y-4">
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
+                  Changes will be reviewed by admin before going live.
+                </div>
+
                 <div className="space-y-2">
                   <Label>Bank <span className="text-destructive">*</span></Label>
                   <Select
                     value={bankForm.bank_code}
                     onValueChange={(val) => {
                       const selected = banks.find(b => b.code === val);
-                      setBankForm(prev => ({ ...prev, bank_code: val, bank_name: selected?.name || '', account_name: '' }));
-                      setAccountVerified(false);
+                      setBankForm(prev => ({ ...prev, bank_code: val, bank_name: selected?.name || '' }));
                     }}
                     disabled={banksLoading}
                   >
@@ -554,11 +563,7 @@ export function AgentDashboard() {
                   <Input
                     type="text" inputMode="numeric" maxLength={10}
                     value={bankForm.account_number}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      setBankForm(prev => ({ ...prev, account_number: val, account_name: '' }));
-                      setAccountVerified(false);
-                    }}
+                    onChange={(e) => setBankForm(prev => ({ ...prev, account_number: e.target.value.replace(/\D/g, '') }))}
                     placeholder="10-digit account number"
                   />
                   {bankForm.account_number?.length > 0 && bankForm.account_number.length < 10 && (
@@ -567,31 +572,22 @@ export function AgentDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Account Name</Label>
-                  <div className="relative">
-                    <Input readOnly value={bankForm.account_name}
-                      placeholder={verifyingAccount ? 'Verifying...' : 'Auto-detected after entering account number'}
-                      className={`pr-10 ${accountVerified ? 'border-green-500 bg-green-50 text-green-800 font-medium' : 'bg-muted/40'}`} />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {verifyingAccount && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                      {!verifyingAccount && accountVerified && <CheckCircle2 className="w-4 h-4 text-green-600" />}
-                    </div>
-                  </div>
-                  {accountVerified && (
-                    <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Account verified
-                    </p>
-                  )}
+                  <Label>Account Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    value={bankForm.account_name}
+                    onChange={(e) => setBankForm(prev => ({ ...prev, account_name: e.target.value }))}
+                    placeholder="Enter your account name exactly as on the account"
+                  />
+                  <p className="text-xs text-muted-foreground">Type the name as it appears on your bank account</p>
                 </div>
 
                 <div className="flex gap-2 pt-1">
                   <Button variant="outline" className="flex-1" onClick={() => {
                     setEditingBank(false);
-                    if (bankDetails) { setBankForm(bankDetails); setAccountVerified(true); }
-                    else { setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' }); setAccountVerified(false); }
+                    setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
                   }}>Cancel</Button>
-                  <Button className="flex-1" onClick={handleSaveBankDetails} disabled={savingBank || !accountVerified}>
-                    {savingBank ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : 'Save Details'}
+                  <Button className="flex-1" onClick={handleSaveBankDetails} disabled={savingBank}>
+                    {savingBank ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</> : 'Submit for Approval'}
                   </Button>
                 </div>
               </div>
