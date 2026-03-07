@@ -62,8 +62,13 @@ export function AdminDashboard() {
       const allUsers = usersRes.data || [];
       setStats(statsRes.data);
       setUsers(allUsers);
-      setAgents(allUsers.filter(u => u.role === 'agent'));
-      setVerifications(verificationsRes.data);
+      setAgents(allUsers.filter(u => u.role === 'agent')); // phone already on user object
+      // Enrich verifications with phone from users
+      const enrichedVerifs = (verificationsRes.data || []).map(v => ({
+        ...v,
+        user_phone: allUsers.find(u => u.id === v.user_id)?.phone || null,
+      }));
+      setVerifications(enrichedVerifs);
       setProperties(propertiesRes.data);
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
@@ -107,34 +112,35 @@ export function AdminDashboard() {
     catch { toast.error('Failed to update user'); }
   };
 
-  const handleReviewVerification = async (requestId, status) => {
+  const handleReviewVerification = async (requestId, status, verif = null) => {
+    // verif can be passed directly (from inline cards) or fall back to selectedVerification (from dialog)
+    const v = verif || selectedVerification;
     try {
       await verificationAPI.review(requestId, status, user.id);
-      toast.success(`Verification ${status}`);
-      // If approved and verification has bank details, write to agent_bank_details
-      if (status === 'approved' && selectedVerification?.bank_name) {
+      toast.success(`Verification ${status === 'approved' ? 'approved ✓' : 'rejected'}`);
+      // If approved and has bank details, write to agent_bank_details
+      if (status === 'approved' && v?.bank_name) {
         await supabase
           .from('agent_bank_details')
           .upsert({
-            user_id: selectedVerification.user_id || selectedVerification.id,
-            bank_code: selectedVerification.bank_code,
-            bank_name: selectedVerification.bank_name,
-            account_number: selectedVerification.account_number,
-            account_name: selectedVerification.account_name,
+            user_id: v.user_id,
+            bank_code: v.bank_code,
+            bank_name: v.bank_name,
+            account_number: v.account_number,
+            account_name: v.account_name,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' });
       }
-      if (selectedVerification) {
-        const name = selectedVerification.user_name;
-        const email = selectedVerification.user_email;
+      // Open email client to notify agent
+      if (v) {
         const isApproved = status === 'approved';
         const subject = isApproved
           ? 'Your Rentora Agent Account Has Been Approved!'
           : 'Update on Your Rentora Agent Application';
         const body = isApproved
-          ? `Hi ${name},\n\nCongratulations! Your agent verification has been approved on Rentora.\n\nYou can now log in and start listing properties on the platform. Head to your Agent Dashboard to add your first property.\n\nWelcome aboard!\n\nBest regards,\nRentora Admin Team`
-          : `Hi ${name},\n\nThank you for applying to become an agent on Rentora.\n\nUnfortunately, we were unable to approve your application at this time. Please review your submitted documents and feel free to reapply.\n\nIf you have any questions, reply to this email.\n\nBest regards,\nRentora Admin Team`;
-        window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+          ? `Hi ${v.user_name},\n\nCongratulations! Your agent verification has been approved on Rentora.\n\nYou can now log in and start listing properties on the platform. Head to your Agent Dashboard to add your first property.\n\nWelcome aboard!\n\nBest regards,\nRentora Admin Team`
+          : `Hi ${v.user_name},\n\nThank you for applying to become an agent on Rentora.\n\nUnfortunately, we were unable to approve your application at this time. Please review your submitted documents and feel free to reapply.\n\nIf you have any questions, reply to this email.\n\nBest regards,\nRentora Admin Team`;
+        window.open(`mailto:${v.user_email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
       }
       setSelectedVerification(null);
       fetchData();
@@ -562,62 +568,126 @@ export function AdminDashboard() {
         {/* ── Verification ── */}
         <TabsContent value="verification">
           <div className="space-y-4">
-            {verifications.filter(v => v.status === 'pending').length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold mb-3 text-yellow-800 text-sm">⏳ Pending Verifications</h3>
-                <div className="space-y-3">
-                  {verifications.filter(v => v.status === 'pending').map((v) => (
-                    <Card key={v.id} className="p-4 border-yellow-200 bg-yellow-50/40">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold text-sm">{v.user_name}</h4>
-                          <p className="text-xs text-muted-foreground truncate">{v.user_email}</p>
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{v.address}</p>
-                          {v.bank_name && <p className="text-xs text-blue-600 mt-1">🏦 {v.bank_name} · {v.account_number}</p>}
+            {verifications.filter(v => v.status === 'pending').length === 0 ? (
+              <Card className="p-12 text-center">
+                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                <p className="font-semibold text-green-700">All caught up!</p>
+                <p className="text-sm text-muted-foreground mt-1">No pending verification requests</p>
+              </Card>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  {verifications.filter(v => v.status === 'pending').length} pending request{verifications.filter(v => v.status === 'pending').length !== 1 ? 's' : ''}
+                </p>
+                <div className="space-y-4">
+                  {verifications.filter(v => v.status === 'pending').map((v) => {
+                    const idName = (v.user_name || '').toUpperCase().trim();
+                    const acctName = (v.account_name || '').toUpperCase().trim();
+                    const idWords = idName.split(' ').filter(Boolean);
+                    const acctWords = acctName.split(' ').filter(Boolean);
+                    const matches = idWords.filter(w => acctWords.includes(w)).length;
+                    const nameMatch = matches >= 2 || (idWords.length === 1 && acctWords.includes(idWords[0]));
+                    return (
+                      <Card key={v.id} className="overflow-hidden border-yellow-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between gap-3 px-5 py-4 bg-yellow-50/60 border-b border-yellow-200">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
+                              <User className="w-5 h-5 text-yellow-700" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-sm">{v.user_name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{v.user_email}</p>
+                              {v.user_phone && (
+                                <a href={`tel:${v.user_phone}`} className="text-xs text-primary font-medium flex items-center gap-1 mt-0.5 hover:underline">
+                                  <Phone className="w-3 h-3" /> {v.user_phone}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 shrink-0">Pending</Badge>
                         </div>
-                        <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                          <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => setSelectedVerification(v)}><Eye className="w-4 h-4" /></Button>
-                          <Button size="sm" className="h-8 px-2" onClick={() => { setSelectedVerification(v); handleReviewVerification(v.id, 'approved'); }}><CheckCircle2 className="w-4 h-4" /></Button>
-                          <Button size="sm" variant="destructive" className="h-8 px-2" onClick={() => { setSelectedVerification(v); handleReviewVerification(v.id, 'rejected'); }}><XCircle className="w-4 h-4" /></Button>
+
+                        <div className="p-5 space-y-4">
+                          {/* Address */}
+                          {v.address && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Address</p>
+                              <p className="text-sm text-foreground/80">{v.address}</p>
+                            </div>
+                          )}
+
+                          {/* Bank details */}
+                          {v.bank_name && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Bank Account</p>
+                              <div className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs mb-2 ${nameMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                {nameMatch
+                                  ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                                  : <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />}
+                                <p className={`font-semibold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>
+                                  {nameMatch ? 'Name matches ID' : 'Name mismatch — verify carefully'}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-3 gap-3 text-xs bg-muted/30 rounded-lg border p-3">
+                                <div><span className="text-muted-foreground block mb-0.5">Bank</span><span className="font-semibold">{v.bank_name}</span></div>
+                                <div>
+                                  <span className="text-muted-foreground block mb-0.5">Account No.</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-mono font-bold">{v.account_number}</span>
+                                    <button onClick={() => copyToClipboard(v.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>
+                                  </div>
+                                </div>
+                                <div><span className="text-muted-foreground block mb-0.5">Account Name</span><span className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>{v.account_name}</span></div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Documents */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {v.id_card_url && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">ID Card</p>
+                                <a href={v.id_card_url} target="_blank" rel="noreferrer">
+                                  <img src={v.id_card_url} alt="ID Card" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                                </a>
+                              </div>
+                            )}
+                            {v.selfie_url && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Selfie with ID</p>
+                                <a href={v.selfie_url} target="_blank" rel="noreferrer">
+                                  <img src={v.selfie_url} alt="Selfie" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                          {v.agreement_url && (
+                            <a href={v.agreement_url} target="_blank" rel="noreferrer"
+                              className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
+                              <FileText className="w-6 h-6 text-primary shrink-0" />
+                              <div><p className="text-sm font-medium text-primary">View Signed Agreement PDF</p><p className="text-xs text-muted-foreground">Opens in new tab</p></div>
+                            </a>
+                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex gap-2 pt-1">
+                            <Button className="flex-1 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => handleReviewVerification(v.id, 'approved', v)}>
+                              <CheckCircle2 className="w-4 h-4" /> Approve
+                            </Button>
+                            <Button variant="destructive" className="flex-1 gap-1.5"
+                              onClick={() => handleReviewVerification(v.id, 'rejected', v)}>
+                              <XCircle className="w-4 h-4" /> Reject
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
-              </div>
+              </>
             )}
-            <h3 className="font-semibold text-sm mb-3">All Verification Requests</h3>
-            <div className="sm:hidden space-y-3">
-              {verifications.map((v) => (
-                <Card key={v.id} className="p-4" onClick={() => setSelectedVerification(v)}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate">{v.user_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{v.user_email}</p>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{v.address}</p>
-                      {v.bank_name && <p className="text-xs text-blue-600 mt-1">🏦 {v.bank_name}</p>}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <Badge className={`${getStatusBadge(v.status)} text-xs`}>{v.status}</Badge>
-                      <p className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-            <Card className="hidden sm:block overflow-x-auto">
-              <Table>
-                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Bank</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
-                <TableBody>{verifications.map((v) => (
-                  <TableRow key={v.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setSelectedVerification(v)}>
-                    <TableCell><p className="font-medium text-sm">{v.user_name}</p><p className="text-xs text-muted-foreground">{v.user_email}</p></TableCell>
-                    <TableCell className="text-sm">{v.bank_name ? `${v.bank_name} · ${v.account_number}` : <span className="text-muted-foreground/40">—</span>}</TableCell>
-                    <TableCell><Badge className={getStatusBadge(v.status)}>{v.status}</Badge></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{new Date(v.created_at).toLocaleDateString()}</TableCell>
-                  </TableRow>
-                ))}</TableBody>
-              </Table>
-            </Card>
           </div>
         </TabsContent>
 
@@ -826,9 +896,48 @@ export function AdminDashboard() {
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-base">{selectedAgentData.full_name}</p>
                   <p className="text-sm text-muted-foreground truncate">{selectedAgentData.email}</p>
+                  {selectedAgentData.phone && (
+                    <a href={`tel:${selectedAgentData.phone}`} className="text-xs text-primary font-medium flex items-center gap-1 mt-1 hover:underline">
+                      <Phone className="w-3 h-3" /> {selectedAgentData.phone}
+                    </a>
+                  )}
                   <Badge className="mt-1.5 bg-green-100 text-green-700 text-xs">✓ Verified Agent</Badge>
                 </div>
               </div>
+
+              {/* Verification Documents */}
+              {(selectedAgentData.verification?.id_card_url || selectedAgentData.verification?.selfie_url) && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Verification Documents</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedAgentData.verification.id_card_url && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">ID Card</p>
+                        <a href={selectedAgentData.verification.id_card_url} target="_blank" rel="noreferrer">
+                          <img src={selectedAgentData.verification.id_card_url} alt="ID Card"
+                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                        </a>
+                      </div>
+                    )}
+                    {selectedAgentData.verification?.selfie_url && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Selfie with ID</p>
+                        <a href={selectedAgentData.verification.selfie_url} target="_blank" rel="noreferrer">
+                          <img src={selectedAgentData.verification.selfie_url} alt="Selfie"
+                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  {selectedAgentData.verification?.agreement_url && (
+                    <a href={selectedAgentData.verification.agreement_url} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-2.5 p-2.5 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
+                      <FileText className="w-5 h-5 text-primary shrink-0" />
+                      <p className="text-sm font-medium text-primary">View Signed Agreement</p>
+                    </a>
+                  )}
+                </div>
+              )}
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-3">
@@ -1121,8 +1230,6 @@ export function AdminDashboard() {
           )}
           <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setSelectedVerification(null)}>Close</Button>
-            <Button variant="destructive" onClick={() => handleReviewVerification(selectedVerification.id, 'rejected')}><XCircle className="w-4 h-4 mr-1.5" /> Reject</Button>
-            <Button onClick={() => handleReviewVerification(selectedVerification.id, 'approved')}><CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
