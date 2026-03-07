@@ -74,11 +74,11 @@ export function Home() {
     <div className="min-h-screen" data-testid="home-page">
 
       {/* ── Hero ─────────────────────────────────────── */}
-      <section className="relative h-[580px] md:h-[640px] flex items-center overflow-hidden">
+      <section className="relative h-[580px] md:h-[640px] flex items-center overflow-hidden" aria-label="Find student hostels and accommodation near LAUTECH Ogbomosho">
         {/* Background image */}
         <img
           src="https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg"
-          alt=""
+          alt="Student accommodation near LAUTECH Ogbomosho"
           className="absolute inset-0 w-full h-full object-cover object-center"
         />
         {/* Solid dark overlay */}
@@ -95,16 +95,15 @@ export function Home() {
               <span className="text-white/90">Student Housing Made Easy</span>
             </div>
 
-            {/* Headline */}
+            {/* H1 — primary keywords */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white drop-shadow-lg">
-              Find Your Perfect
-              <span className="text-primary block mt-2">Student Accommodation</span>
+              Verified Hostels &amp; Rooms
+              <span className="text-primary block mt-2">Near LAUTECH, Ogbomosho</span>
             </h1>
 
-            {/* Subheadline */}
+            {/* Subheadline — secondary keywords */}
             <p className="text-lg md:text-xl text-white/75 max-w-2xl mx-auto">
-              Verified hostels and apartments near LAUTECH, Ogbomosho.
-              Browse, unlock contacts, and schedule inspections — all in one place.
+              Ogbomosho's #1 student housing platform. Find cheap hostels, self-contains, bedsitters and mini flats near LAUTECH — unlock agent contacts &amp; book inspections online.
             </p>
 
             {/* CTAs */}
@@ -143,15 +142,14 @@ export function Home() {
       </section>
 
       {/* ── Features ─────────────────────────────────── */}
-      <section className="py-16 md:py-24 bg-background">
+      <section className="py-16 md:py-24 bg-background" aria-label="Why choose Rentora for student accommodation Ogbomosho">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-              Why Choose Rentora?
+              Why LAUTECH Students Choose Rentora
             </h2>
             <p className="text-foreground/60 mt-3 max-w-2xl mx-auto text-base">
-              We've built a platform designed specifically for students near LAUTECH,
-              with features that make finding accommodation safe and easy.
+              Built for students in Ogbomosho — find affordable, verified student accommodation near LAUTECH quickly and safely.
             </p>
           </div>
 
@@ -174,22 +172,22 @@ export function Home() {
       </section>
 
       {/* ── How It Works ─────────────────────────────── */}
-      <section className="py-16 md:py-24 bg-slate-50 border-y border-border/40">
+      <section className="py-16 md:py-24 bg-slate-50 border-y border-border/40" aria-label="How to rent student accommodation near LAUTECH">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-              How It Works
+              How to Rent a Hostel Near LAUTECH
             </h2>
             <p className="text-foreground/60 mt-3 text-base">
-              Finding your perfect accommodation in 3 simple steps
+              Find student housing in Ogbomosho in 3 simple steps
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {[
-              { step: '01', title: 'Browse', desc: 'Explore verified properties with filters for price and type' },
-              { step: '02', title: 'Unlock', desc: 'Buy tokens and unlock owner contacts for properties you like' },
-              { step: '03', title: 'Inspect', desc: 'Schedule a physical inspection with our verified agents' },
+              { step: '01', title: 'Browse', desc: 'Explore verified hostels and apartments near LAUTECH with filters for price and type' },
+              { step: '02', title: 'Unlock', desc: 'Buy tokens and unlock the agent\'s contact for any hostel or room you like' },
+              { step: '03', title: 'Inspect', desc: 'Schedule a physical inspection with our verified Ogbomosho agents' },
             ].map((item, index) => (
               <div key={item.step} className="relative text-center group">
                 <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-5 shadow-md group-hover:scale-105 transition-transform">
@@ -212,10 +210,10 @@ export function Home() {
           <Card className="relative overflow-hidden bg-primary text-white p-8 md:p-12 border-0 shadow-xl">
             <div className="relative z-10 max-w-2xl">
               <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
-                Ready to Find Your New Home?
+                Ready to Find Student Housing in Ogbomosho?
               </h2>
               <p className="mt-4 text-white/80 text-base leading-relaxed">
-                Join thousands of students who have found their perfect accommodation through our platform.
+                Join LAUTECH students who found their hostel, self-contain or apartment on Rentora — verified listings, trusted agents, easy inspections.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
                 <Link to="/browse">
