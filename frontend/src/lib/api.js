@@ -777,11 +777,11 @@ export const storageAPI = {
     return { data: { url: publicUrl, path: data.path } };
   },
 
-  // Alias used by BecomeAgent.jsx
+  // Used by BecomeAgent.jsx — uploads to dedicated verification bucket
   uploadFile: async (file, folder = 'verification') => {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${uuidv4()}.${fileExt}`;
-    const bucket = 'rentora-uploads';
+    const fileName = `${folder}-${uuidv4()}.${fileExt}`;
+    const bucket = 'verification';
 
     const { data, error } = await supabase.storage
       .from(bucket)
