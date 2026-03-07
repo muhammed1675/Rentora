@@ -43,6 +43,7 @@ export function AdminDashboard() {
   const [bankRejectNote, setBankRejectNote] = useState('');
   const [bankRejectId, setBankRejectId] = useState(null);
   const [agentBankDetails, setAgentBankDetails] = useState([]);
+  const [previewProperty, setPreviewProperty] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -639,6 +640,7 @@ export function AdminDashboard() {
                             <p className="text-xs text-muted-foreground">By: {p.uploaded_by_agent_name}</p>
                           </div>
                           <div className="flex gap-2 mt-2 flex-wrap">
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => setPreviewProperty(p)}><Eye className="w-3 h-3" /> Preview</Button>
                             <Button size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3 h-3" /> Approve</Button>
                             <Button size="sm" variant="destructive" className="h-7 px-2 text-xs gap-1" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3 h-3" /> Reject</Button>
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3 h-3" /> Delete</Button>
@@ -685,7 +687,7 @@ export function AdminDashboard() {
                     <TableCell className="text-sm whitespace-nowrap">{formatPrice(p.price)}</TableCell>
                     <TableCell className="text-sm">{p.uploaded_by_agent_name}</TableCell>
                     <TableCell><Badge className={`${getStatusBadge(p.status)} capitalize`}>{p.status}</Badge></TableCell>
-                    <TableCell><div className="flex gap-1.5">{p.status === 'pending' && (<><Button size="sm" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3.5 h-3.5" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3.5 h-3.5" /></Button></>)}<Button variant="destructive" size="sm" className="h-7 px-2" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3.5 h-3.5" /></Button></div></TableCell>
+                    <TableCell><div className="flex gap-1.5">{p.status === 'pending' && (<><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setPreviewProperty(p)}><Eye className="w-3.5 h-3.5" /></Button><Button size="sm" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3.5 h-3.5" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3.5 h-3.5" /></Button></>)}<Button variant="destructive" size="sm" className="h-7 px-2" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3.5 h-3.5" /></Button></div></TableCell>
                   </TableRow>
                 ))}</TableBody>
               </Table>
@@ -1121,6 +1123,83 @@ export function AdminDashboard() {
             <Button variant="outline" onClick={() => setSelectedVerification(null)}>Close</Button>
             <Button variant="destructive" onClick={() => handleReviewVerification(selectedVerification.id, 'rejected')}><XCircle className="w-4 h-4 mr-1.5" /> Reject</Button>
             <Button onClick={() => handleReviewVerification(selectedVerification.id, 'approved')}><CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* ── Property Preview Dialog ── */}
+      <Dialog open={!!previewProperty} onOpenChange={() => setPreviewProperty(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" /> Property Preview
+            </DialogTitle>
+            <DialogDescription>Review property details before approving</DialogDescription>
+          </DialogHeader>
+          {previewProperty && (
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Image gallery */}
+              {previewProperty.images?.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {previewProperty.images.slice(0, 6).map((img, i) => (
+                    <a key={i} href={img} target="_blank" rel="noreferrer">
+                      <img src={img} alt={`Photo ${i + 1}`}
+                        className={`w-full object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer ${i === 0 ? 'col-span-3 max-h-52' : 'max-h-28'}`} />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {/* Core info */}
+              <div className="space-y-1">
+                <h2 className="text-lg font-bold">{previewProperty.title}</h2>
+                <p className="text-sm text-muted-foreground">{previewProperty.location}</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge className="bg-primary/10 text-primary capitalize">{previewProperty.property_type}</Badge>
+                  <Badge className="bg-green-100 text-green-800 font-bold">{formatPrice(previewProperty.price)}/yr</Badge>
+                  {previewProperty.bedrooms && <Badge variant="outline">{previewProperty.bedrooms} bed</Badge>}
+                  {previewProperty.bathrooms && <Badge variant="outline">{previewProperty.bathrooms} bath</Badge>}
+                </div>
+              </div>
+              {/* Description */}
+              {previewProperty.description && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Description</p>
+                  <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{previewProperty.description}</p>
+                </div>
+              )}
+              {/* Amenities */}
+              {previewProperty.amenities?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Amenities</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {previewProperty.amenities.map((a, i) => (
+                      <span key={i} className="text-xs px-2 py-1 rounded-full bg-muted border">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Agent */}
+              <div className="p-3 rounded-lg bg-muted/40 flex items-center gap-3">
+                <User className="w-8 h-8 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Listed by</p>
+                  <p className="font-semibold text-sm">{previewProperty.uploaded_by_agent_name}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(previewProperty.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPreviewProperty(null)}>Close</Button>
+            {previewProperty?.status === 'pending' && (<>
+              <Button variant="destructive" className="gap-1" onClick={() => { handleApproveProperty(previewProperty.id, 'rejected'); setPreviewProperty(null); }}>
+                <XCircle className="w-4 h-4" /> Reject
+              </Button>
+              <Button className="gap-1" onClick={() => { handleApproveProperty(previewProperty.id, 'approved'); setPreviewProperty(null); }}>
+                <CheckCircle2 className="w-4 h-4" /> Approve
+              </Button>
+            </>)}
           </DialogFooter>
         </DialogContent>
       </Dialog>
