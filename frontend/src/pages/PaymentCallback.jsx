@@ -31,12 +31,12 @@ export function PaymentCallback() {
         if (response.data.status === 'completed') {
           setStatus('success');
           await refreshUser();
-          // If this was an inspection payment, fetch agent contact details
+          // If inspection payment, fetch agent contact
           if (response.data.type === 'inspection' && response.data.inspection_id) {
             try {
               const contactRes = await inspectionAPI.getAgentContact(response.data.inspection_id);
               setAgentContact(contactRes.data);
-            } catch (e) { /* contact fetch failed silently */ }
+            } catch (e) { /* silent fail */ }
           }
         } else if (response.data.status === 'pending') {
           setStatus('pending');
@@ -98,7 +98,7 @@ export function PaymentCallback() {
 
             {/* Agent contact card — shown after inspection payment */}
             {agentContact && (
-              <div className="mt-4 mb-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-left">
+              <div className="mt-2 mb-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-left">
                 <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-3">Your Agent's Contact</p>
                 {agentContact.property_title && (
                   <div className="flex items-start gap-2 mb-2">
@@ -120,10 +120,10 @@ export function PaymentCallback() {
                       <Phone className="w-4 h-4" /> {agentContact.agent_phone}
                     </a>
                   ) : (
-                    <p className="text-xs text-muted-foreground mt-1">Agent phone not available — contact support</p>
+                    <p className="text-xs text-muted-foreground mt-1">Agent phone not available — check your profile for contact details</p>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Save this number — you'll need it for the inspection on {agentContact.inspection_date}.</p>
+                <p className="text-xs text-muted-foreground mt-2">Save this number — contact the agent to confirm your inspection date.</p>
               </div>
             )}
 
