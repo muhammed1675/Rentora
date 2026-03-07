@@ -282,7 +282,7 @@ export function AdminDashboard() {
               <Users className="w-4 h-4 shrink-0" /> Users
               {users.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{users.length}</Badge>}
             </TabsTrigger>
-            <TabsTrigger value="agents" className="relative" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="agents" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
               <UserCog className="w-4 h-4 shrink-0" /> Agents
               {agents.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{agents.length}</Badge>}
             </TabsTrigger>
@@ -1044,21 +1044,45 @@ export function AdminDashboard() {
           <DialogHeader><DialogTitle>Verification Request</DialogTitle><DialogDescription>Review the agent verification documents</DialogDescription></DialogHeader>
           {selectedVerification && (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-              <div className="p-3 rounded-lg bg-muted/40">
+              <div className="p-3 rounded-lg bg-muted/40 space-y-1">
                 <p className="font-semibold">{selectedVerification.user_name}</p>
                 <p className="text-sm text-muted-foreground">{selectedVerification.user_email}</p>
                 <p className="text-sm text-muted-foreground mt-1">{selectedVerification.address}</p>
-                {selectedVerification.bank_name && (
-                  <div className="mt-2 pt-2 border-t border-border/40 space-y-0.5">
-                    <p className="text-xs font-medium text-muted-foreground">Bank Account</p>
-                    <p className="text-sm font-semibold">{selectedVerification.bank_name}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-mono text-sm">{selectedVerification.account_number}</p>
-                      <button onClick={() => copyToClipboard(selectedVerification.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3.5 h-3.5" /></button>
+                {selectedVerification.bank_name && (() => {
+                  const idName = (selectedVerification.user_name || '').toUpperCase().trim();
+                  const acctName = (selectedVerification.account_name || '').toUpperCase().trim();
+                  const idWords = idName.split(' ').filter(Boolean);
+                  const acctWords = acctName.split(' ').filter(Boolean);
+                  const matches = idWords.filter(w => acctWords.includes(w)).length;
+                  const nameMatch = matches >= 2 || (idWords.length === 1 && acctWords.includes(idWords[0]));
+                  return (
+                    <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bank Account</p>
+                      <div className={`flex items-start gap-2 p-2 rounded-lg border text-xs ${nameMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        {nameMatch
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                          : <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />}
+                        <div>
+                          <p className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>
+                            {nameMatch ? 'Names match' : 'Name mismatch — verify carefully'}
+                          </p>
+                          <p className="text-muted-foreground">ID: <strong>{idName}</strong> · Bank: <strong>{acctName}</strong></p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs bg-white rounded border p-2">
+                        <div><span className="text-muted-foreground block">Bank</span><span className="font-semibold">{selectedVerification.bank_name}</span></div>
+                        <div>
+                          <span className="text-muted-foreground block">Account No.</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono font-bold">{selectedVerification.account_number}</span>
+                            <button onClick={() => copyToClipboard(selectedVerification.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>
+                          </div>
+                        </div>
+                        <div><span className="text-muted-foreground block">Account Name</span><span className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>{selectedVerification.account_name}</span></div>
+                      </div>
                     </div>
-                    <p className="text-sm font-bold text-blue-700">{selectedVerification.account_name}</p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
               <div><p className="text-xs font-medium text-muted-foreground mb-2">ID Card</p><img src={selectedVerification.id_card_url} alt="ID Card" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" /></div>
               <div><p className="text-xs font-medium text-muted-foreground mb-2">Selfie with ID</p><img src={selectedVerification.selfie_url} alt="Selfie" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" /></div>
