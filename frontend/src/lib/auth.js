@@ -210,11 +210,11 @@ export function AuthProvider({ children }) {
   };
 
   // ── Register ─────────────────────────────────────────────────
-  const register = async (email, password, fullName) => {
+  const register = async (email, password, fullName, phone = '') => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { full_name: fullName } }
+        options: { data: { full_name: fullName, phone } }
       });
 
       if (error) throw new Error(parseAuthError(error));
@@ -222,6 +222,15 @@ export function AuthProvider({ children }) {
 
       await new Promise(r => setTimeout(r, 1000));
       const profile = await loadUserProfile(data.user);
+
+      // Save phone to users table
+      if (phone && data.user) {
+        await supabase
+          .from('users')
+          .update({ phone })
+          .eq('id', data.user.id);
+      }
+
       setUser(profile);
       setSession(data.session);
 
