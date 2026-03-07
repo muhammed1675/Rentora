@@ -140,16 +140,13 @@ export function AgentDashboard() {
   const fetchBankDetails = async () => {
     if (!user) return;
     try {
-      // Load approved bank details (check any verification row that has bank details)
-      const { data: approvedRows } = await supabase
-        .from('agent_verification_requests')
-        .select('bank_code, bank_name, account_number, account_name, status')
+      // Load approved bank details from dedicated source-of-truth table
+      const { data: bankRow } = await supabase
+        .from('agent_bank_details')
+        .select('bank_code, bank_name, account_number, account_name')
         .eq('user_id', user.id)
-        .not('bank_name', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      const approved = approvedRows?.[0];
-      if (approved?.bank_name) setBankDetails(approved);
+        .maybeSingle();
+      if (bankRow?.bank_name) setBankDetails(bankRow);
 
       // Load any pending bank change request
       const { data: pending } = await supabase
