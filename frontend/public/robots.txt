@@ -1,14 +1,10 @@
 User-agent: *
 Allow: /
 Allow: /browse
-Allow: /register
-Allow: /login
 Allow: /contact
-Allow: /terms
 Disallow: /admin
-Disallow: /agent
 Disallow: /profile
-Disallow: /buy-tokens
-Disallow: /payment/
+Disallow: /payment
+Disallow: /tokens
 
 Sitemap: https://www.rentora.com.ng/sitemap.xml
