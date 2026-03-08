@@ -598,7 +598,7 @@ export const userAPI = {
   getAll: async () => {
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, role, suspended, created_at')
+      .select('id, email, full_name, role, suspended, created_at, phone')
       .order('created_at', { ascending: false });
     
     if (error) throw error;
@@ -608,7 +608,7 @@ export const userAPI = {
   getById: async (userId) => {
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, role, suspended, created_at')
+      .select('id, email, full_name, role, suspended, created_at, phone')
       .eq('id', userId)
       .single();
     
