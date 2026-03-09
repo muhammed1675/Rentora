@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, balanceAPI, withdrawalAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -15,8 +15,7 @@ import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp, Coins,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
-  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock,
-  Wallet, ArrowDownToLine
+  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -45,10 +44,6 @@ export function AdminDashboard() {
   const [bankRejectId, setBankRejectId] = useState(null);
   const [agentBankDetails, setAgentBankDetails] = useState([]);
   const [previewProperty, setPreviewProperty] = useState(null);
-  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
-  const [agentBalances, setAgentBalances] = useState([]);
-  const [rejectWithdrawId, setRejectWithdrawId] = useState(null);
-  const [rejectWithdrawNote, setRejectWithdrawNote] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -99,15 +94,6 @@ export function AdminDashboard() {
           .select('*');
         setAgentBankDetails(bankDetails || []);
       } catch (e) { console.error('agent_bank_details fetch failed:', e); }
-      // Load withdrawal requests and agent balances
-      try {
-        const [wdRes, balRes] = await Promise.all([
-          withdrawalAPI.getAll(),
-          balanceAPI.getAllBalances(),
-        ]);
-        setWithdrawalRequests(wdRes.data || []);
-        setAgentBalances(balRes.data || []);
-      } catch (e) { console.error('Withdrawal/balance fetch failed:', e); }
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load dashboard data');
@@ -194,21 +180,6 @@ export function AdminDashboard() {
     } catch (err) {
       toast.error('Failed to process request');
     }
-  };
-
-  const handleWithdrawalAction = async (requestId, action, note = '') => {
-    try {
-      if (action === 'paid') {
-        await withdrawalAPI.markPaid(requestId, user.id);
-        toast.success('Marked as paid — agent balance updated ✓');
-      } else {
-        await withdrawalAPI.reject(requestId, user.id, note);
-        toast.success('Request rejected');
-      }
-      setRejectWithdrawId(null);
-      setRejectWithdrawNote('');
-      fetchData();
-    } catch (e) { toast.error(e.message || 'Failed to process request'); }
   };
 
   const handleApproveProperty = async (propertyId, status) => {
@@ -343,12 +314,6 @@ export function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
               <Receipt className="w-4 h-4 shrink-0" /> Transactions
-            </TabsTrigger>
-            <TabsTrigger value="payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Wallet className="w-4 h-4 shrink-0" /> Payouts
-              {withdrawalRequests.filter(r => r.status === 'pending').length > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs px-1.5">{withdrawalRequests.filter(r => r.status === 'pending').length}</Badge>
-              )}
             </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
               <MessageSquare className="w-4 h-4 shrink-0" /> Messages
@@ -859,121 +824,6 @@ export function AdminDashboard() {
           </div>
         </TabsContent>
 
-
-        {/* ── Payouts ── */}
-        <TabsContent value="payouts">
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Card className="p-4 bg-yellow-50 border-yellow-200">
-                <p className="text-xs text-yellow-700 font-medium">Pending Requests</p>
-                <p className="text-2xl font-bold text-yellow-900 mt-1">{withdrawalRequests.filter(r => r.status === 'pending').length}</p>
-              </Card>
-              <Card className="p-4 bg-green-50 border-green-200">
-                <p className="text-xs text-green-700 font-medium">Total Paid Out</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">{formatPrice(withdrawalRequests.filter(r => r.status === 'paid').reduce((s, r) => s + (r.amount || 0), 0))}</p>
-              </Card>
-              <Card className="p-4 bg-blue-50 border-blue-200 col-span-2 sm:col-span-1">
-                <p className="text-xs text-blue-700 font-medium">Total Agent Earnings</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">{formatPrice(agentBalances.reduce((s, b) => s + (b.total_earned || 0), 0))}</p>
-              </Card>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-yellow-600" /> Pending Withdrawal Requests
-              </h3>
-              {withdrawalRequests.filter(r => r.status === 'pending').length === 0 ? (
-                <Card className="p-8 text-center">
-                  <CheckCircle2 className="w-10 h-10 text-green-400 mx-auto mb-2" />
-                  <p className="font-semibold text-green-700">All clear!</p>
-                  <p className="text-sm text-muted-foreground mt-1">No pending withdrawal requests</p>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {withdrawalRequests.filter(r => r.status === 'pending').map((wr) => {
-                    const agentBal = agentBalances.find(b => b.agent_id === wr.agent_id);
-                    const available = (agentBal?.total_earned || 0) - (agentBal?.total_withdrawn || 0);
-                    return (
-                      <Card key={wr.id} className="overflow-hidden border-yellow-200">
-                        <div className="flex items-center justify-between gap-3 px-5 py-3 bg-yellow-50/60 border-b border-yellow-200">
-                          <div>
-                            <p className="font-bold text-sm">{wr.agent_name}</p>
-                            <p className="text-xs text-muted-foreground">{wr.agent_email}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold text-green-700">{formatPrice(wr.amount)}</p>
-                            <p className="text-xs text-muted-foreground">of {formatPrice(available)} available</p>
-                          </div>
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <div className="grid grid-cols-3 gap-3 text-xs bg-muted/30 rounded-lg border p-3">
-                            <div><span className="text-muted-foreground block mb-0.5">Bank</span><span className="font-semibold">{wr.bank_name || '—'}</span></div>
-                            <div>
-                              <span className="text-muted-foreground block mb-0.5">Account No.</span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono font-bold">{wr.account_number || '—'}</span>
-                                {wr.account_number && <button onClick={() => copyToClipboard(wr.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>}
-                              </div>
-                            </div>
-                            <div><span className="text-muted-foreground block mb-0.5">Account Name</span><span className="font-bold">{wr.account_name || '—'}</span></div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">Requested: {new Date(wr.requested_at).toLocaleString()}</p>
-
-                          {rejectWithdrawId === wr.id && (
-                            <div className="space-y-2">
-                              <p className="text-xs font-semibold text-red-700">Reason for rejection:</p>
-                              <Input value={rejectWithdrawNote} onChange={e => setRejectWithdrawNote(e.target.value)} placeholder="e.g. Incorrect bank details" className="text-sm border-red-300" />
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="destructive" className="flex-1 h-8" onClick={() => handleWithdrawalAction(wr.id, 'rejected', rejectWithdrawNote)}>
-                                  <XCircle className="w-3.5 h-3.5 mr-1" /> Confirm Reject
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-8" onClick={() => { setRejectWithdrawId(null); setRejectWithdrawNote(''); }}>Cancel</Button>
-                              </div>
-                            </div>
-                          )}
-                          {rejectWithdrawId !== wr.id && (
-                            <div className="flex gap-2">
-                              <Button size="sm" className="flex-1 h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleWithdrawalAction(wr.id, 'paid')}>
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Paid
-                              </Button>
-                              <Button size="sm" variant="destructive" className="flex-1 h-9 gap-1.5" onClick={() => setRejectWithdrawId(wr.id)}>
-                                <XCircle className="w-3.5 h-3.5" /> Reject
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {withdrawalRequests.filter(r => r.status !== 'pending').length > 0 && (
-              <div>
-                <h3 className="font-semibold text-sm mb-3">History</h3>
-                <Card className="overflow-x-auto">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Agent</TableHead><TableHead>Amount</TableHead><TableHead>Bank</TableHead><TableHead>Account No.</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {withdrawalRequests.filter(r => r.status !== 'pending').map((wr) => (
-                        <TableRow key={wr.id}>
-                          <TableCell><p className="font-medium text-sm">{wr.agent_name}</p><p className="text-xs text-muted-foreground">{wr.agent_email}</p></TableCell>
-                          <TableCell className="font-bold text-green-700">{formatPrice(wr.amount)}</TableCell>
-                          <TableCell className="text-sm">{wr.bank_name || '—'}</TableCell>
-                          <TableCell className="font-mono text-sm">{wr.account_number || '—'}</TableCell>
-                          <TableCell><Badge className={wr.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>{wr.status}</Badge></TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{new Date(wr.resolved_at || wr.requested_at).toLocaleDateString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
         {/* ── Messages ── */}
         <TabsContent value="messages">
           {messages.length === 0 ? (
@@ -1100,32 +950,6 @@ export function AdminDashboard() {
                   <p className="text-xs text-muted-foreground mt-0.5">Inspections</p>
                 </Card>
               </div>
-
-              {/* Agent Balance */}
-              {(() => {
-                const agentId = selectedAgentData.id || selectedAgentData.user_id;
-                const bal = agentBalances.find(b => b.agent_id === agentId);
-                const available = (bal?.total_earned || 0) - (bal?.total_withdrawn || 0);
-                return (
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Earnings Balance</p>
-                    <div className="p-3 rounded-lg bg-green-50 border border-green-200 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Available</span>
-                        <span className="text-lg font-bold text-green-700">{formatPrice(available)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs border-t border-green-100 pt-2">
-                        <span className="text-muted-foreground">Total Earned</span>
-                        <span className="font-semibold">{formatPrice(bal?.total_earned || 0)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Total Withdrawn</span>
-                        <span className="font-semibold">{formatPrice(bal?.total_withdrawn || 0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* Bank details */}
               <div className="space-y-2">
