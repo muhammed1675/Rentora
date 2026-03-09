@@ -63,6 +63,21 @@ export function PropertyDetails() {
     }
   };
 
+
+  // Load Korapay inline SDK
+  useEffect(() => {
+    if (document.getElementById('korapay-script')) return;
+    const script = document.createElement('script');
+    script.id = 'korapay-script';
+    script.src = 'https://korablobstorage.blob.core.windows.net/modal-bucket/korapay-collections.min.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      const el = document.getElementById('korapay-script');
+      if (el) document.body.removeChild(el);
+    };
+  }, []);
+
   const handleUnlock = async () => {
     if (!isAuthenticated) {
       toast.error('Please login to unlock contact');
@@ -112,12 +127,36 @@ export function PropertyDetails() {
         phone_number: inspectionPhone,
       }, user);
       
-      toast.success('Redirecting to payment...');
       setShowInspectionDialog(false);
-      
-      // Open checkout URL
-      if (response.data.checkout_url) {
-        window.open(response.data.checkout_url, '_blank');
+
+      // Use Korapay inline JS SDK
+      const { reference, amount } = response.data;
+      const publicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY;
+
+      if (window.Korapay) {
+        window.Korapay.initialize({
+          key: publicKey,
+          reference,
+          amount,
+          currency: 'NGN',
+          customer: {
+            email: inspectionEmail,
+            name: user.full_name,
+          },
+          onSuccess: (data) => {
+            toast.success('Payment successful! Redirecting...');
+            navigate(`/payment-callback?reference=${data.reference}&type=inspection`);
+          },
+          onFailed: () => {
+            toast.error('Payment failed. Please try again.');
+          },
+          onClose: () => {
+            toast.info('Payment cancelled.');
+          },
+        });
+      } else {
+        // Fallback: redirect to Korapay hosted checkout
+        window.location.href = `https://checkout.korapay.com/checkout?amount=${amount}&currency=NGN&reference=${reference}&merchant=${publicKey}&email=${encodeURIComponent(inspectionEmail)}`;
       }
     } catch (error) {
       toast.error(error.message || 'Failed to request inspection');
@@ -356,7 +395,7 @@ export function PropertyDetails() {
           <Card className="p-6">
             <h3 className="font-semibold mb-2">Request Inspection</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Schedule a physical visit with our verified agent for ₦3,000
+              Schedule a physical visit with our verified agent for ₦2,000
             </p>
             <Button
               variant="outline"
@@ -394,7 +433,7 @@ export function PropertyDetails() {
           <DialogHeader>
             <DialogTitle>Request Property Inspection</DialogTitle>
             <DialogDescription>
-              Schedule a physical inspection with our verified agent. Payment of ₦3,000 is required.
+              Schedule a physical inspection with our verified agent. Payment of ₦2,000 is required.
             </DialogDescription>
           </DialogHeader>
 
@@ -441,7 +480,7 @@ export function PropertyDetails() {
             <Card className="p-4 bg-muted/50">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Inspection Fee</span>
-                <span className="text-xl font-bold text-primary">₦3,000</span>
+                <span className="text-xl font-bold text-primary">₦2,000</span>
               </div>
             </Card>
           </div>
