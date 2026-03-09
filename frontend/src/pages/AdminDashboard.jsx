@@ -1101,6 +1101,32 @@ export function AdminDashboard() {
                 </Card>
               </div>
 
+              {/* Agent Balance */}
+              {(() => {
+                const agentId = selectedAgentData.id || selectedAgentData.user_id;
+                const bal = agentBalances.find(b => b.agent_id === agentId);
+                const available = (bal?.total_earned || 0) - (bal?.total_withdrawn || 0);
+                return (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Earnings Balance</p>
+                    <div className="p-3 rounded-lg bg-green-50 border border-green-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Available</span>
+                        <span className="text-lg font-bold text-green-700">{formatPrice(available)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs border-t border-green-100 pt-2">
+                        <span className="text-muted-foreground">Total Earned</span>
+                        <span className="font-semibold">{formatPrice(bal?.total_earned || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Total Withdrawn</span>
+                        <span className="font-semibold">{formatPrice(bal?.total_withdrawn || 0)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Bank details */}
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bank Account</p>
