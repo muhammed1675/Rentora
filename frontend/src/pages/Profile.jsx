@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
-import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI } from '../lib/api';
+import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -16,7 +15,8 @@ import {
   Shield,
   Building2,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Phone
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,11 +30,6 @@ export function Profile() {
   const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
   const [verificationRequest, setVerificationRequest] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [agentBalance, setAgentBalance] = useState(null);
-  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
-  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawing, setWithdrawing] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -42,6 +37,23 @@ export function Profile() {
       return;
     }
     fetchData();
+
+    // Auto-confirm payment if redirected back from Korapay
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get('reference') || params.get('trxref');
+    if (reference) {
+      paymentAPI.confirmPayment(reference).then(async (res) => {
+        if (res?.data?.type === 'token_purchase') {
+          await refreshUser();
+          await fetchData();
+          toast.success(`${res.data.tokens_added} token(s) added to your wallet!`);
+        } else if (res?.data?.type === 'inspection') {
+          await fetchData();
+          toast.success('Inspection payment confirmed!');
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }).catch(() => {});
+    }
   }, [isAuthenticated, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
@@ -60,18 +72,6 @@ export function Profile() {
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
 
-      // Fetch agent balance if agent
-      if (user?.role === 'agent') {
-        try {
-          const [balRes, wdRes] = await Promise.all([
-            balanceAPI.getMyBalance(user.id),
-            withdrawalAPI.getMyRequests(user.id),
-          ]);
-          setAgentBalance(balRes.data);
-          setWithdrawalRequests(wdRes.data);
-        } catch (e) { console.error('Balance fetch failed:', e); }
-      }
-
       // Check verification request for users
       if (user?.role === 'user') {
         try {
@@ -86,40 +86,6 @@ export function Profile() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleWithdraw = async () => {
-    const amount = parseFloat(withdrawAmount);
-    const available = (agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0);
-    if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
-    if (amount > available) { toast.error('Amount exceeds your available balance'); return; }
-
-    // Get agent bank details from verification
-    const { data: bankRow } = await supabase
-      .from('agent_bank_details')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-      .catch(() => ({ data: null }));
-
-    setWithdrawing(true);
-    try {
-      await withdrawalAPI.request({
-        agentId: user.id,
-        agentName: user.full_name,
-        agentEmail: user.email,
-        amount,
-        bankName: bankRow?.bank_name || '',
-        accountNumber: bankRow?.account_number || '',
-        accountName: bankRow?.account_name || '',
-      });
-      toast.success('Withdrawal request submitted! Admin will process it shortly.');
-      setShowWithdrawDialog(false);
-      setWithdrawAmount('');
-      await fetchData();
-    } catch (e) {
-      toast.error(e.message || 'Failed to submit withdrawal request');
-    } finally { setWithdrawing(false); }
   };
 
   const formatPrice = (price) => {
@@ -163,6 +129,11 @@ export function Profile() {
             <div>
               <h2 className="font-semibold text-lg">{user?.full_name}</h2>
               <p className="text-sm text-muted-foreground">{user?.email}</p>
+              {user?.phone && (
+                <a href={`tel:${user.phone}`} className="text-sm text-primary flex items-center gap-1 mt-0.5 hover:underline">
+                  <Phone className="w-3.5 h-3.5" /> {user.phone}
+                </a>
+              )}
               <Badge variant="outline" className="mt-2 capitalize">
                 {user?.role}
               </Badge>
@@ -191,60 +162,7 @@ export function Profile() {
           </Link>
         </Card>
 
-        {/* Agent Balance Card */}
-        {user?.role === 'agent' && (
-          <Card className="p-6 md:col-span-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                  <Wallet className="w-7 h-7 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Available Balance</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    {formatPrice((agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0))}
-                  </p>
-                  <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                    <span>Total Earned: <strong>{formatPrice(agentBalance?.total_earned || 0)}</strong></span>
-                    <span>Withdrawn: <strong>{formatPrice(agentBalance?.total_withdrawn || 0)}</strong></span>
-                  </div>
-                </div>
-              </div>
-              <Button
-                className="gap-2 bg-green-600 hover:bg-green-700 text-white sm:self-center"
-                onClick={() => setShowWithdrawDialog(true)}
-                disabled={(agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0) <= 0}
-              >
-                <ArrowDownToLine className="w-4 h-4" /> Request Withdrawal
-              </Button>
-            </div>
-
-            {/* Recent withdrawal requests */}
-            {withdrawalRequests.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Recent Withdrawal Requests</p>
-                <div className="space-y-2">
-                  {withdrawalRequests.slice(0, 3).map((wr) => (
-                    <div key={wr.id} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/40">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="font-medium">{formatPrice(wr.amount)}</span>
-                        <span className="text-xs text-muted-foreground">{new Date(wr.requested_at).toLocaleDateString()}</span>
-                      </div>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        wr.status === 'paid' ? 'bg-green-100 text-green-700' :
-                        wr.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>{wr.status}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-        )}
-
-      {/* Quick Stats */}
+        {/* Quick Stats */}
         <Card className="p-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
@@ -472,6 +390,16 @@ export function Profile() {
                 <p className="font-medium">{user?.email}</p>
               </div>
               <div>
+                <p className="text-sm text-muted-foreground">Phone Number</p>
+                {user?.phone ? (
+                  <a href={`tel:${user.phone}`} className="font-medium text-primary hover:underline flex items-center gap-1.5">
+                    <Phone className="w-4 h-4" /> {user.phone}
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Not provided</p>
+                )}
+              </div>
+              <div>
                 <p className="text-sm text-muted-foreground">Role</p>
                 <p className="font-medium capitalize">{user?.role}</p>
               </div>
@@ -485,58 +413,6 @@ export function Profile() {
           </Card>
         </TabsContent>
       </Tabs>
-    {/* Withdrawal Dialog */}
-      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ArrowDownToLine className="w-5 h-5 text-green-600" /> Request Withdrawal
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="p-3 rounded-lg bg-green-50 border border-green-200">
-              <p className="text-xs text-green-700 font-medium">Available Balance</p>
-              <p className="text-2xl font-bold text-green-700">
-                {formatPrice((agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0))}
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="withdraw-amount">Amount to Withdraw (₦)</Label>
-              <Input
-                id="withdraw-amount"
-                type="number"
-                placeholder="e.g. 5000"
-                value={withdrawAmount}
-                min={1}
-                max={(agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0)}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  const available = (agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0);
-                  if (val > available) {
-                    setWithdrawAmount(String(available));
-                  } else {
-                    setWithdrawAmount(e.target.value);
-                  }
-                }}
-              />
-              <p className="text-xs text-muted-foreground">Maximum: {formatPrice((agentBalance?.total_earned || 0) - (agentBalance?.total_withdrawn || 0))}</p>
-            </div>
-            <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">
-              Payment will be sent to your registered bank account. Admin will process manually and mark as paid.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowWithdrawDialog(false); setWithdrawAmount(''); }}>Cancel</Button>
-            <Button
-              className="bg-green-600 hover:bg-green-700 text-white gap-2"
-              onClick={handleWithdraw}
-              disabled={withdrawing || !withdrawAmount || parseFloat(withdrawAmount) <= 0}
-            >
-              {withdrawing ? 'Submitting...' : 'Submit Request'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
