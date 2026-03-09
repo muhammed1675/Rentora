@@ -267,15 +267,11 @@ export const tokenAPI = {
         status: 'pending'
       });
     
-    const koralpayPublicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY || 'pk_test_xxx';
-    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=${amount}&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${data.email}`;
-    
     return {
       data: {
         reference,
         amount,
         quantity: data.quantity,
-        checkout_url: checkoutUrl,
         payment_type: 'token_purchase'
       }
     };
@@ -356,19 +352,15 @@ export const inspectionAPI = {
         inspection_id: inspectionId,
         user_id: user.id,
         reference,
-        amount: 2000,
+        amount: 3000,
         status: 'pending'
       });
-    
-    const koralpayPublicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY || 'pk_test_xxx';
-    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=2000&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${data.email}`;
     
     return {
       data: {
         inspection_id: inspectionId,
         reference,
-        amount: 2000,
-        checkout_url: checkoutUrl,
+        amount: 3000,
         payment_type: 'inspection'
       }
     };
