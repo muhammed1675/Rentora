@@ -1037,10 +1037,9 @@ export const withdrawalAPI = {
         account_name: accountName,
         status: 'pending',
         requested_at: new Date().toISOString(),
-      })
-      .select();
-    if (insertRes.error) throw insertRes.error;
-    return { data: insertRes.data?.[0] };
+      });
+    if (insertRes.error) throw new Error(insertRes.error.message);
+    return { data: { ok: true } };
   },
 
   getMyRequests: async (agentId) => {
