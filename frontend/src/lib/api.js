@@ -1002,12 +1002,12 @@ export const balanceAPI = {
   },
 
   getAllBalances: async () => {
-    const { data, error } = await supabase
+    const res = await supabase
       .from('agent_balances')
       .select('*')
       .order('total_earned', { ascending: false });
-    if (error) throw error;
-    return { data: data || [] };
+    if (res.error) { console.warn('agent_balances:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
   },
 };
 
@@ -1044,22 +1044,23 @@ export const withdrawalAPI = {
   },
 
   getMyRequests: async (agentId) => {
-    const { data, error } = await supabase
+    const res = await supabase
       .from('withdrawal_requests')
       .select('*')
       .eq('agent_id', agentId)
       .order('requested_at', { ascending: false });
-    if (error) throw error;
-    return { data: data || [] };
+    // Return empty array on error (e.g. table not yet created)
+    if (res.error) { console.warn('withdrawal_requests:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
   },
 
   getAll: async () => {
-    const { data, error } = await supabase
+    const res = await supabase
       .from('withdrawal_requests')
       .select('*')
       .order('requested_at', { ascending: false });
-    if (error) throw error;
-    return { data: data || [] };
+    if (res.error) { console.warn('withdrawal_requests:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
   },
 
   markPaid: async (requestId, adminId) => {
