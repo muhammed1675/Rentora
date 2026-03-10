@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, balanceAPI, withdrawalAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -44,10 +44,6 @@ export function AdminDashboard() {
   const [bankRejectId, setBankRejectId] = useState(null);
   const [agentBankDetails, setAgentBankDetails] = useState([]);
   const [previewProperty, setPreviewProperty] = useState(null);
-  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
-  const [agentBalances, setAgentBalances] = useState([]);
-  const [rejectingId, setRejectingId] = useState(null);
-  const [rejectNote, setRejectNote] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -77,15 +73,6 @@ export function AdminDashboard() {
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
       setMessages(messagesRes.data);
-      // Fetch withdrawal requests and agent balances
-      try {
-        const [wrRes, balRes] = await Promise.all([
-          withdrawalAPI.getAll(),
-          balanceAPI.getAllBalances(),
-        ]);
-        setWithdrawalRequests(wrRes.data || []);
-        setAgentBalances(balRes.data || []);
-      } catch (e) { console.error('Withdrawal/balance fetch failed:', e); }
       // Load bank change requests (no FK join - enrich from allUsers instead)
       try {
         const { data: bankReqs, error: bankErr } = await supabase
@@ -193,29 +180,6 @@ export function AdminDashboard() {
     } catch (err) {
       toast.error('Failed to process request');
     }
-  };
-
-  const handleMarkPaid = async (requestId) => {
-    try {
-      await withdrawalAPI.markPaid(requestId, user.id);
-      toast.success('Marked as paid — balance updated');
-      fetchData();
-    } catch (err) { toast.error(err.message || 'Failed to mark as paid'); }
-  };
-
-  const handleRejectWithdrawal = async (requestId) => {
-    try {
-      await withdrawalAPI.reject(requestId, user.id, rejectNote);
-      toast.success('Withdrawal request rejected');
-      setRejectingId(null);
-      setRejectNote('');
-      fetchData();
-    } catch (err) { toast.error('Failed to reject request'); }
-  };
-
-  const getAgentBalance = (agentId) => {
-    const b = agentBalances.find(b => b.agent_id === agentId);
-    return b ? { earned: b.total_earned || 0, withdrawn: b.total_withdrawn || 0, available: (b.total_earned || 0) - (b.total_withdrawn || 0) } : { earned: 0, withdrawn: 0, available: 0 };
   };
 
   const handleApproveProperty = async (propertyId, status) => {
@@ -356,14 +320,6 @@ export function AdminDashboard() {
               {messages.filter(m => m.status === 'unread').length > 0 && (
                 <Badge variant="destructive" className="ml-1 text-xs px-1.5">
                   {messages.filter(m => m.status === 'unread').length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <CreditCard className="w-4 h-4 shrink-0" /> Payouts
-              {withdrawalRequests.filter(r => r.status === 'pending').length > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs px-1.5">
-                  {withdrawalRequests.filter(r => r.status === 'pending').length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -913,141 +869,6 @@ export function AdminDashboard() {
             </div>
           )}
         </TabsContent>
-
-        {/* ── Payouts ── */}
-        <TabsContent value="payouts">
-          <div className="space-y-6">
-            {/* Summary */}
-            <div className="grid grid-cols-3 gap-3">
-              <Card className="p-4 bg-yellow-50 border-yellow-200">
-                <p className="text-xs text-yellow-700 font-medium">Pending</p>
-                <p className="text-2xl font-bold text-yellow-900 mt-1">{withdrawalRequests.filter(r => r.status === 'pending').length}</p>
-              </Card>
-              <Card className="p-4 bg-green-50 border-green-200">
-                <p className="text-xs text-green-700 font-medium">Total Paid Out</p>
-                <p className="text-xl font-bold text-green-900 mt-1">
-                  {formatPrice(withdrawalRequests.filter(r => r.status === 'paid').reduce((s, r) => s + (r.amount || 0), 0))}
-                </p>
-              </Card>
-              <Card className="p-4 bg-blue-50 border-blue-200">
-                <p className="text-xs text-blue-700 font-medium">Total Agent Earnings</p>
-                <p className="text-xl font-bold text-blue-900 mt-1">
-                  {formatPrice(agentBalances.reduce((s, b) => s + (b.total_earned || 0), 0))}
-                </p>
-              </Card>
-            </div>
-
-            {/* Pending requests */}
-            <div>
-              <h3 className="font-semibold text-sm mb-3">Pending Withdrawal Requests</h3>
-              {withdrawalRequests.filter(r => r.status === 'pending').length === 0 ? (
-                <Card className="p-8 text-center">
-                  <CheckCircle2 className="w-10 h-10 text-green-400 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No pending withdrawal requests</p>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {withdrawalRequests.filter(r => r.status === 'pending').map(req => {
-                    const bal = getAgentBalance(req.agent_id);
-                    return (
-                      <Card key={req.id} className="p-4 border-yellow-200">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <p className="font-semibold text-sm">{req.agent_name}</p>
-                            <p className="text-xs text-muted-foreground">{req.agent_email}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{new Date(req.requested_at).toLocaleString()}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-primary">{formatPrice(req.amount)}</p>
-                            <p className="text-xs text-muted-foreground">Available: {formatPrice(bal.available)}</p>
-                          </div>
-                        </div>
-                        {/* Bank details */}
-                        <div className="grid grid-cols-3 gap-2 text-xs bg-muted/30 rounded-lg border p-3 mb-3">
-                          <div><span className="text-muted-foreground block">Bank</span><span className="font-semibold">{req.bank_name}</span></div>
-                          <div>
-                            <span className="text-muted-foreground block">Account No.</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono font-bold">{req.account_number}</span>
-                              <button onClick={() => copyToClipboard(req.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>
-                            </div>
-                          </div>
-                          <div><span className="text-muted-foreground block">Account Name</span><span className="font-bold">{req.account_name}</span></div>
-                        </div>
-                        {/* Reject note input */}
-                        {rejectingId === req.id && (
-                          <div className="mb-3 space-y-2">
-                            <Input
-                              placeholder="Reason for rejection..."
-                              value={rejectNote}
-                              onChange={e => setRejectNote(e.target.value)}
-                              className="text-sm border-red-300"
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="destructive" className="flex-1 h-8 gap-1" onClick={() => handleRejectWithdrawal(req.id)}>
-                                <XCircle className="w-3.5 h-3.5" /> Confirm Reject
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-8" onClick={() => { setRejectingId(null); setRejectNote(''); }}>Cancel</Button>
-                            </div>
-                          </div>
-                        )}
-                        {rejectingId !== req.id && (
-                          <div className="flex gap-2">
-                            <Button size="sm" className="flex-1 h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleMarkPaid(req.id)}>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Paid
-                            </Button>
-                            <Button size="sm" variant="destructive" className="flex-1 h-9 gap-1.5" onClick={() => { setRejectingId(req.id); setRejectNote(''); }}>
-                              <XCircle className="w-3.5 h-3.5" /> Reject
-                            </Button>
-                          </div>
-                        )}
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* History */}
-            {withdrawalRequests.filter(r => r.status !== 'pending').length > 0 && (
-              <div>
-                <h3 className="font-semibold text-sm mb-3">History</h3>
-                <Card className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Agent</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Bank</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {withdrawalRequests.filter(r => r.status !== 'pending').map(req => (
-                        <TableRow key={req.id}>
-                          <TableCell>
-                            <p className="font-medium text-sm">{req.agent_name}</p>
-                            <p className="text-xs text-muted-foreground">{req.agent_email}</p>
-                          </TableCell>
-                          <TableCell className="font-bold">{formatPrice(req.amount)}</TableCell>
-                          <TableCell className="text-sm">{req.bank_name} · {req.account_number}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadge(req.status)}>{req.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {req.resolved_at ? new Date(req.resolved_at).toLocaleDateString() : '—'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Card>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
       </Tabs>
 
       {/* ── Agent Detail Dialog ── */}
