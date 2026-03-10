@@ -1021,7 +1021,7 @@ export const balanceAPI = {
 
 export const withdrawalAPI = {
   request: async ({ agentId, agentName, agentEmail, amount, bankName, accountNumber, accountName }) => {
-    // Check available balance — use array select to avoid maybeSingle body-lock bug
+    // Check available balance
     const balRes = await supabase
       .from('agent_balances')
       .select('total_earned, total_withdrawn')
@@ -1031,9 +1031,21 @@ export const withdrawalAPI = {
     const available = Number(bal?.total_earned || 0) - Number(bal?.total_withdrawn || 0);
     if (amount > available) throw new Error(`Amount exceeds available balance (₦${available.toLocaleString('en-NG')})`);
 
-    const insertRes = await supabase
-      .from('withdrawal_requests')
-      .insert({
+    // Use raw fetch so we can read the real error from the response body
+    const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
+    const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || SUPA_KEY;
+
+    const rawRes = await fetch(`${SUPA_URL}/rest/v1/withdrawal_requests`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
         agent_id: agentId,
         agent_name: agentName,
         agent_email: agentEmail,
@@ -1043,14 +1055,21 @@ export const withdrawalAPI = {
         account_name: accountName,
         status: 'pending',
         requested_at: new Date().toISOString(),
-      });
-    if (insertRes.error) {
-      const msg = insertRes.error.message || 'Insert failed';
-      const detail = insertRes.error.details || '';
-      const hint = insertRes.error.hint || '';
-      const code = insertRes.error.code || '';
-      throw new Error(`[${code}] ${msg}${detail ? ' — ' + detail : ''}${hint ? ' | Hint: ' + hint : ''}`);
+      }),
+    });
+
+    if (!rawRes.ok) {
+      const errText = await rawRes.text();
+      let errMsg = `HTTP ${rawRes.status}`;
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg = errJson.message || errJson.error || errText;
+        if (errJson.details) errMsg += ' — ' + errJson.details;
+        if (errJson.hint) errMsg += ' | ' + errJson.hint;
+      } catch { errMsg = errText || errMsg; }
+      throw new Error(errMsg);
     }
+
     return { data: { ok: true } };
   },
 
