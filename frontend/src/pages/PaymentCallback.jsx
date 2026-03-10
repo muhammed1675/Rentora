@@ -24,7 +24,7 @@ export function PaymentCallback() {
       }
 
       try {
-        const response = await paymentAPI.complete(reference);
+        const response = await paymentAPI.confirmPayment(reference);
         setPaymentDetails(response.data);
         
         // complete() always returns 'completed' or throws
