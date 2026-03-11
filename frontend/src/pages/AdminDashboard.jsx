@@ -881,6 +881,8 @@ export function AdminDashboard() {
             </div>
           )}
 
+        </TabsContent>
+
         {/* ── Payouts Tab ── */}
         <TabsContent value="payouts">
           {/* Summary cards */}
