@@ -1074,14 +1074,19 @@ export const withdrawalAPI = {
     });
 
     if (!insertFetch.ok) {
-      const errText = await insertFetch.text();
       let errMsg = `HTTP ${insertFetch.status}`;
       try {
+        // clone() before reading — PostHog may have consumed the original body
+        const errText = await insertFetch.clone().text();
         const errJson = JSON.parse(errText);
         errMsg = errJson.message || errJson.error || errText;
         if (errJson.details) errMsg += ' — ' + errJson.details;
         if (errJson.hint) errMsg += ' | ' + errJson.hint;
-      } catch { errMsg = errText || errMsg; }
+      } catch {
+        if (insertFetch.status === 400) errMsg = 'Insert blocked (400) — RLS policy or missing column';
+        if (insertFetch.status === 401) errMsg = 'Not authenticated';
+        if (insertFetch.status === 403) errMsg = 'Permission denied';
+      }
       throw new Error(errMsg);
     }
 
