@@ -286,7 +286,41 @@ export function AgentDashboard() {
   const handleMarkCompleted = async (inspectionId) => {
     try {
       await inspectionAPI.update(inspectionId, { status: 'completed' });
-      toast.success('Inspection marked as completed');
+
+      // Credit agent balance ₦2,100 (70% of ₦3,000 fee) on inspection completion
+      const AGENT_SHARE = 2100;
+      const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
+      const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      let token = SUPA_KEY;
+      try {
+        const ref = SUPA_URL.split('//')[1].split('.')[0];
+        const stored = localStorage.getItem(`sb-${ref}-auth-token`);
+        if (stored) { const p = JSON.parse(stored); token = p?.access_token || p?.session?.access_token || SUPA_KEY; }
+      } catch {}
+      const hdrs = { 'Content-Type': 'application/json', 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` };
+
+      const balFetch = await fetch(
+        `${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${user.id}&limit=1`,
+        { headers: hdrs }
+      );
+      const balRows = balFetch.ok ? await balFetch.json() : [];
+      const existing = balRows?.[0] || null;
+
+      if (existing) {
+        await fetch(`${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${user.id}`, {
+          method: 'PATCH',
+          headers: { ...hdrs, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ total_earned: Number(existing.total_earned || 0) + AGENT_SHARE, updated_at: new Date().toISOString() }),
+        });
+      } else {
+        await fetch(`${SUPA_URL}/rest/v1/agent_balances`, {
+          method: 'POST',
+          headers: { ...hdrs, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ agent_id: user.id, total_earned: AGENT_SHARE, total_withdrawn: 0, updated_at: new Date().toISOString() }),
+        });
+      }
+
+      toast.success('Inspection completed! ₦2,100 added to your balance.');
       fetchData();
     } catch (error) {
       toast.error('Failed to update inspection');
