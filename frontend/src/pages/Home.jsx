@@ -17,10 +17,21 @@ export function Home() {
 
   useEffect(() => {
     const seen = localStorage.getItem('rentora_onboarding_seen');
-    if (!seen) {
-      const t = setTimeout(() => setShowOnboarding(true), 800);
-      return () => clearTimeout(t);
-    }
+    if (seen) return; // already seen, never show again
+
+    // Wait for consent to be answered first, then show onboarding
+    const checkConsent = () => {
+      const consent = localStorage.getItem('rentora_consent');
+      if (consent) {
+        // Consent answered — show onboarding after a short delay
+        setTimeout(() => setShowOnboarding(true), 500);
+      } else {
+        // Consent not yet answered — keep polling
+        setTimeout(checkConsent, 300);
+      }
+    };
+    const t = setTimeout(checkConsent, 800);
+    return () => clearTimeout(t);
   }, []);
 
   const dismissOnboarding = () => {
