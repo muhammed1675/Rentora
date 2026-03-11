@@ -26,7 +26,7 @@ const sections = [
       },
       {
         title: '4. Inspection Bookings',
-        body: `Inspection Fee = ₦2,000 per booking.\n\nImportant Conditions:\n• Payment confirms inspection scheduling\n• If the assigned agent fails to attend, a refund may be issued\n• If the user fails to attend, the inspection is considered completed\n• Rentora is not responsible for rental negotiations or final rental agreements`
+        body: `Inspection Fee = ₦3,000 per booking.\n\nImportant Conditions:\n• Payment confirms inspection scheduling\n• If the assigned agent fails to attend, a refund may be issued\n• If the user fails to attend, the inspection is considered completed\n• Rentora is not responsible for rental negotiations or final rental agreements`
       },
       {
         title: '5. Property Information Disclaimer',
