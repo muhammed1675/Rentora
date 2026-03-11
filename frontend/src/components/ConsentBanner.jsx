@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Cookie } from 'lucide-react';
+import { X, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 
 export function ConsentBanner() {
@@ -43,7 +43,7 @@ export function ConsentBanner() {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Cookie className="w-4 h-4 text-primary" />
+              <ShieldCheck className="w-4 h-4 text-primary" />
             </div>
             <p className="font-semibold text-sm">We value your privacy</p>
           </div>
@@ -61,7 +61,7 @@ export function ConsentBanner() {
           <Link to="/terms" className="text-primary hover:underline font-medium" onClick={accept}>
             Privacy Policy
           </Link>
-          . We use cookies to improve your experience.
+          . We store your login session and preferences in your browser's local storage to keep you signed in. No tracking or advertising data is collected.
         </p>
 
         <div className="flex gap-2">
