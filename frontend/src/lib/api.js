@@ -815,49 +815,6 @@ export const paymentAPI = {
           .update({ payment_status: 'completed', status: 'assigned' })
           .eq('id', inspTx.inspection_id);
 
-        // 3. Credit agent balance (₦2,100 = 70% of ₦3,000 inspection fee)
-        if (inspection?.agent_id) {
-          const AGENT_SHARE = 2100;
-          const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-          const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-          let token = SUPA_KEY;
-          try {
-            const ref = SUPA_URL.split('//')[1].split('.')[0];
-            const stored = localStorage.getItem(`sb-${ref}-auth-token`);
-            if (stored) { const p = JSON.parse(stored); token = p?.access_token || p?.session?.access_token || SUPA_KEY; }
-          } catch {}
-          const hdrs = { 'Content-Type': 'application/json', 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` };
-
-          // Get current balance
-          const balFetch = await fetch(
-            `${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${inspection.agent_id}&limit=1`,
-            { headers: hdrs }
-          );
-          const balRows = balFetch.ok ? await balFetch.json() : [];
-          const existing = balRows?.[0] || null;
-
-          if (existing) {
-            // Update existing record
-            const newEarned = Number(existing.total_earned || 0) + AGENT_SHARE;
-            await fetch(`${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${inspection.agent_id}`, {
-              method: 'PATCH',
-              headers: { ...hdrs, 'Prefer': 'return=minimal' },
-              body: JSON.stringify({ total_earned: newEarned, updated_at: new Date().toISOString() }),
-            });
-          } else {
-            // Create new balance record
-            await fetch(`${SUPA_URL}/rest/v1/agent_balances`, {
-              method: 'POST',
-              headers: { ...hdrs, 'Prefer': 'return=minimal' },
-              body: JSON.stringify({
-                agent_id: inspection.agent_id,
-                total_earned: AGENT_SHARE,
-                total_withdrawn: 0,
-                updated_at: new Date().toISOString(),
-              }),
-            });
-          }
-        }
       }
       return { data: { type: 'inspection', status: 'completed', amount: inspTx.amount } };
     }
