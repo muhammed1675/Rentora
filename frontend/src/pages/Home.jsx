@@ -289,35 +289,6 @@ export function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Download App Section ────────────────────── */}
-      <section className="py-12 bg-slate-50 border-y border-border/40">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 max-w-3xl mx-auto">
-            <div className="flex items-center gap-4">
-              <img src="/launchericon-192x192.png" alt="Rentora App" className="w-16 h-16 rounded-2xl shadow-md" />
-              <div>
-                <h3 className="font-bold text-lg">Download the Rentora App</h3>
-                <p className="text-sm text-foreground/60 mt-0.5">Fast, easy access to student housing near LAUTECH</p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-              <a href="/rentora.apk" download="Rentora.apk"
-                className="flex items-center gap-2.5 bg-black text-white px-4 py-2.5 rounded-xl hover:bg-black/80 transition-colors">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white shrink-0"><path d="M3.18 23.76c.3.17.64.24.99.2l12.6-11.96L13.5 8.74 3.18 23.76zm16.7-10.8L16.7 11.1l-3.5 3.33 3.5 3.32 3.2-1.88c.9-.53.9-1.4-.02-1.91zM2.3.32C2.1.55 2 .9 2 1.34v21.3c0 .44.1.78.31 1.01l.06.06 11.93-11.93v-.28L2.36.26 2.3.32zm10.8 11.07L2.3.32l-.01-.06L13.5 8.74l-.4 2.65z"/></svg>
-                <div><p className="text-[10px] text-white/70 leading-none">Download APK for</p><p className="text-sm font-semibold leading-tight">Android</p></div>
-              </a>
-              <div className="cursor-not-allowed opacity-50">
-                <img
-                  src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
-                  alt="Download on the App Store"
-                  className="h-10"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── Become an Agent CTA ──────────────────────── */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4">
@@ -351,6 +322,35 @@ export function Home() {
             <div className="absolute bottom-0 right-1/4 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
             <div className="absolute top-1/2 right-8 w-20 h-20 bg-white/5 rounded-full -translate-y-1/2" />
           </Card>
+        </div>
+      </section>
+
+      {/* ── Download App Section ────────────────────── */}
+      <section className="py-12 bg-slate-50 border-y border-border/40">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 max-w-3xl mx-auto">
+            <div className="flex items-center gap-4">
+              <img src="/launchericon-192x192.png" alt="Rentora App" className="w-16 h-16 rounded-2xl shadow-md" />
+              <div>
+                <h3 className="font-bold text-lg">Download the Rentora App</h3>
+                <p className="text-sm text-foreground/60 mt-0.5">Fast, easy access to student housing near LAUTECH</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+              <a href="/rentora.apk" download="Rentora.apk"
+                className="flex items-center gap-2.5 bg-black text-white px-4 py-2.5 rounded-xl hover:bg-black/80 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white shrink-0"><path d="M3.18 23.76c.3.17.64.24.99.2l12.6-11.96L13.5 8.74 3.18 23.76zm16.7-10.8L16.7 11.1l-3.5 3.33 3.5 3.32 3.2-1.88c.9-.53.9-1.4-.02-1.91zM2.3.32C2.1.55 2 .9 2 1.34v21.3c0 .44.1.78.31 1.01l.06.06 11.93-11.93v-.28L2.36.26 2.3.32zm10.8 11.07L2.3.32l-.01-.06L13.5 8.74l-.4 2.65z"/></svg>
+                <div><p className="text-[10px] text-white/70 leading-none">Download APK for</p><p className="text-sm font-semibold leading-tight">Android</p></div>
+              </a>
+              <div className="cursor-not-allowed opacity-50">
+                <img
+                  src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+                  alt="Download on the App Store"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
