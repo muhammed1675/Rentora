@@ -10,6 +10,10 @@ import {
   ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 
+import { AppBanner } from '../components/AppBanner';
+
+import { AppBanner } from '../components/AppBanner';
+
 export function Home() {
   const { isAuthenticated } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -204,50 +208,6 @@ export function Home() {
         </div>
       </section>
 
-      {/* ── Become an Agent CTA ──────────────────────── */}
-      <section className="py-16 md:py-24 bg-background">
-        <div className="container mx-auto px-4">
-          <Card className="relative overflow-hidden bg-primary text-white p-8 md:p-12 border-0 shadow-xl">
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="max-w-xl">
-                <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
-                  Want to Become a Rentora Agent?
-                </h2>
-                <p className="mt-4 text-white/80 text-base leading-relaxed">
-                  Earn <strong>₦2,100</strong> per completed inspection. Work flexible hours, help students find housing, and grow your income — all verified through our platform.
-                </p>
-                <ul className="mt-4 space-y-1.5">
-                  {[
-                    '₦2,100 paid per inspection you complete',
-                    'Flexible — work at your own pace',
-                    'ID-verified badge builds trust with renters',
-                    'Withdraw earnings directly to your bank account',
-                  ].map(item => (
-                    <li key={item} className="flex items-center gap-2 text-sm text-white/80">
-                      <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="shrink-0 flex flex-col sm:flex-row md:flex-col gap-4">
-                <Link to="/become-agent">
-                  <Button size="lg" className="gap-2 bg-white text-primary hover:bg-white/90 font-semibold shadow active:scale-95 transition-transform">
-                    Apply to Become an Agent
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </Link>
-                <p className="text-xs text-white/50 text-center">Free to join · No monthly fees</p>
-              </div>
-            </div>
-            {/* Decorative circles — same as CTA section */}
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3" />
-            <div className="absolute bottom-0 right-1/4 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
-            <div className="absolute top-1/2 right-8 w-20 h-20 bg-white/5 rounded-full -translate-y-1/2" />
-          </Card>
-        </div>
-      </section>
-
       {/* ── CTA ──────────────────────────────────────── */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4">
@@ -331,6 +291,70 @@ export function Home() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Download App Section ────────────────────── */}
+      <section className="py-12 bg-slate-50 border-y border-border/40">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 max-w-3xl mx-auto">
+            <div className="flex items-center gap-4">
+              <img src="/launchericon-192x192.png" alt="Rentora App" className="w-16 h-16 rounded-2xl shadow-md" />
+              <div>
+                <h3 className="font-bold text-lg">Download the Rentora App</h3>
+                <p className="text-sm text-foreground/60 mt-0.5">Fast, easy access to student housing near LAUTECH</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+              <a href="/rentora.apk" download="Rentora.apk"
+                className="flex items-center gap-2.5 bg-black text-white px-4 py-2.5 rounded-xl hover:bg-black/80 transition-colors">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white shrink-0"><path d="M3.18 23.76c.3.17.64.24.99.2l12.6-11.96L13.5 8.74 3.18 23.76zm16.7-10.8L16.7 11.1l-3.5 3.33 3.5 3.32 3.2-1.88c.9-.53.9-1.4-.02-1.91zM2.3.32C2.1.55 2 .9 2 1.34v21.3c0 .44.1.78.31 1.01l.06.06 11.93-11.93v-.28L2.36.26 2.3.32zm10.8 11.07L2.3.32l-.01-.06L13.5 8.74l-.4 2.65z"/></svg>
+                <div><p className="text-[10px] text-white/70 leading-none">Download for</p><p className="text-sm font-semibold leading-tight">Android (APK)</p></div>
+              </a>
+              <div className="flex items-center gap-2.5 bg-black/50 text-white px-4 py-2.5 rounded-xl cursor-not-allowed opacity-60">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white shrink-0"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                <div><p className="text-[10px] text-white/70 leading-none">Coming soon on</p><p className="text-sm font-semibold leading-tight">App Store</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Become an Agent CTA ──────────────────────── */}
+      <section className="py-16 md:py-24 bg-background">
+        <div className="container mx-auto px-4">
+          <Card className="relative overflow-hidden bg-primary text-white p-8 md:p-12 border-0 shadow-xl">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="max-w-xl">
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
+                  Want to Become a Rentora Agent?
+                </h2>
+                <p className="mt-4 text-white/80 text-base leading-relaxed">
+                  Earn <strong>₦2,100</strong> per completed inspection. Work flexible hours, help students find housing, and grow your income — all verified through our platform.
+                </p>
+                <ul className="mt-4 space-y-1.5">
+                  {['₦2,100 paid per inspection you complete','Flexible — work at your own pace','ID-verified badge builds trust with renters','Withdraw earnings directly to your bank account'].map(item => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-white/80">
+                      <CheckCircle2 className="w-4 h-4 text-white shrink-0" />{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="shrink-0 flex flex-col gap-3">
+                <Link to="/become-agent">
+                  <Button size="lg" className="gap-2 bg-white text-primary hover:bg-white/90 font-semibold shadow active:scale-95 transition-transform">
+                    Apply to Become an Agent <ArrowRight className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <p className="text-xs text-white/50 text-center">Free to join · No monthly fees</p>
+              </div>
+            </div>
+            <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3" />
+            <div className="absolute bottom-0 right-1/4 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
+            <div className="absolute top-1/2 right-8 w-20 h-20 bg-white/5 rounded-full -translate-y-1/2" />
+          </Card>
+        </div>
+      </section>
+
+      {/* App install banner — shows on mobile */}
+      <AppBanner />
     </div>
   );
 }
