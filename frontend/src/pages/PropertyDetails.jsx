@@ -441,6 +441,32 @@ export function PropertyDetails() {
             <p className="text-sm text-muted-foreground">Annual Rent</p>
             <p className="text-4xl font-bold text-primary mt-1">{formatPrice(property.price)}</p>
             <p className="text-sm text-muted-foreground">/year</p>
+            {(property.caution_fee || property.agent_fee) && (
+              <div className="mt-4 pt-4 border-t border-border/60 space-y-2">
+                {property.caution_fee && (
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-muted-foreground">Caution Fee</p>
+                    <p className="text-sm font-semibold">{formatPrice(property.caution_fee)}</p>
+                  </div>
+                )}
+                {property.agent_fee && (
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-muted-foreground">Agent Fee</p>
+                    <p className="text-sm font-semibold">{formatPrice(property.agent_fee)}</p>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-border/40">
+                  <p className="text-sm font-semibold">Total Move-in Cost</p>
+                  <p className="text-sm font-bold text-primary">
+                    {formatPrice(
+                      Number(property.price || 0) +
+                      Number(property.caution_fee || 0) +
+                      Number(property.agent_fee || 0)
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card className="p-6">
