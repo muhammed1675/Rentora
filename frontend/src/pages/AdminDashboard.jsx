@@ -1416,6 +1416,31 @@ export function AdminDashboard() {
                   {previewProperty.bedrooms && <Badge variant="outline">{previewProperty.bedrooms} bed</Badge>}
                   {previewProperty.bathrooms && <Badge variant="outline">{previewProperty.bathrooms} bath</Badge>}
                 </div>
+                {(previewProperty.caution_fee || previewProperty.agent_fee) && (
+                  <div className="mt-3 p-3 rounded-lg bg-muted/40 space-y-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Fee Breakdown</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Annual Rent</span>
+                      <span className="font-medium">{formatPrice(previewProperty.price)}</span>
+                    </div>
+                    {previewProperty.caution_fee && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Caution Fee</span>
+                        <span className="font-medium">{formatPrice(previewProperty.caution_fee)}</span>
+                      </div>
+                    )}
+                    {previewProperty.agent_fee && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Agent Fee</span>
+                        <span className="font-medium">{formatPrice(previewProperty.agent_fee)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-bold pt-1.5 border-t border-border/50">
+                      <span>Total Move-in Cost</span>
+                      <span className="text-primary">{formatPrice(Number(previewProperty.price||0)+Number(previewProperty.caution_fee||0)+Number(previewProperty.agent_fee||0))}</span>
+                    </div>
+                  </div>
+                )}
               </div>
               {/* Description */}
               {previewProperty.description && (
