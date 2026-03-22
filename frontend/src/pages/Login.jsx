@@ -91,6 +91,7 @@ export function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 className="pl-10 h-12"
+                autoComplete="email"
                 data-testid="login-email"
               />
             </div>
@@ -107,6 +108,7 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 className="pl-10 pr-10 h-12"
+                autoComplete="current-password"
                 data-testid="login-password"
               />
               <button
