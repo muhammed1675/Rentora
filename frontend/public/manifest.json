@@ -4,14 +4,22 @@
   "short_name": "Rentora",
   "description": "Find verified student hostels and rooms near LAUTECH Ogbomosho. Book inspections, unlock contacts, find your perfect accommodation.",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#ffffff",
   "theme_color": "#1d4ed8",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["lifestyle", "education"],
+  "categories": [
+    "lifestyle",
+    "education"
+  ],
   "icons": [
     {
       "src": "launchericon-72x72.png",
@@ -50,7 +58,7 @@
       "purpose": "maskable any"
     },
     {
-      "src": "launchericon-512x512.png",
+      "src": "512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
@@ -60,14 +68,28 @@
     {
       "name": "Browse Properties",
       "short_name": "Browse",
+      "description": "Browse verified student properties",
       "url": "/browse",
-      "icons": [{ "src": "launchericon-96x96.png", "sizes": "96x96", "type": "image/png" }]
+      "icons": [
+        {
+          "src": "launchericon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "My Profile",
       "short_name": "Profile",
+      "description": "View your profile",
       "url": "/profile",
-      "icons": [{ "src": "launchericon-96x96.png", "sizes": "96x96", "type": "image/png" }]
+      "icons": [
+        {
+          "src": "launchericon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
