@@ -21,9 +21,6 @@ export const propertyAPI = {
     } else {
       query = query.eq('status', 'approved');
     }
-
-    // Never show unavailable properties to browsers
-    query = query.or('availability.is.null,availability.eq.available');
     
     if (params.property_type) {
       query = query.eq('property_type', params.property_type);
@@ -697,12 +694,11 @@ export const adminAPI = {
 export const paymentAPI = {
   verify: async (reference) => {
     // Check token transaction
-    const tokenVerifyRes = await supabase
+    const { data: tokenTx } = await supabase
       .from('transactions')
       .select('*')
       .eq('reference', reference)
-      .limit(1);
-    const tokenTx = tokenVerifyRes.data?.[0] || null;
+      .single();
     
     if (tokenTx) {
       return {
@@ -716,28 +712,27 @@ export const paymentAPI = {
     }
     
     // Check inspection transaction
-    const inspVerifyRes = await supabase
+    const { data: inspTx } = await supabase
       .from('inspection_transactions')
       .select('*')
       .eq('reference', reference)
-      .limit(1);
-    const inspTx = inspVerifyRes.data?.[0] || null;
+      .single();
     
     if (inspTx) {
-      const inspDetailVerifyRes = await supabase
+      // Get inspection details to return agent info
+      const { data: inspection } = await supabase
         .from('inspections')
         .select('agent_name, agent_id, property_title')
         .eq('id', inspTx.inspection_id)
-        .limit(1);
-      const inspection = inspDetailVerifyRes.data?.[0] || null;
+        .single();
+      // Agent phone comes from users.phone — the number they registered with
       let agentPhone = null;
       if (inspection?.agent_id) {
-        const agentVerifyRes = await supabase
+        const { data: agentUser } = await supabase
           .from('users')
           .select('phone')
           .eq('id', inspection.agent_id)
-          .limit(1);
-        const agentUser = agentVerifyRes.data?.[0] || null;
+          .single();
         agentPhone = agentUser?.phone || null;
       }
       return {
@@ -759,13 +754,11 @@ export const paymentAPI = {
   // Simulate payment for testing
   confirmPayment: async (reference) => {
     // Called by korapay.js onSuccess — marks payment completed in DB
-    // Using .limit(1) + data[0] instead of .single() to avoid body-stream-read errors
-    const tokenRes = await supabase
+    const { data: tokenTx } = await supabase
       .from('transactions')
       .select('*')
       .eq('reference', reference)
-      .limit(1);
-    const tokenTx = tokenRes.data?.[0] || null;
+      .single();
 
     if (tokenTx) {
       if (tokenTx.status !== 'completed') {
@@ -774,12 +767,11 @@ export const paymentAPI = {
           .update({ status: 'completed' })
           .eq('reference', reference);
 
-        const walletRes = await supabase
+        const { data: wallet } = await supabase
           .from('wallets')
           .select('token_balance')
           .eq('user_id', tokenTx.user_id)
-          .limit(1);
-        const wallet = walletRes.data?.[0] || null;
+          .single();
 
         const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
         await supabase
@@ -787,38 +779,87 @@ export const paymentAPI = {
           .update({ token_balance: newBalance })
           .eq('user_id', tokenTx.user_id);
       }
+      // Send token receipt email
+      try {
+        const userRes = await supabase.from('users').select('email, full_name').eq('id', tokenTx.user_id).limit(1);
+        const u = userRes.data?.[0] || null;
+        if (u?.email) {
+          await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'token_receipt',
+              userEmail: u.email,
+              userName: u.full_name || 'User',
+              amount: tokenTx.amount,
+              tokens: tokenTx.tokens_added,
+              reference: reference,
+            }),
+          });
+        }
+      } catch (e) { console.warn('Token receipt email failed:', e); }
       return { data: { type: 'token_purchase', status: 'completed', amount: tokenTx.amount, tokens: tokenTx.tokens_added } };
     }
 
-    const inspRes = await supabase
+    const { data: inspTx } = await supabase
       .from('inspection_transactions')
       .select('*')
       .eq('reference', reference)
-      .limit(1);
-    const inspTx = inspRes.data?.[0] || null;
+      .single();
 
     if (inspTx) {
       if (inspTx.status !== 'completed') {
-        // 1. Mark transaction completed
         await supabase
           .from('inspection_transactions')
           .update({ status: 'completed' })
           .eq('reference', reference);
 
-        // 2. Mark inspection completed + assigned
-        const inspUpdateRes = await supabase
-          .from('inspections')
-          .select('agent_id')
-          .eq('id', inspTx.inspection_id)
-          .limit(1);
-        const inspection = inspUpdateRes.data?.[0] || null;
-
         await supabase
           .from('inspections')
           .update({ payment_status: 'completed', status: 'assigned' })
           .eq('id', inspTx.inspection_id);
-
       }
+      // Send inspection receipt emails to client and agent
+      try {
+        const inspFullRes = await supabase
+          .from('inspections')
+          .select('user_id, user_name, user_email, agent_id, agent_name, property_title, inspection_date')
+          .eq('id', inspTx.inspection_id)
+          .limit(1);
+        const insp = inspFullRes.data?.[0] || null;
+        if (insp) {
+          let agentPhone = null;
+          let agentEmail = null;
+          if (insp.agent_id) {
+            const agentRes = await supabase.from('users').select('phone, email').eq('id', insp.agent_id).limit(1);
+            const agentUser = agentRes.data?.[0] || null;
+            agentPhone = agentUser?.phone || null;
+            agentEmail = agentUser?.email || null;
+          }
+          let userPhone = null;
+          if (insp.user_id) {
+            const userRes = await supabase.from('users').select('phone').eq('id', insp.user_id).limit(1);
+            userPhone = userRes.data?.[0]?.phone || null;
+          }
+          await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'inspection_receipt',
+              userEmail: insp.user_email,
+              userName: insp.user_name,
+              userPhone: userPhone || 'Not provided',
+              agentName: insp.agent_name || 'Your Agent',
+              agentEmail: agentEmail,
+              agentPhone: agentPhone,
+              propertyTitle: insp.property_title,
+              inspectionDate: insp.inspection_date,
+              reference: reference,
+              amount: inspTx.amount,
+            }),
+          });
+        }
+      } catch (e) { console.warn('Inspection receipt email failed:', e); }
       return { data: { type: 'inspection', status: 'completed', amount: inspTx.amount } };
     }
 
@@ -827,11 +868,11 @@ export const paymentAPI = {
 
   simulate: async (reference) => {
     // Check token transaction
-    const tokenTxRes = await supabase
+    const { data: tokenTx } = await supabase
       .from('transactions')
       .select('*')
-      .eq('reference', reference).limit(1);
-    const tokenTx = tokenTxRes.data?.[0] || null;
+      .eq('reference', reference)
+      .single();
     
     if (tokenTx) {
       await supabase
@@ -840,11 +881,11 @@ export const paymentAPI = {
         .eq('reference', reference);
       
       // Add tokens to wallet
-      const walletRes = await supabase
+      const { data: wallet } = await supabase
         .from('wallets')
         .select('token_balance')
-        .eq('user_id', tokenTx.user_id).limit(1);
-    const wallet = walletRes.data?.[0] || null;
+        .eq('user_id', tokenTx.user_id)
+        .single();
       
       const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
       await supabase
@@ -856,11 +897,11 @@ export const paymentAPI = {
     }
     
     // Check inspection transaction
-    const inspTxRes = await supabase
+    const { data: inspTx } = await supabase
       .from('inspection_transactions')
       .select('*')
-      .eq('reference', reference).limit(1);
-    const inspTx = inspTxRes.data?.[0] || null;
+      .eq('reference', reference)
+      .single();
     
     if (inspTx) {
       await supabase
@@ -1008,30 +1049,25 @@ export const contactAPI = {
 
 export const balanceAPI = {
   getMyBalance: async (agentId) => {
-    try {
-      const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-      const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-      let token = SUPA_KEY;
-      try { const ref = SUPA_URL.split('//')[1].split('.')[0]; const s = localStorage.getItem(`sb-${ref}-auth-token`); if (s) { const p = JSON.parse(s); token = p?.access_token || p?.session?.access_token || SUPA_KEY; } } catch {}
-      const res = await fetch(`${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${agentId}&limit=1`, { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` } });
-      const rows = res.ok ? await res.json() : [];
-      const data = rows?.[0] || null;
-      if (!data) return { data: { total_earned: 0, total_withdrawn: 0, available: 0 } };
-      const available = Number(data.total_earned || 0) - Number(data.total_withdrawn || 0);
-      return { data: { ...data, available } };
-    } catch { return { data: { total_earned: 0, total_withdrawn: 0, available: 0 } }; }
+    const balRes = await supabase
+      .from('agent_balances')
+      .select('*')
+      .eq('agent_id', agentId)
+      .limit(1);
+    if (balRes.error) throw balRes.error;
+    const data = balRes.data?.[0] || null;
+    if (!data) return { data: { total_earned: 0, total_withdrawn: 0, available: 0 } };
+    const available = Number(data.total_earned || 0) - Number(data.total_withdrawn || 0);
+    return { data: { ...data, available } };
   },
 
   getAllBalances: async () => {
-    try {
-      const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-      const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-      let token = SUPA_KEY;
-      try { const ref = SUPA_URL.split('//')[1].split('.')[0]; const s = localStorage.getItem(`sb-${ref}-auth-token`); if (s) { const p = JSON.parse(s); token = p?.access_token || p?.session?.access_token || SUPA_KEY; } } catch {}
-      const res = await fetch(`${SUPA_URL}/rest/v1/agent_balances?order=total_earned.desc`, { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` } });
-      const data = res.ok ? await res.json() : [];
-      return { data: Array.isArray(data) ? data : [] };
-    } catch { return { data: [] }; }
+    const res = await supabase
+      .from('agent_balances')
+      .select('*')
+      .order('total_earned', { ascending: false });
+    if (res.error) { console.warn('agent_balances:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
   },
 };
 
@@ -1039,41 +1075,19 @@ export const balanceAPI = {
 
 export const withdrawalAPI = {
   request: async ({ agentId, agentName, agentEmail, amount, bankName, accountNumber, accountName }) => {
-    const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-    const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-    // Get auth token from localStorage — avoids all Supabase client body-stream issues
-    let token = SUPA_KEY;
-    try {
-      const projectRef = SUPA_URL.split('//')[1].split('.')[0];
-      const stored = localStorage.getItem(`sb-${projectRef}-auth-token`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        token = parsed?.access_token || parsed?.session?.access_token || SUPA_KEY;
-      }
-    } catch { /* use anon key */ }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'apikey': SUPA_KEY,
-      'Authorization': `Bearer ${token}`,
-    };
-
-    // 1. Check available balance via raw fetch
-    const balFetch = await fetch(
-      `${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${agentId}&select=total_earned,total_withdrawn&limit=1`,
-      { headers }
-    );
-    const balData = balFetch.ok ? await balFetch.json() : [];
-    const bal = balData?.[0] || null;
+    // Check available balance — use array select to avoid maybeSingle body-lock bug
+    const balRes = await supabase
+      .from('agent_balances')
+      .select('total_earned, total_withdrawn')
+      .eq('agent_id', agentId)
+      .limit(1);
+    const bal = balRes.data?.[0] || null;
     const available = Number(bal?.total_earned || 0) - Number(bal?.total_withdrawn || 0);
     if (amount > available) throw new Error(`Amount exceeds available balance (₦${available.toLocaleString('en-NG')})`);
 
-    // 2. Insert withdrawal request via raw fetch
-    const insertFetch = await fetch(`${SUPA_URL}/rest/v1/withdrawal_requests`, {
-      method: 'POST',
-      headers: { ...headers, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
+    const insertRes = await supabase
+      .from('withdrawal_requests')
+      .insert({
         agent_id: agentId,
         agent_name: agentName,
         agent_email: agentEmail,
@@ -1083,116 +1097,69 @@ export const withdrawalAPI = {
         account_name: accountName,
         status: 'pending',
         requested_at: new Date().toISOString(),
-      }),
-    });
-
-    if (!insertFetch.ok) {
-      let errMsg = `HTTP ${insertFetch.status}`;
-      try {
-        // clone() before reading — PostHog may have consumed the original body
-        const errText = await insertFetch.clone().text();
-        const errJson = JSON.parse(errText);
-        errMsg = errJson.message || errJson.error || errText;
-        if (errJson.details) errMsg += ' — ' + errJson.details;
-        if (errJson.hint) errMsg += ' | ' + errJson.hint;
-      } catch {
-        if (insertFetch.status === 400) errMsg = 'Insert blocked (400) — RLS policy or missing column';
-        if (insertFetch.status === 401) errMsg = 'Not authenticated';
-        if (insertFetch.status === 403) errMsg = 'Permission denied';
-      }
-      throw new Error(errMsg);
-    }
-
+      });
+    if (insertRes.error) throw new Error(insertRes.error.message);
     return { data: { ok: true } };
   },
 
-
   getMyRequests: async (agentId) => {
-    try {
-      const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-      const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-      let token = SUPA_KEY;
-      try {
-        const ref = SUPA_URL.split('//')[1].split('.')[0];
-        const stored = localStorage.getItem(`sb-${ref}-auth-token`);
-        if (stored) { const p = JSON.parse(stored); token = p?.access_token || p?.session?.access_token || SUPA_KEY; }
-      } catch { /* use anon */ }
-      const res = await fetch(
-        `${SUPA_URL}/rest/v1/withdrawal_requests?agent_id=eq.${agentId}&order=requested_at.desc`,
-        { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` } }
-      );
-      const data = res.ok ? await res.json() : [];
-      return { data: Array.isArray(data) ? data : [] };
-    } catch { return { data: [] }; }
+    const res = await supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .eq('agent_id', agentId)
+      .order('requested_at', { ascending: false });
+    // Return empty array on error (e.g. table not yet created)
+    if (res.error) { console.warn('withdrawal_requests:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
   },
 
   getAll: async () => {
-    try {
-      const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-      const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-      let token = SUPA_KEY;
-      try {
-        const ref = SUPA_URL.split('//')[1].split('.')[0];
-        const stored = localStorage.getItem(`sb-${ref}-auth-token`);
-        if (stored) { const p = JSON.parse(stored); token = p?.access_token || p?.session?.access_token || SUPA_KEY; }
-      } catch { /* use anon */ }
-      const res = await fetch(
-        `${SUPA_URL}/rest/v1/withdrawal_requests?order=requested_at.desc`,
-        { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` } }
-      );
-      const data = res.ok ? await res.json() : [];
-      return { data: Array.isArray(data) ? data : [] };
-    } catch { return { data: [] }; }
+    const res = await supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .order('requested_at', { ascending: false });
+    if (res.error) { console.warn('withdrawal_requests:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
   },
 
   markPaid: async (requestId, adminId) => {
-    const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-    const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-    let token = SUPA_KEY;
-    try { const ref = SUPA_URL.split('//')[1].split('.')[0]; const s = localStorage.getItem(`sb-${ref}-auth-token`); if (s) { const p = JSON.parse(s); token = p?.access_token || p?.session?.access_token || SUPA_KEY; } } catch {}
-    const hdrs = { 'Content-Type': 'application/json', 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}` };
+    // Get the request first
+    const { data: req, error: reqErr } = await supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+    if (reqErr) throw reqErr;
 
-    // Get the request
-    const reqFetch = await fetch(`${SUPA_URL}/rest/v1/withdrawal_requests?id=eq.${requestId}&limit=1`, { headers: hdrs });
-    const reqRows = reqFetch.ok ? await reqFetch.json() : [];
-    const req = reqRows?.[0] || null;
-    if (!req) throw new Error('Withdrawal request not found');
+    // Update status
+    const { error: updErr } = await supabase
+      .from('withdrawal_requests')
+      .update({ status: 'paid', resolved_at: new Date().toISOString(), resolved_by: adminId })
+      .eq('id', requestId);
+    if (updErr) throw updErr;
 
-    // Mark as paid
-    const updFetch = await fetch(`${SUPA_URL}/rest/v1/withdrawal_requests?id=eq.${requestId}`, {
-      method: 'PATCH',
-      headers: { ...hdrs, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ status: 'paid', resolved_at: new Date().toISOString(), resolved_by: adminId }),
-    });
-    if (!updFetch.ok) { const t = await updFetch.text(); throw new Error(t); }
-
-    // Get current balance
-    const balFetch = await fetch(`${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${req.agent_id}&limit=1`, { headers: hdrs });
-    const balRows = balFetch.ok ? await balFetch.json() : [];
-    const bal = balRows?.[0] || null;
+    // Add to total_withdrawn in agent_balances
+    const balRes2 = await supabase
+      .from('agent_balances')
+      .select('total_withdrawn')
+      .eq('agent_id', req.agent_id)
+      .limit(1);
+    const bal = balRes2.data?.[0] || null;
     const newWithdrawn = Number(bal?.total_withdrawn || 0) + Number(req.amount);
-
-    // Update balance
-    await fetch(`${SUPA_URL}/rest/v1/agent_balances?agent_id=eq.${req.agent_id}`, {
-      method: 'PATCH',
-      headers: { ...hdrs, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ total_withdrawn: newWithdrawn, updated_at: new Date().toISOString() }),
-    });
+    await supabase
+      .from('agent_balances')
+      .update({ total_withdrawn: newWithdrawn, updated_at: new Date().toISOString() })
+      .eq('agent_id', req.agent_id);
 
     return { data: { ok: true } };
   },
 
   reject: async (requestId, adminId, notes) => {
-    const SUPA_URL = process.env.REACT_APP_SUPABASE_URL;
-    const SUPA_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-    let token = SUPA_KEY;
-    try { const ref = SUPA_URL.split('//')[1].split('.')[0]; const s = localStorage.getItem(`sb-${ref}-auth-token`); if (s) { const p = JSON.parse(s); token = p?.access_token || p?.session?.access_token || SUPA_KEY; } } catch {}
-    const res = await fetch(`${SUPA_URL}/rest/v1/withdrawal_requests?id=eq.${requestId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token}`, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ status: 'rejected', resolved_at: new Date().toISOString(), resolved_by: adminId, notes: notes || null }),
-    });
-    if (!res.ok) { const t = await res.text(); throw new Error(t); }
+    const { error } = await supabase
+      .from('withdrawal_requests')
+      .update({ status: 'rejected', resolved_at: new Date().toISOString(), resolved_by: adminId, notes: notes || null })
+      .eq('id', requestId);
+    if (error) throw error;
     return { data: { ok: true } };
   },
 };
@@ -1214,4 +1181,3 @@ export default {
   balanceAPI,
   withdrawalAPI
 };
-
