@@ -7,7 +7,7 @@ import { Dialog, DialogContent } from '../components/ui/dialog';
 import {
   Search, Shield, Coins, Calendar, ArrowRight,
   Building2, Users, CheckCircle2, MessageSquare,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon, ShoppingBag, Sparkles
 } from 'lucide-react';
 
 import { AppBanner } from '../components/AppBanner';
@@ -142,6 +142,48 @@ export function Home() {
                 <p className="text-sm font-medium text-foreground/60 mt-1">{stat.label}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── NEW: Ogbomosho Marketplace Promo Banner ──── */}
+      <section className="py-8 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="relative overflow-hidden rounded-3xl bg-slate-900 p-1 border border-slate-800 shadow-2xl">
+            <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-indigo-600 via-purple-600 to-primary px-6 py-8 md:px-12 md:py-10">
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 -mt-8 -mr-8 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute bottom-0 left-0 -mb-8 -ml-8 h-48 w-48 rounded-full bg-black/20 blur-2xl" />
+              
+              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 shadow-xl">
+                    <ShoppingBag className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 text-xs font-bold uppercase tracking-wider mb-3">
+                      <Sparkles className="w-3 h-3" />
+                      Coming Soon
+                    </div>
+                    <h2 className="text-2xl md:text-4xl font-black text-white leading-tight">
+                      The Ogbomosho Student <br className="hidden md:block" /> Marketplace
+                    </h2>
+                    <p className="mt-3 text-white/80 text-lg max-w-xl">
+                      Buy and sell anything within the LAUTECH community. From used textbooks to electronics—safe, local, and student-only.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <Link to="/listings">
+                    <Button size="lg" className="bg-white text-indigo-600 hover:bg-slate-100 font-bold px-10 h-14 rounded-2xl shadow-xl hover:scale-105 transition-all group">
+                      Explore Marketplace
+                      <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
