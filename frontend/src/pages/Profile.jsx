@@ -333,26 +333,28 @@ export function Profile() {
             <div className="space-y-4">
               {unlocks.map((unlock) => (
                 <Card key={unlock.id} className="p-4">
-                  <div className="flex gap-4">
-                    <img
-                      src={unlock.property?.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
-                      alt=""
-                      className="w-24 h-24 rounded-lg object-cover"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{unlock.property?.title}</h3>
-                      <p className="text-sm text-muted-foreground">{unlock.property?.location}</p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="text-primary font-bold">
-                          {formatPrice(unlock.property?.price || 0)}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          Contact: {unlock.property?.contact_phone}
-                        </span>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex gap-4 min-w-0">
+                      <img
+                        src={unlock.property?.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+                        alt=""
+                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate">{unlock.property?.title}</h3>
+                        <p className="text-sm text-muted-foreground truncate">{unlock.property?.location}</p>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                          <span className="text-primary font-bold">
+                            {formatPrice(unlock.property?.price || 0)}
+                          </span>
+                          <span className="text-sm text-muted-foreground truncate">
+                            Contact: {unlock.property?.contact_phone}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Link to={`/property/${unlock.property_id}`}>
+                    <div className="flex sm:flex-col gap-2 sm:w-40 shrink-0">
+                      <Link to={`/property/${unlock.property_id}`} className="flex-1 sm:flex-none">
                         <Button variant="outline" size="sm" className="w-full gap-1">
                           <ExternalLink className="w-4 h-4" />View
                         </Button>
@@ -361,14 +363,14 @@ export function Profile() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full gap-1 text-green-600 border-green-300 hover:bg-green-50"
+                          className="flex-1 sm:flex-none w-full gap-1 text-green-600 border-green-300 hover:bg-green-50"
                           onClick={() => handleMarkTaken(unlock.property_id)}
                           data-testid={`mark-taken-${unlock.property_id}`}
                         >
                           <CheckCircle2 className="w-4 h-4" />Mark as Taken
                         </Button>
                       ) : (
-                        <Badge variant="secondary" className="justify-center">Taken</Badge>
+                        <Badge variant="secondary" className="flex-1 sm:flex-none justify-center">Taken</Badge>
                       )}
                     </div>
                   </div>
