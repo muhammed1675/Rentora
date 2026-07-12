@@ -738,7 +738,9 @@ export function AdminDashboard() {
               <div className="mb-2">
                 <h3 className="font-semibold mb-3 text-yellow-800 text-sm">⏳ Pending Approval</h3>
                 <div className="space-y-3">
-                  {properties.filter(p => p.status === 'pending').map((p) => (
+                  {properties.filter(p => p.status === 'pending').map((p) => {
+                    const dupMatch = p.possible_duplicate_of ? properties.find(x => x.id === p.possible_duplicate_of) : null;
+                    return (
                     <Card key={p.id} className="overflow-hidden border-yellow-200">
                       <div className="flex">
                         <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-24 sm:w-32 object-cover flex-shrink-0" style={{ minHeight: '100px' }} />
@@ -748,6 +750,11 @@ export function AdminDashboard() {
                             <p className="text-xs text-muted-foreground line-clamp-1">{p.location}</p>
                             <p className="text-primary font-bold text-sm mt-1">{formatPrice(p.price)}/yr</p>
                             <p className="text-xs text-muted-foreground">By: {p.uploaded_by_agent_name}</p>
+                            {dupMatch && (
+                              <p className="text-xs text-red-600 font-medium mt-1">
+                                ⚠ Possible duplicate of "{dupMatch.title}" by {dupMatch.uploaded_by_agent_name}
+                              </p>
+                            )}
                           </div>
                           <div className="flex gap-2 mt-2 flex-wrap">
                             <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => setPreviewProperty(p)}><Eye className="w-3 h-3" /> Preview</Button>
@@ -758,7 +765,8 @@ export function AdminDashboard() {
                         </div>
                       </div>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -961,7 +969,13 @@ export function AdminDashboard() {
                       <div className="space-y-1">
                         <p className="font-semibold">{req.agent_name}</p>
                         <p className="text-sm text-muted-foreground">{req.agent_email}</p>
-                        <p className="text-lg font-bold text-green-600">₦{Number(req.amount).toLocaleString('en-NG')}</p>
+                        <p className="text-lg font-bold text-green-600">₦{Number(req.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">requested</span></p>
+                        <div className="text-xs text-muted-foreground">
+                          Fee (3.5%): -₦{Number(req.fee_amount || 0).toLocaleString('en-NG')}
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Pay out: ₦{Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}
+                        </p>
                         {agentBal && (
                           <p className="text-xs text-muted-foreground">
                             Available: ₦{(Number(agentBal.total_earned) - Number(agentBal.total_withdrawn)).toLocaleString('en-NG')}
@@ -1481,8 +1495,8 @@ export function AdminDashboard() {
                     <p className="font-semibold">{previewProperty.caution_fee ? formatPrice(previewProperty.caution_fee) : '—'}</p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Agent Fee</p>
-                    <p className="font-semibold">{previewProperty.agent_fee ? formatPrice(previewProperty.agent_fee) : '—'}</p>
+                    <p className="text-xs text-muted-foreground">Agent Fee (20% of rent)</p>
+                    <p className="font-semibold">{formatPrice(Math.round(Number(previewProperty.price || 0) * 0.20))}</p>
                   </div>
                 </div>
               </div>

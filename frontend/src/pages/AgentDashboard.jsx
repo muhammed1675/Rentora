@@ -93,7 +93,7 @@ export function AgentDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', caution_fee: '', agent_fee: '', inspection_fee: '3000', location: '',
+    title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
   });
 
@@ -246,7 +246,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', agent_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '' });
+    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '' });
     setEditingProperty(null);
   };
 
@@ -257,7 +257,6 @@ export function AgentDashboard() {
         title: property.title, description: property.description, price: property.price.toString(),
         caution_fee: property.caution_fee ? property.caution_fee.toString() : '',
         inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
-        agent_fee: property.agent_fee ? property.agent_fee.toString() : '',
         location: property.location, property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
       });
@@ -271,7 +270,27 @@ export function AgentDashboard() {
     }
     try {
       const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
-      const data = { ...formData, price: parseInt(formData.price), caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, agent_fee: formData.agent_fee ? parseInt(formData.agent_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
+      const priceVal = parseInt(formData.price);
+
+      // Warn if another agent already has a listing that looks like the
+      // same property — same type, similar price/title/location.
+      const dupRes = await propertyAPI.checkPossibleDuplicates({
+        title: formData.title,
+        location: formData.location,
+        price: priceVal,
+        propertyType: formData.property_type,
+        agentId: user.id,
+        excludePropertyId: editingProperty?.id,
+      });
+      if (dupRes.data.length > 0) {
+        const match = dupRes.data[0];
+        const proceed = window.confirm(
+          `This looks similar to an existing listing — "${match.title}" (${match.location}) posted by ${match.uploaded_by_agent_name}.\n\nIf this is a different property, click OK to continue. If it's the same house, please don't post a duplicate.`
+        );
+        if (!proceed) return;
+      }
+
+      const data = { ...formData, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
       if (editingProperty) {
         // Any edit to an existing listing's details must go back through admin
         // approval — clear the previous approval so it doesn't stay "approved"
@@ -754,7 +773,7 @@ export function AgentDashboard() {
           <DialogHeader>
             <DialogTitle>Request Withdrawal</DialogTitle>
             <DialogDescription>
-              Funds will be sent to your registered bank account. Admin will process within 1–2 business days.
+              Funds will be sent to your registered bank account, minus a 3.5% withdrawal fee. Admin will process within 1–2 business days.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -778,6 +797,12 @@ export function AgentDashboard() {
                 className="mt-1"
               />
             </div>
+            {withdrawAmount > 0 && (
+              <div className="p-3 rounded-lg bg-muted text-sm space-y-1">
+                <div className="flex justify-between"><span className="text-muted-foreground">Withdrawal fee (3.5%)</span><span>-₦{withdrawalAPI.previewFee(withdrawAmount).fee.toLocaleString('en-NG')}</span></div>
+                <div className="flex justify-between font-semibold pt-1 border-t"><span>You'll receive</span><span>₦{withdrawalAPI.previewFee(withdrawAmount).net.toLocaleString('en-NG')}</span></div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>Cancel</Button>
@@ -811,7 +836,12 @@ export function AgentDashboard() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
               <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
-              <div className="space-y-2"><Label>Agent Fee (₦)</Label><Input type="number" value={formData.agent_fee} onChange={(e) => setFormData({ ...formData, agent_fee: e.target.value })} placeholder="e.g. 10000" /></div>
+              <div className="space-y-2">
+                <Label>Agent Fee</Label>
+                <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
+                  {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.20)) : '₦0'} <span className="ml-1">(20% of rent, auto-calculated)</span>
+                </div>
+              </div>
               <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
               <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Near LAUTECH Main Gate" /></div>
             </div>

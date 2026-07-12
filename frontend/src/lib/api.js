@@ -10,6 +10,25 @@ const generateReference = (prefix) => {
 // ============== PROPERTY APIs ==============
 
 export const propertyAPI = {
+  // Checks for existing listings that look like the same property —
+  // similar title/location, similar price, same type, posted by a
+  // DIFFERENT agent. Call before submitting a new/edited listing so the
+  // agent can be warned. The DB also flags this server-side on save
+  // regardless (see trg_flag_possible_duplicate), so this is a UX layer,
+  // not the only line of defense.
+  checkPossibleDuplicates: async ({ title, location, price, propertyType, agentId, excludePropertyId }) => {
+    const { data, error } = await supabase.rpc('find_possible_duplicate_properties', {
+      p_title: title,
+      p_location: location,
+      p_price: price,
+      p_property_type: propertyType,
+      p_exclude_agent_id: agentId || null,
+      p_exclude_property_id: excludePropertyId || null,
+    });
+    if (error) { console.warn('duplicate check:', error.message); return { data: [] }; }
+    return { data: data || [] };
+  },
+
   getAll: async (params = {}) => {
     let query = supabase
       .from('properties')
@@ -1104,6 +1123,15 @@ export const balanceAPI = {
 // ============== WITHDRAWAL APIs ==============
 
 export const withdrawalAPI = {
+  WITHDRAWAL_FEE_PCT: 3.5,
+
+  // Preview the fee/net split for a given withdrawal amount (used by the UI
+  // to show "you'll receive ₦X" before the agent submits).
+  previewFee: (amount) => {
+    const fee = Math.round(Number(amount || 0) * (withdrawalAPI.WITHDRAWAL_FEE_PCT / 100));
+    return { fee, net: Number(amount || 0) - fee };
+  },
+
   request: async ({ agentId, agentName, agentEmail, amount, bankName, accountNumber, accountName }) => {
     // Check available balance — use array select to avoid maybeSingle body-lock bug
     const balRes = await supabase
@@ -1115,6 +1143,12 @@ export const withdrawalAPI = {
     const available = Number(bal?.total_earned || 0) - Number(bal?.total_withdrawn || 0);
     if (amount > available) throw new Error(`Amount exceeds available balance (₦${available.toLocaleString('en-NG')})`);
 
+    // Rentora takes a 3.5% fee on every withdrawal. The agent's balance is
+    // still debited by the full requested amount (that's what leaves their
+    // available balance) — the fee is what Rentora keeps out of it, and
+    // net_amount is what actually gets paid out to their bank account.
+    const { fee, net } = withdrawalAPI.previewFee(amount);
+
     const insertRes = await supabase
       .from('withdrawal_requests')
       .insert({
@@ -1122,6 +1156,8 @@ export const withdrawalAPI = {
         agent_name: agentName,
         agent_email: agentEmail,
         amount,
+        fee_amount: fee,
+        net_amount: net,
         bank_name: bankName,
         account_number: accountNumber,
         account_name: accountName,
@@ -1129,7 +1165,7 @@ export const withdrawalAPI = {
         requested_at: new Date().toISOString(),
       });
     if (insertRes.error) throw new Error(insertRes.error.message);
-    return { data: { ok: true } };
+    return { data: { ok: true, fee, net } };
   },
 
   getMyRequests: async (agentId) => {
@@ -1232,6 +1268,8 @@ export const rentAPI = {
   // Initiate a rent payment. Rentora holds (rent + agent_fee) until move-in,
   // then releases the FULL amount to the agent — Rentora's only cut is the
   // service_fee, added on top, never a percentage of the rent itself.
+  // Agent fee is always 20% of rent, computed here — it is not a value
+  // agents type into the listing form.
   initiate: async (propertyId, user) => {
     const { data: property, error: propErr } = await supabase
       .from('properties')
@@ -1245,8 +1283,8 @@ export const rentAPI = {
 
     const feePct = await rentAPI.getServiceFeePct();
     const rentAmount  = Number(property.price);
-    const agentFee    = Number(property.agent_fee || 0);
-    const baseAmount  = rentAmount + agentFee;              // what the agent will receive in full
+    const agentFee    = Math.round(rentAmount * 0.20);      // 20% of rent, always
+    const baseAmount  = rentAmount + agentFee;               // what the agent will receive in full
     const serviceFee  = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut, on top
     const totalAmount = baseAmount + serviceFee;
     const reference   = generateReference('RENT');
