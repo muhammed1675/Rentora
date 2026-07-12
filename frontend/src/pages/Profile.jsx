@@ -226,8 +226,11 @@ export function Profile() {
 
       {/* Tabs */}
       <Tabs defaultValue="unlocks" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
-          <TabsTrigger value="rent" className="gap-2" data-testid="tab-rent"><HomeIcon className="w-4 h-4" />Rent</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsTrigger value="rent" className="gap-2" data-testid="tab-rent">
+            <HomeIcon className="w-4 h-4" />
+            <span className="hidden sm:inline">Rent</span>
+          </TabsTrigger>
           <TabsTrigger value="unlocks" className="gap-2" data-testid="tab-unlocks">
             <Unlock className="w-4 h-4" />
             <span className="hidden sm:inline">Unlocked</span>

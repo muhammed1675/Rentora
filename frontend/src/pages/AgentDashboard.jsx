@@ -425,10 +425,10 @@ export function AgentDashboard() {
       {/* Tabs */}
       <Tabs defaultValue="properties">
         <TabsList className="mb-5 w-full grid grid-cols-4">
-          <TabsTrigger value="properties" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">My </span>Properties</TabsTrigger>
-          <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned </span>Inspections</TabsTrigger>
-          <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4 shrink-0" />Bank Details</TabsTrigger>
-          <TabsTrigger value="earnings" className="gap-1.5 text-xs sm:text-sm"><Wallet className="w-4 h-4 shrink-0" />Earnings</TabsTrigger>
+          <TabsTrigger value="properties" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">My </span><span className="hidden sm:inline">Properties</span></TabsTrigger>
+          <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned Inspections</span></TabsTrigger>
+          <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Bank Details</span></TabsTrigger>
+          <TabsTrigger value="earnings" className="gap-1.5 text-xs sm:text-sm"><Wallet className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Earnings</span></TabsTrigger>
         </TabsList>
 
         {/* ── Properties Tab ── */}
