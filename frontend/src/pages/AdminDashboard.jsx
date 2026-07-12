@@ -1034,7 +1034,7 @@ export function AdminDashboard() {
 
           {/* History */}
           <h3 className="font-semibold mb-3">History</h3>
-          <Card className="overflow-hidden">
+          <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
