@@ -1464,6 +1464,47 @@ export function AdminDashboard() {
                   </div>
                 </div>
               )}
+              {/* Pricing & Fees — everything the agent entered */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pricing &amp; Fees</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Rent (yearly)</p>
+                    <p className="font-semibold">{formatPrice(previewProperty.price)}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Inspection Fee</p>
+                    <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Caution Fee</p>
+                    <p className="font-semibold">{previewProperty.caution_fee ? formatPrice(previewProperty.caution_fee) : '—'}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Agent Fee</p>
+                    <p className="font-semibold">{previewProperty.agent_fee ? formatPrice(previewProperty.agent_fee) : '—'}</p>
+                  </div>
+                </div>
+              </div>
+              {/* Contact info the agent provided for this listing */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Listing Contact</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Contact Name</p>
+                    <p className="font-semibold">{previewProperty.contact_name || '—'}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Contact Phone</p>
+                    <p className="font-semibold">{previewProperty.contact_phone || '—'}</p>
+                  </div>
+                </div>
+              </div>
+              {/* Status & availability at a glance */}
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="capitalize">Status: {previewProperty.status}</Badge>
+                <Badge variant="outline" className="capitalize">Availability: {previewProperty.availability || 'available'}</Badge>
+              </div>
               {/* Agent */}
               <div className="p-3 rounded-lg bg-muted/40 flex items-center gap-3">
                 <User className="w-8 h-8 text-muted-foreground shrink-0" />
@@ -1510,4 +1551,4 @@ export function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;
+export default AdminDashboard;``
