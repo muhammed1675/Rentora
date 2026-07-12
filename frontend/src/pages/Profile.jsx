@@ -278,6 +278,9 @@ export function Profile() {
                       <p className="text-sm text-muted-foreground">{rp.property?.location}</p>
                       <div className="mt-2 text-sm space-y-0.5">
                         <div>Rent: <span className="font-medium">{formatPrice(rp.rent_amount)}</span></div>
+                        {rp.agent_fee > 0 && (
+                          <div>Agent fee: <span className="font-medium">{formatPrice(rp.agent_fee)}</span></div>
+                        )}
                         <div>Service fee: <span className="font-medium">{formatPrice(rp.service_fee)}</span></div>
                         <div>Total paid: <span className="font-semibold">{formatPrice(rp.total_amount)}</span></div>
                         {rp.status === 'held' && rp.auto_release_at && (

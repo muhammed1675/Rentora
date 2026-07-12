@@ -1229,7 +1229,9 @@ export const rentAPI = {
     return Number.isFinite(pct) && pct > 0 ? pct : 5;
   },
 
-  // Initiate a rent payment. Money is "held" by Rentora until move-in.
+  // Initiate a rent payment. Rentora holds (rent + agent_fee) until move-in,
+  // then releases the FULL amount to the agent — Rentora's only cut is the
+  // service_fee, added on top, never a percentage of the rent itself.
   initiate: async (propertyId, user) => {
     const { data: property, error: propErr } = await supabase
       .from('properties')
@@ -1243,8 +1245,10 @@ export const rentAPI = {
 
     const feePct = await rentAPI.getServiceFeePct();
     const rentAmount  = Number(property.price);
-    const serviceFee  = Math.round(rentAmount * (feePct / 100));
-    const totalAmount = rentAmount + serviceFee;
+    const agentFee    = Number(property.agent_fee || 0);
+    const baseAmount  = rentAmount + agentFee;              // what the agent will receive in full
+    const serviceFee  = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut, on top
+    const totalAmount = baseAmount + serviceFee;
     const reference   = generateReference('RENT');
 
     // 5-day auto-release window from now
@@ -1258,6 +1262,7 @@ export const rentAPI = {
         user_id: user.id,
         agent_id: property.uploaded_by_agent_id,
         rent_amount: rentAmount,
+        agent_fee: agentFee,
         service_fee: serviceFee,
         total_amount: totalAmount,
         reference,
@@ -1276,6 +1281,7 @@ export const rentAPI = {
         id: row.id,
         reference,
         rent_amount: rentAmount,
+        agent_fee: agentFee,
         service_fee: serviceFee,
         amount: totalAmount,
         service_fee_pct: feePct,

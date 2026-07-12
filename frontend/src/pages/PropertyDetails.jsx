@@ -473,7 +473,7 @@ export function PropertyDetails() {
               <div className="mt-4 pt-4 border-t border-border/60 space-y-2">
                 {property.caution_fee && (
                   <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">Caution Fee</p>
+                    <p className="text-sm text-muted-foreground">Caution Fee <span className="text-xs">(paid to agent directly)</span></p>
                     <p className="text-sm font-semibold">{formatPrice(property.caution_fee)}</p>
                   </div>
                 )}
@@ -493,6 +493,9 @@ export function PropertyDetails() {
                     )}
                   </p>
                 </div>
+                <p className="text-xs text-muted-foreground pt-1">
+                  Rent + agent fee are held by Rentora and released to the agent after you confirm move-in. Caution fee is settled directly with the agent.
+                </p>
               </div>
             )}
           </Card>
