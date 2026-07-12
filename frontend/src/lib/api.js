@@ -21,6 +21,14 @@ export const propertyAPI = {
     } else {
       query = query.eq('status', 'approved');
     }
+
+    // Exclude properties marked "taken" (unavailable) from public listings,
+    // unless the caller explicitly asks to include them (e.g. an admin view).
+    // Handles NULL availability (older rows that predate the column) safely —
+    // a plain .neq() would silently exclude those too.
+    if (!params.include_unavailable) {
+      query = query.or('availability.neq.unavailable,availability.is.null');
+    }
     
     if (params.property_type) {
       query = query.eq('property_type', params.property_type);
@@ -1323,10 +1331,15 @@ export const rentAPI = {
 // shows up on the public browse page. Agents/admins can still revert.
 export const propertyStatusAPI = {
   markTaken: async (propertyId) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('properties')
       .update({ availability: 'unavailable' })
-      .eq('id', propertyId);
+      .eq('id', propertyId)
+      .select();
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Could not mark this property as taken — you may not have unlocked it, or it was already updated.');
+    }
+    return data[0];
   },
 };
