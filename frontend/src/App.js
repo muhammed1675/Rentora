@@ -19,6 +19,7 @@ import PaymentCallback from "./pages/PaymentCallback";
 import TermsAndPolicies from "./pages/TermsAndPolicies";
 import Contact from "./pages/Contact";
 import { Compare } from './pages/Compare';
+import { ResetPassword } from './pages/ResetPassword';
 
 // Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/payment/callback" element={<Layout><PaymentCallback /></Layout>} />
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
       <Route path="/compare" element={<Layout><Compare /></Layout>} />
+      <Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />
 
       {/* Protected Routes - Any authenticated user */}
       <Route

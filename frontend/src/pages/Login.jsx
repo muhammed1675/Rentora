@@ -6,16 +6,40 @@ import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Building2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { toast } from 'sonner';
 
 export function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  
+  const { login, requestPasswordReset } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  const openForgotPassword = () => {
+    setResetEmail(email);
+    setResetSent(false);
+    setShowForgotPassword(true);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!resetEmail) { toast.error('Enter your email address'); return; }
+    setResetLoading(true);
+    try {
+      await requestPasswordReset(resetEmail);
+      setResetSent(true);
+    } catch (err) {
+      toast.error(err.message || 'Failed to send reset link');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   // Rate limiting — max 5 attempts per 15 minutes
   const getRateLimitKey = () => `rentora_login_attempts_${email.toLowerCase().trim()}`;
@@ -98,7 +122,17 @@ export function Login() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <button
+                type="button"
+                onClick={openForgotPassword}
+                className="text-xs text-primary hover:underline"
+                data-testid="login-forgot-password"
+              >
+                Forgot password?
+              </button>
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
@@ -138,6 +172,55 @@ export function Login() {
           </Link>
         </p>
       </Card>
+
+      <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              {resetSent
+                ? "Check your inbox for a reset link."
+                : "Enter your email and we'll send you a link to reset your password."}
+            </DialogDescription>
+          </DialogHeader>
+          {resetSent ? (
+            <div className="py-2">
+              <p className="text-sm text-muted-foreground">
+                We've sent a password reset link to <span className="font-medium text-foreground">{resetEmail}</span>. It may take a minute to arrive — check your spam folder if you don't see it.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 py-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="reset-email"
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="pl-10 h-12"
+                  autoComplete="email"
+                  data-testid="reset-email"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            {resetSent ? (
+              <Button onClick={() => setShowForgotPassword(false)} className="w-full">Done</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setShowForgotPassword(false)}>Cancel</Button>
+                <Button onClick={handleForgotPassword} disabled={resetLoading} data-testid="send-reset-link">
+                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

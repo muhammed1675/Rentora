@@ -268,6 +268,17 @@ export function AuthProvider({ children }) {
     setSession(null);
   };
 
+  // ── Request password reset email ────────────────────────────
+  // Sends a recovery link to the given email. Supabase redirects the
+  // user to /reset-password with a recovery token in the URL hash,
+  // handled by ResetPassword.jsx.
+  const requestPasswordReset = async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw new Error(parseAuthError(error));
+  };
+
   // ── Refresh user ─────────────────────────────────────────────
   const refreshUser = async () => {
     const { data: { session: s } } = await supabase.auth.getSession();
@@ -288,7 +299,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, session, loading,
-      login, register, logout, refreshUser,
+      login, register, logout, refreshUser, requestPasswordReset,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',
       isAgent: user?.role === 'agent',
