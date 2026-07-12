@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { propertyAPI, inspectionAPI, reviewAPI } from '../lib/api';
+import { propertyAPI, inspectionAPI, reviewAPI, rentAPI } from '../lib/api';
 import { openKorapayCheckout } from '../lib/korapay';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -229,6 +229,34 @@ export function PropertyDetails() {
     } catch (error) {
       toast.error(error.message || 'Failed to request inspection');
       setRequestingInspection(false);
+    }
+  };
+
+  const [payingRent, setPayingRent] = useState(false);
+  const handlePayRent = async () => {
+    if (!user) { toast.error('Please log in first'); return; }
+    if (property?.availability === 'unavailable') { toast.error('This property is no longer available'); return; }
+    setPayingRent(true);
+    try {
+      const res = await rentAPI.initiate(id, user);
+      const { openKorapayCheckout } = await import('../lib/korapay');
+      await openKorapayCheckout({
+        reference: res.data.reference,
+        amount: res.data.amount,
+        email: user.email,
+        name: user?.full_name || user?.email,
+        narration: `Rent (held by Rentora) — ${property?.title}`,
+        onSuccess: async (kref) => {
+          try { await rentAPI.markHeld(res.data.reference, kref); } catch (_) {}
+          toast.success('Rent held by Rentora. Confirm move-in from your profile to release funds.');
+          setPayingRent(false);
+        },
+        onFailed: () => { toast.error('Payment failed. Please try again.'); setPayingRent(false); },
+        onClose: () => setPayingRent(false),
+      });
+    } catch (e) {
+      toast.error(e.message || 'Failed to start rent payment');
+      setPayingRent(false);
     }
   };
 
@@ -509,6 +537,25 @@ export function PropertyDetails() {
           </Card>
 
           <Card className="p-6">
+            <div className="mb-4 p-4 rounded-lg border bg-muted/30">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold">Rent this property</h3>
+                {property?.availability === 'unavailable' && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-secondary">Taken</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Rentora holds your rent safely until you confirm you've moved in. A small service fee (5%) applies.
+              </p>
+              <Button
+                onClick={handlePayRent}
+                disabled={payingRent || property?.availability === 'unavailable'}
+                className="w-full gap-2"
+                data-testid="pay-rent-btn"
+              >
+                {payingRent ? 'Processing...' : (<><ExternalLink className="w-4 h-4" />Pay Rent Securely</>)}
+              </Button>
+            </div>
             <h3 className="font-semibold mb-2">Request Inspection</h3>
             <p className="text-sm text-muted-foreground mb-4">Schedule a physical visit with our verified agent for ₦3,000</p>
             <Button variant="outline" onClick={() => {
@@ -561,7 +608,7 @@ export function PropertyDetails() {
             <Card className="p-4 bg-muted/50">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Inspection Fee</span>
-                <span className="text-xl font-bold text-primary">₦3,000</span>
+                <span className="text-xl font-bold text-primary">{formatPrice(Number(property?.inspection_fee) || 3000)}</span>
               </div>
             </Card>
           </div>

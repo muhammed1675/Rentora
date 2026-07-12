@@ -348,6 +348,11 @@ export const inspectionAPI = {
         payment_reference: reference
       });
     
+    // Dynamic inspection fee set by the agent (min 1000, default 3000)
+    const inspectionAmount = Number(property.inspection_fee) > 0
+      ? Number(property.inspection_fee)
+      : 3000;
+
     // Create inspection transaction
     await supabase
       .from('inspection_transactions')
@@ -356,18 +361,18 @@ export const inspectionAPI = {
         inspection_id: inspectionId,
         user_id: user.id,
         reference,
-        amount: 3000,
+        amount: inspectionAmount,
         status: 'pending'
       });
     
     const koralpayPublicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY || 'pk_test_xxx';
-    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=3000&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${data.email}`;
+    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=${inspectionAmount}&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${data.email}`;
     
     return {
       data: {
         inspection_id: inspectionId,
         reference,
-        amount: 3000,
+        amount: inspectionAmount,
         checkout_url: checkoutUrl,
         payment_type: 'inspection'
       }
@@ -748,6 +753,23 @@ export const paymentAPI = {
       };
     }
     
+    // Rent escrow payment
+    const { data: rentTx } = await supabase
+      .from('property_rent_payments')
+      .select('*')
+      .eq('reference', reference)
+      .maybeSingle();
+
+    if (rentTx) {
+      if (rentTx.status === 'pending') {
+        await supabase
+          .from('property_rent_payments')
+          .update({ status: 'held', held_at: new Date().toISOString() })
+          .eq('reference', reference);
+      }
+      return { data: { type: 'rent_held', status: 'held', amount: rentTx.total_amount, rent_amount: rentTx.rent_amount, service_fee: rentTx.service_fee } };
+    }
+
     throw new Error('Transaction not found');
   },
 
@@ -1180,4 +1202,131 @@ export default {
   storageAPI,
   balanceAPI,
   withdrawalAPI
+};
+
+
+// ============== RENT (ESCROW) APIs ==============
+// Rentora holds the rent until the user confirms move-in. A configurable
+// service fee (default 5%) is added on top of the rent price.
+
+export const rentAPI = {
+  // Read the platform service fee percentage (default 5).
+  getServiceFeePct: async () => {
+    const { data } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'rent_service_fee_pct')
+      .maybeSingle();
+    const pct = Number(data?.value);
+    return Number.isFinite(pct) && pct > 0 ? pct : 5;
+  },
+
+  // Initiate a rent payment. Money is "held" by Rentora until move-in.
+  initiate: async (propertyId, user) => {
+    const { data: property, error: propErr } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('id', propertyId)
+      .single();
+    if (propErr || !property) throw new Error('Property not found');
+    if (property.availability === 'unavailable') {
+      throw new Error('This property is no longer available');
+    }
+
+    const feePct = await rentAPI.getServiceFeePct();
+    const rentAmount  = Number(property.price);
+    const serviceFee  = Math.round(rentAmount * (feePct / 100));
+    const totalAmount = rentAmount + serviceFee;
+    const reference   = generateReference('RENT');
+
+    // 5-day auto-release window from now
+    const autoRelease = new Date();
+    autoRelease.setDate(autoRelease.getDate() + 5);
+
+    const { data: row, error } = await supabase
+      .from('property_rent_payments')
+      .insert({
+        property_id: propertyId,
+        user_id: user.id,
+        agent_id: property.uploaded_by_agent_id,
+        rent_amount: rentAmount,
+        service_fee: serviceFee,
+        total_amount: totalAmount,
+        reference,
+        status: 'pending',
+        auto_release_at: autoRelease.toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const koralpayPublicKey = process.env.REACT_APP_KORALPAY_PUBLIC_KEY || 'pk_test_xxx';
+    const checkoutUrl = `https://checkout.korapay.com/checkout?amount=${totalAmount}&currency=NGN&reference=${reference}&merchant=${koralpayPublicKey}&email=${user.email}`;
+
+    return {
+      data: {
+        id: row.id,
+        reference,
+        rent_amount: rentAmount,
+        service_fee: serviceFee,
+        amount: totalAmount,
+        service_fee_pct: feePct,
+        checkout_url: checkoutUrl,
+        payment_type: 'rent',
+      },
+    };
+  },
+
+  // Called by the Korapay success callback: mark the rent as held in escrow.
+  markHeld: async (reference, koralpayRef) => {
+    const { error } = await supabase
+      .from('property_rent_payments')
+      .update({
+        status: 'held',
+        held_at: new Date().toISOString(),
+        koralpay_reference: koralpayRef || null,
+      })
+      .eq('reference', reference)
+      .eq('status', 'pending');
+    if (error) throw error;
+  },
+
+  // User confirms move-in / keys received → release funds to agent.
+  confirmMoveIn: async (rentPaymentId, userId) => {
+    const { error } = await supabase
+      .from('property_rent_payments')
+      .update({
+        status: 'released',
+        released_by: 'user',
+        released_at: new Date().toISOString(),
+      })
+      .eq('id', rentPaymentId)
+      .eq('user_id', userId)
+      .eq('status', 'held');
+    if (error) throw error;
+  },
+
+  // Rent payments for the logged-in user (their held/released receipts).
+  getMyPayments: async (userId) => {
+    const { data, error } = await supabase
+      .from('property_rent_payments')
+      .select('*, property:properties(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data: data || [] };
+  },
+};
+
+// ============== MARK PROPERTY AS TAKEN ==============
+// A user who has unlocked a property can flag it as taken so it no longer
+// shows up on the public browse page. Agents/admins can still revert.
+export const propertyStatusAPI = {
+  markTaken: async (propertyId) => {
+    const { error } = await supabase
+      .from('properties')
+      .update({ availability: 'unavailable' })
+      .eq('id', propertyId);
+    if (error) throw error;
+  },
 };

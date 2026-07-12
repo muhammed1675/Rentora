@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI } from '../lib/api';
+import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, propertyStatusAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -16,7 +16,10 @@ import {
   Building2,
   Plus,
   ExternalLink,
-  Phone
+  Phone,
+  Home as HomeIcon,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,6 +31,7 @@ export function Profile() {
   const [unlocks, setUnlocks] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
+  const [rentPayments, setRentPayments] = useState([]);
   const [verificationRequest, setVerificationRequest] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,17 +64,19 @@ export function Profile() {
     if (!user) return;
     setLoading(true);
     try {
-      const [walletRes, unlocksRes, inspectionsRes, txRes] = await Promise.all([
+      const [walletRes, unlocksRes, inspectionsRes, txRes, rentRes] = await Promise.all([
         walletAPI.get(user.id),
         unlockAPI.getMyUnlocks(user.id),
         inspectionAPI.getMyInspections(user.id),
         transactionAPI.getMyTransactions(user.id),
+        rentAPI.getMyPayments(user.id).catch(() => ({ data: [] })),
       ]);
       
       setWallet(walletRes.data);
       setUnlocks(unlocksRes.data);
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
+      setRentPayments(rentRes.data || []);
 
       // Check verification request for users
       if (user?.role === 'user') {
@@ -85,6 +91,28 @@ export function Profile() {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarkTaken = async (propertyId) => {
+    if (!window.confirm('Mark this property as taken? It will no longer appear on the public listings.')) return;
+    try {
+      await propertyStatusAPI.markTaken(propertyId);
+      toast.success('Property marked as taken');
+      fetchData();
+    } catch (e) {
+      toast.error(e.message || 'Failed to update property');
+    }
+  };
+
+  const handleConfirmMoveIn = async (rentPaymentId) => {
+    if (!window.confirm('Confirm you have moved in / received the keys? This releases the rent to the agent.')) return;
+    try {
+      await rentAPI.confirmMoveIn(rentPaymentId, user.id);
+      toast.success('Move-in confirmed. Rent has been released to the agent.');
+      fetchData();
+    } catch (e) {
+      toast.error(e.message || 'Failed to confirm move-in');
     }
   };
 
@@ -199,6 +227,7 @@ export function Profile() {
       {/* Tabs */}
       <Tabs defaultValue="unlocks" className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsTrigger value="rent" className="gap-2" data-testid="tab-rent"><HomeIcon className="w-4 h-4" />Rent</TabsTrigger>
           <TabsTrigger value="unlocks" className="gap-2" data-testid="tab-unlocks">
             <Unlock className="w-4 h-4" />
             <span className="hidden sm:inline">Unlocked</span>
@@ -218,6 +247,73 @@ export function Profile() {
         </TabsList>
 
         {/* Unlocked Properties */}
+        {/* Rent payments (escrow) */}
+        <TabsContent value="rent">
+          {rentPayments.length > 0 ? (
+            <div className="space-y-4">
+              {rentPayments.map((rp) => (
+                <Card key={rp.id} className="p-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <img
+                      src={rp.property?.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+                      alt=""
+                      className="w-24 h-24 rounded-lg object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold">{rp.property?.title || 'Property'}</h3>
+                        {rp.status === 'held' && (
+                          <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" />Held by Rentora</Badge>
+                        )}
+                        {rp.status === 'released' && (
+                          <Badge className="gap-1 bg-green-600"><CheckCircle2 className="w-3 h-3" />Released</Badge>
+                        )}
+                        {rp.status === 'pending' && (
+                          <Badge variant="outline">Payment pending</Badge>
+                        )}
+                        {rp.status === 'refunded' && (
+                          <Badge variant="destructive">Refunded</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{rp.property?.location}</p>
+                      <div className="mt-2 text-sm space-y-0.5">
+                        <div>Rent: <span className="font-medium">{formatPrice(rp.rent_amount)}</span></div>
+                        <div>Service fee: <span className="font-medium">{formatPrice(rp.service_fee)}</span></div>
+                        <div>Total paid: <span className="font-semibold">{formatPrice(rp.total_amount)}</span></div>
+                        {rp.status === 'held' && rp.auto_release_at && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Auto-releases on {new Date(rp.auto_release_at).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {rp.status === 'held' && (
+                      <div className="flex items-start">
+                        <Button
+                          size="sm"
+                          onClick={() => handleConfirmMoveIn(rp.id)}
+                          className="gap-1"
+                          data-testid={`confirm-movein-${rp.id}`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />I've moved in
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-8 text-center">
+              <HomeIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold">No rent payments yet</h3>
+              <p className="text-sm text-muted-foreground mt-2">
+                When you pay rent on Rentora, we hold it safely until you confirm you've moved in.
+              </p>
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="unlocks">
           {loading ? (
             <div className="space-y-4">
@@ -249,11 +345,26 @@ export function Profile() {
                         </span>
                       </div>
                     </div>
-                    <Link to={`/property/${unlock.property_id}`}>
-                      <Button variant="outline" size="sm">
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </Link>
+                    <div className="flex flex-col gap-2">
+                      <Link to={`/property/${unlock.property_id}`}>
+                        <Button variant="outline" size="sm" className="w-full gap-1">
+                          <ExternalLink className="w-4 h-4" />View
+                        </Button>
+                      </Link>
+                      {unlock.property?.availability !== 'unavailable' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1 text-green-600 border-green-300 hover:bg-green-50"
+                          onClick={() => handleMarkTaken(unlock.property_id)}
+                          data-testid={`mark-taken-${unlock.property_id}`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />Mark as Taken
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary" className="justify-center">Taken</Badge>
+                      )}
+                    </div>
                   </div>
                 </Card>
               ))}

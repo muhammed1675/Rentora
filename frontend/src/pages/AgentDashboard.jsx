@@ -93,7 +93,7 @@ export function AgentDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', caution_fee: '', agent_fee: '', location: '',
+    title: '', description: '', price: '', caution_fee: '', agent_fee: '', inspection_fee: '3000', location: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
   });
 
@@ -246,7 +246,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', agent_fee: '', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '' });
+    setFormData({ title: '', description: '', price: '', caution_fee: '', agent_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '' });
     setEditingProperty(null);
   };
 
@@ -256,6 +256,7 @@ export function AgentDashboard() {
       setFormData({
         title: property.title, description: property.description, price: property.price.toString(),
         caution_fee: property.caution_fee ? property.caution_fee.toString() : '',
+        inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
         agent_fee: property.agent_fee ? property.agent_fee.toString() : '',
         location: property.location, property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
@@ -269,7 +270,8 @@ export function AgentDashboard() {
       toast.error('Please fill in all required fields'); return;
     }
     try {
-      const data = { ...formData, price: parseInt(formData.price), caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, agent_fee: formData.agent_fee ? parseInt(formData.agent_fee) : null, images: formData.images };
+      const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
+      const data = { ...formData, price: parseInt(formData.price), caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, agent_fee: formData.agent_fee ? parseInt(formData.agent_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
       if (editingProperty) {
         await propertyAPI.update(editingProperty.id, data);
         toast.success('Property updated — pending admin re-approval');
@@ -836,6 +838,7 @@ export function AgentDashboard() {
               <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
               <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
               <div className="space-y-2"><Label>Agent Fee (₦)</Label><Input type="number" value={formData.agent_fee} onChange={(e) => setFormData({ ...formData, agent_fee: e.target.value })} placeholder="e.g. 10000" /></div>
+              <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
               <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Near LAUTECH Main Gate" /></div>
             </div>
             <div className="space-y-2"><Label>Description</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the property..." rows={4} /></div>
