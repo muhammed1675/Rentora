@@ -333,7 +333,10 @@ export function AgentDashboard() {
       toast.success(`Property ${label}.`);
       fetchData();
     } catch (err) {
-      toast.error('Failed to update property availability');
+      // The DB blocks reopening a property while a rent payment is held in
+      // escrow for it (see trg_prevent_reopening_reserved_property) — surface
+      // that reason directly rather than a generic failure message.
+      toast.error(err.message || 'Failed to update property availability');
     }
   };
 

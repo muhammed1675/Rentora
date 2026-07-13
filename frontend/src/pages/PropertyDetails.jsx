@@ -558,7 +558,7 @@ export function PropertyDetails() {
               </Button>
             </div>
             <h3 className="font-semibold mb-2">Request Inspection</h3>
-            <p className="text-sm text-muted-foreground mb-4">Schedule a physical visit with our verified agent for ₦3,000</p>
+            <p className="text-sm text-muted-foreground mb-4">Schedule a physical visit with our verified agent for {formatPrice(Number(property?.inspection_fee) || 3000)}</p>
             <Button variant="outline" onClick={() => {
               if (!isAuthenticated) { toast.error('Please login to request inspection'); navigate('/login'); return; }
               setInspectionEmail(user?.email || '');
@@ -583,7 +583,7 @@ export function PropertyDetails() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Request Property Inspection</DialogTitle>
-            <DialogDescription>Schedule a physical inspection with our verified agent. Payment of ₦3,000 is required.</DialogDescription>
+            <DialogDescription>Schedule a physical inspection with our verified agent. Payment of {formatPrice(Number(property?.inspection_fee) || 3000)} is required.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
