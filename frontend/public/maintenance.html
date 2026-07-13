@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rentora — Under Renovation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue-900:#0B2E8A;
+    --blue-700:#2450E0;
+    --blue-600:#3B63F0;
+    --blue-100:#E8EDFD;
+    --ink:#0F172A;
+    --slate:#5B6577;
+    --paper:#F5F7FB;
+    --amber:#FBBF24;
+    --line: rgba(15,23,42,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #EAF0FF 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #FFF6DD 0%, transparent 55%),
+      var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+  }
+  .tape{
+    position:fixed;
+    left:-10%;
+    width:120%;
+    height:34px;
+    background:repeating-linear-gradient(135deg, var(--amber) 0 22px, #0F172A 22px 44px);
+    opacity:0.9;
+    z-index:0;
+  }
+  .tape.top{ top:64px; transform:rotate(-2deg); }
+  .tape.bottom{ bottom:52px; transform:rotate(1.4deg); }
+
+  header{
+    position:relative;
+    z-index:2;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:22px 6vw;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .brand .mark{
+    height:32px;
+    width:auto;
+    display:block;
+  }
+  .status-pill{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 14px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--slate);
+    box-shadow:0 1px 2px rgba(15,23,42,0.04);
+  }
+  .status-pill .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--amber);
+    box-shadow:0 0 0 4px rgba(251,191,36,0.25);
+    animation:pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ box-shadow:0 0 0 4px rgba(251,191,36,0.25); }
+    50%{ box-shadow:0 0 0 8px rgba(251,191,36,0.12); }
+  }
+
+  main{
+    position:relative;
+    z-index:2;
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px 6vw 60px;
+  }
+  .card{
+    width:100%;
+    max-width:760px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:24px;
+    padding:56px 56px 44px;
+    box-shadow:0 20px 60px -20px rgba(11,46,138,0.18);
+    text-align:center;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--blue-100);
+    color:var(--blue-700);
+    font-weight:600;
+    font-size:13px;
+    padding:7px 14px;
+    border-radius:999px;
+    margin-bottom:22px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(30px, 4.4vw, 44px);
+    line-height:1.12;
+    margin:0 0 14px;
+    letter-spacing:-0.02em;
+  }
+  h1 span{ color:var(--blue-700); }
+  p.lede{
+    color:var(--slate);
+    font-size:16.5px;
+    line-height:1.65;
+    max-width:520px;
+    margin:0 auto 34px;
+  }
+
+  /* Room-key progress meter */
+  .meter-wrap{
+    max-width:460px;
+    margin:0 auto 40px;
+  }
+  .meter-track{
+    position:relative;
+    height:10px;
+    background:var(--blue-100);
+    border-radius:999px;
+    overflow:hidden;
+  }
+  .meter-fill{
+    position:absolute;
+    inset:0;
+    width:64%;
+    border-radius:999px;
+    background:linear-gradient(90deg, var(--blue-600), var(--blue-700));
+    animation:grow 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes grow{
+    0%{ width:58%; }
+    100%{ width:70%; }
+  }
+  .meter-labels{
+    display:flex;
+    justify-content:space-between;
+    margin-top:10px;
+    font-size:12.5px;
+    color:var(--slate);
+    font-weight:600;
+  }
+  .meter-labels .done{ color:var(--blue-700); }
+
+  .steps{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-bottom:36px;
+  }
+  .step{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 12px;
+    text-align:left;
+    background:var(--paper);
+  }
+  .step.active{
+    background:var(--blue-100);
+    border-color:#c9d7fb;
+  }
+  .step .num{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:12px;
+    color:var(--blue-700);
+    margin-bottom:6px;
+    letter-spacing:0.04em;
+  }
+  .step .label{
+    font-weight:600;
+    font-size:13.5px;
+    color:var(--ink);
+    margin-bottom:2px;
+  }
+  .step .sub{
+    font-size:12px;
+    color:var(--slate);
+    line-height:1.4;
+  }
+
+  form{
+    display:flex;
+    gap:10px;
+    max-width:420px;
+    margin:0 auto 18px;
+  }
+  form input[type="email"]{
+    flex:1;
+    padding:13px 16px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    font-size:14px;
+    font-family:inherit;
+    outline:none;
+    background:var(--paper);
+  }
+  form input[type="email"]:focus{
+    border-color:var(--blue-600);
+    background:#fff;
+    box-shadow:0 0 0 3px rgba(59,99,240,0.15);
+  }
+  form button{
+    padding:13px 20px;
+    border:none;
+    border-radius:12px;
+    background:var(--blue-700);
+    color:#fff;
+    font-weight:600;
+    font-size:14px;
+    font-family:inherit;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:background 0.15s ease, transform 0.15s ease;
+  }
+  form button:hover{ background:var(--blue-900); transform:translateY(-1px); }
+  .fine{
+    font-size:12.5px;
+    color:var(--slate);
+  }
+
+  footer{
+    position:relative;
+    z-index:2;
+    text-align:center;
+    padding:20px 6vw 30px;
+    font-size:12.5px;
+    color:var(--slate);
+  }
+  footer a{ color:var(--blue-700); text-decoration:none; font-weight:600; }
+
+  @media (max-width:640px){
+    header{ padding:18px 5vw; }
+    .card{ padding:38px 24px 32px; border-radius:18px; }
+    .steps{ grid-template-columns:1fr; }
+    form{ flex-direction:column; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .meter-fill, .status-pill .dot{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="tape top"></div>
+  <div class="tape bottom"></div>
+
+  <header>
+    <div class="brand">
+      <img class="mark" src="https://www.rentora.com.ng/rentora-logo.png" alt="Rentora">
+    </div>
+    <div class="status-pill">
+      <span class="dot"></span>
+      Under renovation
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <span class="eyebrow">🛠️ Site Maintenance</span>
+      <h1>We're renovating your<br><span>hostel search</span> experience</h1>
+      <p class="lede">
+        Rentora is offline for scheduled upgrades — new filters, faster inspection booking,
+        and a smoother way to unlock verified agents near LAUTECH. Back online shortly.
+      </p>
+
+      <div class="meter-wrap">
+        <div class="meter-track"><div class="meter-fill"></div></div>
+        <div class="meter-labels">
+          <span class="done">Renovation in progress</span>
+          <span>Est. completion soon</span>
+        </div>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="num">01 — DONE</div>
+          <div class="label">Taking listings offline</div>
+          <div class="sub">Backing up hostel & agent data safely.</div>
+        </div>
+        <div class="step active">
+          <div class="num">02 — IN PROGRESS</div>
+          <div class="label">Rebuilding the platform</div>
+          <div class="sub">Improving speed, escrow, and inspections.</div>
+        </div>
+        <div class="step">
+          <div class="num">03 — NEXT</div>
+          <div class="label">Reopening doors</div>
+          <div class="sub">Verified rooms near LAUTECH, back live.</div>
+        </div>
+      </div>
+
+      <form onsubmit="event.preventDefault(); const b=this.querySelector('button'); b.textContent='You\'re on the list ✓'; b.style.background='#0B2E8A';">
+        <input type="email" placeholder="Enter your email for updates" required>
+        <button type="submit">Notify me</button>
+      </form>
+      <div class="fine">No spam — just one message when we're back.</div>
+    </div>
+  </main>
+
+  <footer>
+    Rentora · Student Housing Platform, Ogbomosho &nbsp;·&nbsp;
+    Questions? <a href="#">Contact us</a>
+  </footer>
+
+</body>
+</html>

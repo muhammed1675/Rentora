@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/((?!static|favicon|manifest|robots|logo).*)",
-      "destination": "/index.html"
+      "destination": "/maintenance.html"
     }
   ],
   "headers": [
