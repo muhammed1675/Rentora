@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, ownerPayoutAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -46,6 +46,7 @@ export function AdminDashboard() {
   const [agentBankDetails, setAgentBankDetails] = useState([]);
   const [previewProperty, setPreviewProperty] = useState(null);
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
+  const [ownerPayouts, setOwnerPayouts] = useState([]);
   const [agentBalances, setAgentBalances] = useState([]);
   const [rejectingWithdrawal, setRejectingWithdrawal] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
@@ -61,10 +62,11 @@ export function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes] = await Promise.all([
+      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, ownerPayoutsRes] = await Promise.all([
         adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(),
         propertyAPI.getAllAdmin(), inspectionAPI.getAll(), transactionAPI.getAll(),
         contactAPI.getAll(), withdrawalAPI.getAll(), balanceAPI.getAllBalances(),
+        ownerPayoutAPI.getAll(),
       ]);
       const allUsers = usersRes.data || [];
       setStats(statsRes.data);
@@ -82,6 +84,7 @@ export function AdminDashboard() {
       setMessages(messagesRes.data);
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
       if (balancesRes?.data) setAgentBalances(balancesRes.data);
+      if (ownerPayoutsRes?.data) setOwnerPayouts(ownerPayoutsRes.data);
       // Load bank change requests (no FK join - enrich from allUsers instead)
       try {
         const { data: bankReqs, error: bankErr } = await supabase
@@ -365,9 +368,15 @@ export function AdminDashboard() {
               <Receipt className="w-4 h-4 shrink-0" /> Transactions
             </TabsTrigger>
             <TabsTrigger value="payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Wallet className="w-4 h-4" /><span>Payouts</span>
+              <Wallet className="w-4 h-4" /><span>Agent Payouts</span>
               {withdrawalRequests.filter(r => r.status === 'pending').length > 0 && (
                 <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{withdrawalRequests.filter(r => r.status === 'pending').length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="owner-payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
+              <CreditCard className="w-4 h-4" /><span>Owner Payouts</span>
+              {ownerPayouts.filter(p => p.status === 'pending').length > 0 && (
+                <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{ownerPayouts.filter(p => p.status === 'pending').length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
@@ -1070,6 +1079,98 @@ export function AdminDashboard() {
                     <TableCell><Badge variant={req.status === 'paid' ? 'default' : 'destructive'} className="capitalize">{req.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(req.requested_at).toLocaleDateString('en-NG')}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{req.notes || '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="owner-payouts">
+          <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+            Rent is paid directly to the property owner's bank account, not the agent. Each row below is an amount owed to an <strong>owner</strong> (not an agent) — verify the bank details carefully before transferring, since owners aren't platform users and can't confirm receipt in-app.
+          </div>
+
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <Card className="p-4">
+              <p className="text-sm text-muted-foreground mb-1">Pending Owner Payouts</p>
+              <p className="text-2xl font-bold text-orange-500">{ownerPayouts.filter(p => p.status === 'pending').length}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-sm text-muted-foreground mb-1">Total Paid to Owners</p>
+              <p className="text-2xl font-bold text-green-600">
+                ₦{ownerPayouts.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0).toLocaleString('en-NG')}
+              </p>
+            </Card>
+          </div>
+
+          {/* Pending owner payouts */}
+          <h3 className="font-semibold mb-3">Pending — Owed to Property Owners</h3>
+          {ownerPayouts.filter(p => p.status === 'pending').length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground mb-6">No pending owner payouts</Card>
+          ) : (
+            <div className="space-y-3 mb-6">
+              {ownerPayouts.filter(p => p.status === 'pending').map(payout => (
+                <Card key={payout.id} className="p-4 border-blue-200">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Property</p>
+                      <p className="font-semibold">{payout.properties?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payout.properties?.location}</span></p>
+                      <p className="text-lg font-bold text-green-600">₦{Number(payout.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">owed to owner</span></p>
+                      <div className="mt-2 p-2 rounded bg-muted text-xs space-y-0.5">
+                        <p className="font-medium">Owner: {payout.owner_name || 'Not provided'}{payout.owner_phone ? ` — ${payout.owner_phone}` : ''}</p>
+                        <p>{payout.owner_bank_name} — {payout.owner_account_number}</p>
+                        <p>{payout.owner_account_name}</p>
+                        {payout.owner_account_number && (
+                          <button onClick={() => { navigator.clipboard.writeText(payout.owner_account_number); toast.success('Copied!'); }}
+                            className="text-primary underline text-xs mt-1">Copy account number</button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Released {new Date(payout.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <Button size="sm" className="gap-1.5"
+                        onClick={async () => {
+                          if (!window.confirm(`Confirm you have transferred ₦${Number(payout.amount).toLocaleString('en-NG')} to ${payout.owner_account_name || 'the owner'}'s bank account?`)) return;
+                          try {
+                            await ownerPayoutAPI.markPaid(payout.id, user.id);
+                            toast.success('Marked as paid');
+                            fetchData();
+                          } catch (e) { toast.error(e.message || 'Failed to update'); }
+                        }}>
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Mark Paid
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* History */}
+          <h3 className="font-semibold mb-3">History</h3>
+          <Card className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Owner</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ownerPayouts.filter(p => p.status !== 'pending').length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No history yet</TableCell></TableRow>
+                ) : ownerPayouts.filter(p => p.status !== 'pending').map(payout => (
+                  <TableRow key={payout.id}>
+                    <TableCell className="font-medium">{payout.properties?.title || '—'}</TableCell>
+                    <TableCell>{payout.owner_name || '—'}</TableCell>
+                    <TableCell>₦{Number(payout.amount).toLocaleString('en-NG')}</TableCell>
+                    <TableCell><Badge variant="default" className="capitalize">{payout.status}</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{payout.paid_at ? new Date(payout.paid_at).toLocaleDateString('en-NG') : '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

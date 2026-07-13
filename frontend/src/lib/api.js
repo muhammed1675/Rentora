@@ -1222,6 +1222,33 @@ export const withdrawalAPI = {
   },
 };
 
+// Owner payouts — rent paid straight to the property owner, NOT the agent.
+// Owners aren't platform users, so there's no "withdrawal request" from
+// them; instead a payout obligation is created automatically the moment
+// rent is released, and an admin manually transfers the money and marks
+// it paid here. Kept as its own API/table so it never mixes with agent
+// withdrawal_requests in the UI.
+export const ownerPayoutAPI = {
+  getAll: async () => {
+    const res = await supabase
+      .from('owner_payouts')
+      .select('*, properties(title, location)')
+      .order('created_at', { ascending: false });
+    if (res.error) { console.warn('owner_payouts:', res.error.message); return { data: [] }; }
+    return { data: res.data || [] };
+  },
+
+  markPaid: async (payoutId, adminId, notes) => {
+    const { error } = await supabase
+      .from('owner_payouts')
+      .update({ status: 'paid', paid_at: new Date().toISOString(), paid_by: adminId, notes: notes || null })
+      .eq('id', payoutId)
+      .eq('status', 'pending'); // guard against double-paying
+    if (error) throw error;
+    return { data: { ok: true } };
+  },
+};
+
 export default {
   propertyAPI,
   reviewAPI,
@@ -1272,11 +1299,17 @@ export const rentAPI = {
     if (property.availability === 'unavailable') {
       throw new Error('This property is no longer available');
     }
+    // Rent is paid out directly to the property owner's bank account, not
+    // the agent — so payment can't proceed until the agent has added the
+    // owner's details to the listing.
+    if (!property.owner_full_name || !property.owner_phone || !property.owner_bank_name || !property.owner_account_number || !property.owner_account_name) {
+      throw new Error('This property is missing the owner\'s payout details. Please ask the listing agent to update the listing before paying rent.');
+    }
 
     const feePct = await rentAPI.getServiceFeePct();
     const rentAmount  = Number(property.price);
     const agentFee    = Math.round(rentAmount * 0.20);      // 20% of rent, always
-    const baseAmount  = rentAmount + agentFee;               // what the agent will receive in full
+    const baseAmount  = rentAmount + agentFee;               // rent portion goes to the owner, agent fee to the agent
     const serviceFee  = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut, on top
     const totalAmount = baseAmount + serviceFee;
     const reference   = generateReference('RENT');
@@ -1298,6 +1331,14 @@ export const rentAPI = {
         reference,
         status: 'pending',
         auto_release_at: autoRelease.toISOString(),
+        // Snapshot the owner's payout details at payment time, so a later
+        // edit to the listing doesn't retroactively change where an
+        // already-in-progress payment is owed.
+        owner_name: property.owner_full_name,
+        owner_phone: property.owner_phone,
+        owner_bank_name: property.owner_bank_name,
+        owner_account_number: property.owner_account_number,
+        owner_account_name: property.owner_account_name,
       })
       .select()
       .single();

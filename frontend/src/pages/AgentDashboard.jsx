@@ -96,6 +96,7 @@ export function AgentDashboard() {
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
+    owner_full_name: '', owner_phone: '', owner_bank_name: '', owner_account_number: '', owner_account_name: '',
   });
 
   // Bank details
@@ -255,7 +256,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '' });
+    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', owner_bank_name: '', owner_account_number: '', owner_account_name: '' });
     setEditingProperty(null);
   };
 
@@ -268,6 +269,9 @@ export function AgentDashboard() {
         inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
         location: property.location, property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
+        owner_full_name: property.owner_full_name || '', owner_phone: property.owner_phone || '',
+        owner_bank_name: property.owner_bank_name || '', owner_account_number: property.owner_account_number || '',
+        owner_account_name: property.owner_account_name || '',
       });
     } else { resetForm(); }
     setShowPropertyDialog(true);
@@ -276,6 +280,9 @@ export function AgentDashboard() {
   const handleSubmitProperty = async () => {
     if (!formData.title || !formData.price || !formData.location || !formData.contact_name || !formData.contact_phone) {
       toast.error('Please fill in all required fields'); return;
+    }
+    if (!formData.owner_full_name || !formData.owner_phone || !formData.owner_bank_name || !formData.owner_account_number || !formData.owner_account_name) {
+      toast.error('Please fill in the property owner\'s payout details — rent is paid directly to the owner\'s bank account.'); return;
     }
     try {
       const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
@@ -302,9 +309,11 @@ export function AgentDashboard() {
       const data = { ...formData, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
       if (editingProperty) {
         // Any edit to an existing listing's details must go back through admin
-        // approval — clear the previous approval so it doesn't stay "approved"
-        // (and visible on Browse) with unreviewed changes.
-        await propertyAPI.update(editingProperty.id, { ...data, status: 'pending', approved_by_admin_id: null });
+        // approval — status: 'pending' is enough to pull it out of "approved"
+        // (and off Browse) until reviewed. approved_by_admin_id is NOT sent
+        // here — the DB only allows admins to change that column, and an
+        // agent's own edit will be rejected if it's included.
+        await propertyAPI.update(editingProperty.id, { ...data, status: 'pending' });
         toast.success('Property updated — pending admin re-approval');
       } else {
         await propertyAPI.create(data, user);
@@ -876,8 +885,19 @@ export function AgentDashboard() {
             </div>
             <div className="space-y-2"><Label>Description</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the property..." rows={4} /></div>
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Owner Name *</Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
-              <div className="space-y-2"><Label>Owner Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
+              <div className="space-y-2"><Label>Contact Name *<span className="text-xs text-muted-foreground font-normal ml-1">shown to students who unlock this listing</span></Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
+              <div className="space-y-2"><Label>Contact Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
+            </div>
+            <div className="space-y-1 pt-2">
+              <h4 className="text-sm font-semibold">Property Owner — Payout Details</h4>
+              <p className="text-xs text-muted-foreground">Rent is paid directly to the owner's bank account when a tenant moves in — never to your own account. This is separate from the contact info above.</p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2"><Label>Owner Full Name *</Label><Input value={formData.owner_full_name} onChange={(e) => setFormData({ ...formData, owner_full_name: e.target.value })} placeholder="Landlord's full name" /></div>
+              <div className="space-y-2"><Label>Owner Phone *</Label><Input value={formData.owner_phone} onChange={(e) => setFormData({ ...formData, owner_phone: e.target.value })} placeholder="+234..." /></div>
+              <div className="space-y-2"><Label>Owner Bank Name *</Label><Input value={formData.owner_bank_name} onChange={(e) => setFormData({ ...formData, owner_bank_name: e.target.value })} placeholder="e.g. GTBank" /></div>
+              <div className="space-y-2"><Label>Owner Account Number *</Label><Input value={formData.owner_account_number} onChange={(e) => setFormData({ ...formData, owner_account_number: e.target.value })} placeholder="0123456789" /></div>
+              <div className="space-y-2 md:col-span-2"><Label>Owner Account Name *<span className="text-xs text-muted-foreground font-normal ml-1">must match the bank account exactly</span></Label><Input value={formData.owner_account_name} onChange={(e) => setFormData({ ...formData, owner_account_name: e.target.value })} placeholder="Name on the bank account" /></div>
             </div>
             <div className="space-y-3">
               <Label>Property Images <span className="text-muted-foreground text-xs font-normal">(max 5, up to 5MB each)</span></Label>
