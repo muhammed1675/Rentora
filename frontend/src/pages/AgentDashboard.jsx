@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { propertyAPI, inspectionAPI, storageAPI, balanceAPI, withdrawalAPI } from '../lib/api';
+import { propertyAPI, inspectionAPI, storageAPI, balanceAPI, withdrawalAPI, rentAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -12,7 +12,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
-import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil, Phone, Wallet, TrendingUp, ArrowDownCircle, EyeOff, Eye } from 'lucide-react';
+import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil, Phone, Wallet, TrendingUp, ArrowDownCircle, EyeOff, Eye, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const FALLBACK_BANKS = [
@@ -86,6 +86,7 @@ export function AgentDashboard() {
 
   // Properties & inspections
   const [properties, setProperties] = useState([]);
+  const [rentPaymentsByProperty, setRentPaymentsByProperty] = useState({});
   const [inspections, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPropertyDialog, setShowPropertyDialog] = useState(false);
@@ -129,16 +130,24 @@ export function AgentDashboard() {
     if (!user) return;
     setLoading(true);
     try {
-      const [propertiesRes, inspectionsRes, balanceRes, withdrawalsRes] = await Promise.all([
+      const [propertiesRes, inspectionsRes, balanceRes, withdrawalsRes, rentPaymentsRes] = await Promise.all([
         propertyAPI.getMyListings(user.id),
         inspectionAPI.getAssigned(user.id),
         balanceAPI.getMyBalance(user.id),
         withdrawalAPI.getMyRequests(user.id),
+        rentAPI.getPaymentsForAgent(user.id).catch(() => ({ data: [] })),
       ]);
       setProperties(propertiesRes.data);
       setInspections(inspectionsRes.data);
       if (balanceRes?.data) setBalance(balanceRes.data);
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
+      // If a property has both a held and a released record (shouldn't
+      // normally happen), prefer 'released' since it's the more final state.
+      const paymentMap = {};
+      for (const p of (rentPaymentsRes?.data || [])) {
+        if (!paymentMap[p.property_id] || p.status === 'released') paymentMap[p.property_id] = p;
+      }
+      setRentPaymentsByProperty(paymentMap);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -452,7 +461,9 @@ export function AgentDashboard() {
             </div>
           ) : properties.length > 0 ? (
             <div className="space-y-3">
-              {properties.map((property) => (
+              {properties.map((property) => {
+                const paidRecord = rentPaymentsByProperty[property.id];
+                return (
                 <Card key={property.id} className="overflow-hidden">
                   <div className="flex">
                     <div className="relative group flex-shrink-0 w-28 sm:w-32" style={{ minHeight: '110px' }}>
@@ -482,28 +493,43 @@ export function AgentDashboard() {
                       <p className="text-xs text-muted-foreground line-clamp-1">{property.location}</p>
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-primary font-bold text-sm truncate">{formatPrice(property.price)}<span className="text-xs font-normal text-muted-foreground">/yr</span></p>
-                        <div className="flex gap-1.5 shrink-0">
+                        <div className="flex gap-1.5 shrink-0 items-center">
                           <Button variant="outline" size="sm"
                             onClick={() => { if (user?.suspended) { toast.error('Your account is suspended.'); return; } handleOpenDialog(property); }}
                             disabled={user?.suspended} className="h-7 px-2.5 text-xs gap-1">
                             <Edit className="w-3 h-3" /> Edit
                           </Button>
-                          <Button variant="outline" size="sm"
-                            onClick={() => handleToggleAvailability(property)}
-                            disabled={user?.suspended}
-                            className={`h-7 px-2.5 text-xs gap-1 ${property.availability === 'unavailable' ? 'text-green-600 border-green-300 hover:bg-green-50' : 'text-orange-600 border-orange-300 hover:bg-orange-50'}`}>
-                            {property.availability === 'unavailable'
-                              ? <><Eye className="w-3 h-3" /> Available</>
-                              : <><EyeOff className="w-3 h-3" /> Unavailable</>
-                            }
-                          </Button>
+                          {paidRecord ? (
+                            <Badge
+                              variant="secondary"
+                              className="h-7 px-2.5 text-xs gap-1 bg-green-100 text-green-700 hover:bg-green-100 cursor-help"
+                              title={paidRecord.status === 'held'
+                                ? "Payment held in escrow — awaiting the renter's move-in confirmation. This listing is locked and can't be reopened until then."
+                                : "Rent has been paid and released — this property is occupied. Contact support@rentora.com.ng if it needs to be relisted."}
+                            >
+                              <Lock className="w-3 h-3" />
+                              {paidRecord.status === 'held' ? 'Payment Held' : 'Taken (Paid)'}
+                            </Badge>
+                          ) : (
+                            <Button variant="outline" size="sm"
+                              onClick={() => handleToggleAvailability(property)}
+                              disabled={user?.suspended}
+                              className={`h-7 px-2.5 text-xs gap-1 ${property.availability === 'unavailable' ? 'text-green-600 border-green-300 hover:bg-green-50' : 'text-orange-600 border-orange-300 hover:bg-orange-50'}`}>
+                              {property.availability === 'unavailable'
+                                ? <><Eye className="w-3 h-3" /> Available</>
+                                : <><EyeOff className="w-3 h-3" /> Unavailable</>
+                              }
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
                 </Card>
-              ))}
+                );
+              })}
             </div>
+
           ) : (
             <Card className="p-10 text-center">
               <Building2 className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />

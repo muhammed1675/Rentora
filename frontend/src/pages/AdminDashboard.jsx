@@ -196,6 +196,21 @@ export function AdminDashboard() {
     catch { toast.error('Failed to update property'); }
   };
 
+  // Only admins can do this — agents are blocked from reopening a property
+  // once any rent payment for it has been held or released (prevents an
+  // agent double-renting an already-occupied room). Use this once a
+  // tenancy has genuinely ended and the listing should go live again.
+  const handleRelistProperty = async (property) => {
+    if (!window.confirm(`Relist "${property.title}" as available? Only do this if you've confirmed the previous tenancy has actually ended.`)) return;
+    try {
+      await propertyAPI.update(property.id, { availability: 'available' });
+      toast.success('Property relisted as available');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to relist property');
+    }
+  };
+
   const confirmDeleteProperty = (property) => setDeleteConfirm({ open: true, property, deleting: false });
 
   const handleDeleteProperty = async () => {
@@ -1515,9 +1530,15 @@ export function AdminDashboard() {
                 </div>
               </div>
               {/* Status & availability at a glance */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="capitalize">Status: {previewProperty.status}</Badge>
                 <Badge variant="outline" className="capitalize">Availability: {previewProperty.availability || 'available'}</Badge>
+                {previewProperty.availability === 'unavailable' && (
+                  <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
+                    onClick={() => handleRelistProperty(previewProperty)}>
+                    <Eye className="w-3 h-3" /> Relist as Available
+                  </Button>
+                )}
               </div>
               {/* Agent */}
               <div className="p-3 rounded-lg bg-muted/40 flex items-center gap-3">

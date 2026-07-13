@@ -1330,6 +1330,20 @@ export const rentAPI = {
   },
 
   // Called by the Korapay success callback: mark the rent as held in escrow.
+  // Returns held/released rent payments for properties this agent owns, so
+  // the Agent Dashboard can show an accurate "Taken" state and block the
+  // availability toggle client-side (the DB also blocks it — this is just
+  // for a clear UI instead of a surprise error).
+  getPaymentsForAgent: async (agentId) => {
+    const { data, error } = await supabase
+      .from('property_rent_payments')
+      .select('id, property_id, status, rent_amount, agent_fee, total_amount, held_at, released_at, auto_release_at')
+      .eq('agent_id', agentId)
+      .in('status', ['held', 'released']);
+    if (error) throw error;
+    return { data: data || [] };
+  },
+
   markHeld: async (reference, koralpayRef) => {
     const { error } = await supabase
       .from('property_rent_payments')
