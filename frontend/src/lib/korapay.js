@@ -21,6 +21,7 @@ function loadScript() {
 
 export async function openKorapayCheckout({
   reference, amount, email, name, narration,
+  channels, defaultChannel,
   onSuccess, onFailed, onClose,
 }) {
   await loadScript();
@@ -37,6 +38,11 @@ export async function openKorapayCheckout({
     currency: 'NGN',
     narration: narration || 'Rentora',
     merchant_bears_cost: false,   // ← client bears the fee
+    // Without this, Korapay defaults to ["bank_transfer"] ONLY — this is
+    // why only transfer was showing. card + pay_with_bank cover Nigeria's
+    // card and USSD payment flows; mobile_money isn't available for NGN.
+    channels: channels || ['card', 'bank_transfer', 'pay_with_bank'],
+    ...(defaultChannel ? { default_channel: defaultChannel } : {}),
     customer: {
       name: name || 'Customer',
       email,
