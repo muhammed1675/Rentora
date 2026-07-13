@@ -279,6 +279,12 @@ export function AuthProvider({ children }) {
     if (error) throw new Error(parseAuthError(error));
   };
 
+  // ── Change password (already logged in) ─────────────────────
+  const changePassword = async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(parseAuthError(error));
+  };
+
   // ── Refresh user ─────────────────────────────────────────────
   const refreshUser = async () => {
     const { data: { session: s } } = await supabase.auth.getSession();
@@ -299,7 +305,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, session, loading,
-      login, register, logout, refreshUser, requestPasswordReset,
+      login, register, logout, refreshUser, requestPasswordReset, changePassword,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',
       isAgent: user?.role === 'agent',

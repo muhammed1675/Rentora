@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, propertyStatusAPI } from '../lib/api';
+import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { 
   User, 
   Coins, 
@@ -25,7 +27,7 @@ import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, refreshUser, isUser } = useAuth();
+  const { user, isAuthenticated, refreshUser, isUser, changePassword } = useAuth();
   
   const [wallet, setWallet] = useState(null);
   const [unlocks, setUnlocks] = useState([]);
@@ -94,17 +96,6 @@ export function Profile() {
     }
   };
 
-  const handleMarkTaken = async (propertyId) => {
-    if (!window.confirm('Mark this property as taken? It will no longer appear on the public listings.')) return;
-    try {
-      await propertyStatusAPI.markTaken(propertyId);
-      toast.success('Property marked as taken');
-      fetchData();
-    } catch (e) {
-      toast.error(e.message || 'Failed to update property');
-    }
-  };
-
   const handleConfirmMoveIn = async (rentPaymentId) => {
     if (!window.confirm('Confirm you have moved in / received the keys? This releases the rent to the agent.')) return;
     try {
@@ -113,6 +104,26 @@ export function Profile() {
       fetchData();
     } catch (e) {
       toast.error(e.message || 'Failed to confirm move-in');
+    }
+  };
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    if (newPassword !== confirmNewPassword) { toast.error('Passwords do not match'); return; }
+    setChangingPassword(true);
+    try {
+      await changePassword(newPassword);
+      toast.success('Password updated');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (e) {
+      toast.error(e.message || 'Failed to update password');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -360,17 +371,17 @@ export function Profile() {
                         </Button>
                       </Link>
                       {unlock.property?.availability !== 'unavailable' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 sm:flex-none w-full gap-1 text-green-600 border-green-300 hover:bg-green-50"
-                          onClick={() => handleMarkTaken(unlock.property_id)}
-                          data-testid={`mark-taken-${unlock.property_id}`}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />Mark as Taken
-                        </Button>
+                        <Link to={`/property/${unlock.property_id}`} className="flex-1 sm:flex-none">
+                          <Button
+                            size="sm"
+                            className="w-full gap-1"
+                            data-testid={`pay-rent-${unlock.property_id}`}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />Pay Rent
+                          </Button>
+                        </Link>
                       ) : (
-                        <Badge variant="secondary" className="flex-1 sm:flex-none justify-center">Taken</Badge>
+                        <Badge variant="secondary" className="flex-1 sm:flex-none justify-center bg-green-100 text-green-700 hover:bg-green-100">Taken</Badge>
                       )}
                     </div>
                   </div>
@@ -528,6 +539,39 @@ export function Profile() {
                   {user?.suspended ? 'Suspended' : 'Active'}
                 </Badge>
               </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 mt-4">
+            <h3 className="font-semibold mb-4">Change Password</h3>
+            <div className="space-y-3 max-w-sm">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-password" className="text-sm text-muted-foreground">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                  data-testid="profile-new-password"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-new-password" className="text-sm text-muted-foreground">Confirm new password</Label>
+                <Input
+                  id="confirm-new-password"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  autoComplete="new-password"
+                  data-testid="profile-confirm-new-password"
+                />
+              </div>
+              <Button onClick={handleChangePassword} disabled={changingPassword} data-testid="profile-change-password-submit">
+                {changingPassword ? 'Updating...' : 'Update Password'}
+              </Button>
             </div>
           </Card>
         </TabsContent>

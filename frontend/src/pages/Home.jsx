@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import {
-  Search, Shield, Coins, Calendar, ArrowRight,
+  Search, Shield, Coins, Calendar, ArrowRight, Lock,
   Building2, Users, CheckCircle2, MessageSquare,
   ChevronRight as ChevronRightIcon, ShoppingBag, Sparkles
 } from 'lucide-react';
@@ -48,21 +48,21 @@ export function Home() {
     {
       icon: Calendar,
       title: 'Book an Inspection',
-      desc: 'Pay ₦3,000 to schedule a physical visit. Our verified agent will accompany you to inspect the property in person.',
+      desc: 'Pay a small inspection fee (from ₦1,000, set by the agent) to schedule a physical visit. Our verified agent will accompany you to inspect the property in person.',
       color: 'bg-green-500',
     },
     {
       icon: Shield,
       title: "You're Protected",
-      desc: "Every agent on Rentora is ID-verified. If anything goes wrong, our support team is available 24/7.",
+      desc: "Every agent on Rentora is ID-verified, and your rent stays held in escrow until you confirm you've moved in — never paid to the agent upfront. Support is available if anything goes wrong.",
       color: 'bg-primary',
     },
   ];
 
   const features = [
     { icon: Shield, title: 'Verified Properties', description: 'All listings are reviewed and approved by our admin team for quality assurance.' },
-    { icon: Coins, title: 'Token System', description: 'Buy tokens to unlock owner contacts. ₦1,000 per token, simple and transparent.' },
-    { icon: Calendar, title: 'Request Inspections', description: 'Schedule property visits with our verified agents for just ₦3,000.' },
+    { icon: Lock, title: 'Rent Held in Escrow', description: 'Your rent stays safely held with Rentora until you confirm you\'ve moved in — never paid to the agent upfront.' },
+    { icon: Calendar, title: 'Request Inspections', description: 'Schedule property visits with our verified agents from just ₦1,000, set per listing.' },
     { icon: Users, title: 'Trusted Agents', description: 'Our agents are ID-verified and accountable for the properties they list.' },
   ];
 
@@ -254,10 +254,10 @@ export function Home() {
                   Want to Become a Rentora Agent?
                 </h2>
                 <p className="mt-4 text-white/80 text-base leading-relaxed">
-                  Earn <strong>₦2,100</strong> per completed inspection. Work flexible hours and grow your income.
+                  Keep <strong>100% of every inspection fee</strong> you set, plus your full rent commission when a tenant moves in. Work flexible hours and grow your income.
                 </p>
                 <ul className="mt-4 space-y-1.5">
-                  {['₦2,100 paid per inspection', 'Flexible hours', 'ID-verified badge', 'Direct bank withdrawals'].map(item => (
+                  {['Keep 100% of your inspection fee', 'Earn your full rent + agent fee via secure escrow', 'Flexible hours', 'ID-verified badge', 'Direct bank withdrawals'].map(item => (
                     <li key={item} className="flex items-center gap-2 text-sm text-white/80">
                       <CheckCircle2 className="w-4 h-4 text-white shrink-0" />{item}
                     </li>
