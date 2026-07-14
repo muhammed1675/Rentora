@@ -676,7 +676,9 @@ export const adminAPI = {
       { count: completedInspections },
       { count: pendingVerifications },
       { data: tokenTxs },
-      { data: inspTxs }
+      { data: inspTxs },
+      { data: rentPayments },
+      { data: paidWithdrawals },
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'agent'),
@@ -688,12 +690,30 @@ export const adminAPI = {
       supabase.from('inspections').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
       supabase.from('agent_verification_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('transactions').select('amount').eq('status', 'completed'),
-      supabase.from('inspection_transactions').select('amount').eq('status', 'completed')
+      supabase.from('inspection_transactions').select('amount').eq('status', 'completed'),
+      supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, service_fee, total_amount'),
+      supabase.from('withdrawal_requests').select('fee_amount').eq('status', 'paid'),
     ]);
-    
+
     const tokenRevenue = tokenTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-    const inspectionRevenue = inspTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-    
+    // Inspection fees are NOT Rentora revenue anymore — agents keep 100% of
+    // them. Kept as its own figure purely as a volume/activity metric.
+    const inspectionFeesProcessed = inspTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+
+    const rentRows = rentPayments || [];
+    const heldRows = rentRows.filter(r => r.status === 'held');
+    const releasedRows = rentRows.filter(r => r.status === 'released');
+    // Rentora's only realized revenue from rent is the service fee — counted
+    // once the money has actually landed (held or released), not while still
+    // 'pending' (unpaid) or if 'refunded'.
+    const rentServiceFeeRevenue = [...heldRows, ...releasedRows].reduce((s, r) => s + Number(r.service_fee || 0), 0);
+    // Total currently sitting in escrow: the full amount collected (rent +
+    // agent fee + service fee) for payments still 'held' — not yet released
+    // to the agent or paid out to the owner.
+    const totalEscrowHeld = heldRows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+
+    const withdrawalFeeRevenue = paidWithdrawals?.reduce((s, w) => s + Number(w.fee_amount || 0), 0) || 0;
+
     return {
       data: {
         total_users: totalUsers || 0,
@@ -706,8 +726,16 @@ export const adminAPI = {
         completed_inspections: completedInspections || 0,
         pending_verifications: pendingVerifications || 0,
         token_revenue: tokenRevenue,
-        inspection_revenue: inspectionRevenue,
-        total_revenue: tokenRevenue + inspectionRevenue
+        inspection_fees_processed: inspectionFeesProcessed,
+        rent_service_fee_revenue: rentServiceFeeRevenue,
+        withdrawal_fee_revenue: withdrawalFeeRevenue,
+        // Rentora's actual revenue: token sales + rent service fee +
+        // withdrawal fee. Inspection fees are excluded — 100% goes to agents.
+        total_revenue: tokenRevenue + rentServiceFeeRevenue + withdrawalFeeRevenue,
+        total_escrow_held: totalEscrowHeld,
+        total_rent_payments: rentRows.length,
+        held_rent_payments: heldRows.length,
+        released_rent_payments: releasedRows.length,
       }
     };
   }
@@ -1116,6 +1144,7 @@ export const balanceAPI = {
 
 export const withdrawalAPI = {
   WITHDRAWAL_FEE_PCT: 3.5,
+  MAX_WITHDRAWAL_AMOUNT: 3000, // per request — larger balances need multiple requests
 
   // Preview the fee/net split for a given withdrawal amount (used by the UI
   // to show "you'll receive ₦X" before the agent submits).
@@ -1125,6 +1154,9 @@ export const withdrawalAPI = {
   },
 
   request: async ({ agentId, agentName, agentEmail, amount, bankName, accountNumber, accountName }) => {
+    if (amount > withdrawalAPI.MAX_WITHDRAWAL_AMOUNT) {
+      throw new Error(`Maximum withdrawal is ₦${withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request. Submit another request for the rest.`);
+    }
     // Check available balance — use array select to avoid maybeSingle body-lock bug
     const balRes = await supabase
       .from('agent_balances')
@@ -1409,6 +1441,18 @@ export const rentAPI = {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) throw error;
+    return { data: data || [] };
+  },
+
+  // Admin visibility into every rent payment — used by the Escrow tab so
+  // admins can see exactly which payments are currently held, not just a
+  // total figure.
+  getAllForAdmin: async () => {
+    const { data, error } = await supabase
+      .from('property_rent_payments')
+      .select('*, property:properties(title, location)')
+      .order('created_at', { ascending: false });
+    if (error) { console.warn('property_rent_payments:', error.message); return { data: [] }; }
     return { data: data || [] };
   },
 };

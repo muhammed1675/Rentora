@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { downloadReceiptPNG } from '../lib/receipt';
 import { 
   User, 
   Coins, 
@@ -21,7 +22,8 @@ import {
   Phone,
   Home as HomeIcon,
   CheckCircle2,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -240,7 +242,7 @@ export function Profile() {
         <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="rent" className="gap-2" data-testid="tab-rent">
             <HomeIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Rent</span>
+            <span className="hidden sm:inline">Rent &amp; Escrow</span>
           </TabsTrigger>
           <TabsTrigger value="unlocks" className="gap-2" data-testid="tab-unlocks">
             <Unlock className="w-4 h-4" />
@@ -263,6 +265,10 @@ export function Profile() {
         {/* Unlocked Properties */}
         {/* Rent payments (escrow) */}
         <TabsContent value="rent">
+          <h3 className="font-semibold mb-3">Escrow Payment History</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Every rent payment you've made through Rentora, and where it stands — held safely with us, released to the agent, or refunded.
+          </p>
           {rentPayments.length > 0 ? (
             <div className="space-y-4">
               {rentPayments.map((rp) => (
@@ -304,8 +310,8 @@ export function Profile() {
                         )}
                       </div>
                     </div>
-                    {rp.status === 'held' && (
-                      <div className="flex items-start">
+                    <div className="flex flex-col items-start gap-2">
+                      {rp.status === 'held' && (
                         <Button
                           size="sm"
                           onClick={() => handleConfirmMoveIn(rp.id)}
@@ -314,8 +320,30 @@ export function Profile() {
                         >
                           <CheckCircle2 className="w-4 h-4" />I've moved in
                         </Button>
-                      </div>
-                    )}
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        onClick={() => downloadReceiptPNG({
+                          title: 'Rent Payment Receipt',
+                          reference: rp.reference,
+                          date: new Date(rp.created_at || rp.held_at || Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+                          status: rp.status,
+                          rows: [
+                            { label: 'Property', value: rp.property?.title || 'Property' },
+                            { label: 'Location', value: rp.property?.location || '—' },
+                            { label: 'Rent', value: formatPrice(rp.rent_amount) },
+                            { label: 'Agent Fee', value: formatPrice(rp.agent_fee) },
+                            { label: 'Service Fee', value: formatPrice(rp.service_fee) },
+                          ],
+                          total: { label: 'Total Paid', value: formatPrice(rp.total_amount) },
+                          filename: `rentora-rent-receipt-${rp.reference || rp.id}.png`,
+                        })}
+                      >
+                        <Download className="w-4 h-4" />Receipt
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -458,14 +486,30 @@ export function Profile() {
                 <div className="space-y-3">
                   {transactions.token_transactions.map((tx) => (
                     <Card key={tx.id} className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-medium">{tx.tokens_added} Tokens</p>
                           <p className="text-sm text-muted-foreground">{tx.reference}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
-                          <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
+                            <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
+                          </div>
+                          <Button
+                            size="sm" variant="outline" className="gap-1 shrink-0"
+                            onClick={() => downloadReceiptPNG({
+                              title: 'Token Purchase Receipt',
+                              reference: tx.reference,
+                              date: new Date(tx.created_at || Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+                              status: tx.status,
+                              rows: [{ label: 'Tokens', value: `${tx.tokens_added}` }],
+                              total: { label: 'Amount Paid', value: formatPrice(tx.amount) },
+                              filename: `rentora-token-receipt-${tx.reference || tx.id}.png`,
+                            })}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     </Card>
@@ -484,14 +528,30 @@ export function Profile() {
                 <div className="space-y-3">
                   {transactions.inspection_transactions.map((tx) => (
                     <Card key={tx.id} className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-medium">Inspection Fee</p>
                           <p className="text-sm text-muted-foreground">{tx.reference}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
-                          <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
+                            <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
+                          </div>
+                          <Button
+                            size="sm" variant="outline" className="gap-1 shrink-0"
+                            onClick={() => downloadReceiptPNG({
+                              title: 'Inspection Payment Receipt',
+                              reference: tx.reference,
+                              date: new Date(tx.created_at || Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+                              status: tx.status,
+                              rows: [{ label: 'Inspection Fee', value: formatPrice(tx.amount) }],
+                              total: { label: 'Amount Paid', value: formatPrice(tx.amount) },
+                              filename: `rentora-inspection-receipt-${tx.reference || tx.id}.png`,
+                            })}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     </Card>
