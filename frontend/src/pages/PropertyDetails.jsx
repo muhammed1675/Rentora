@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { 
   MapPin, Phone, User, Lock, Unlock, Calendar as CalendarIcon, ArrowLeft,
   Home, Building, ChevronLeft, ChevronRight, ExternalLink, Heart, Share2,
-  Check, Eye, GitCompare, Star, Send,
+  Check, CheckCircle2, Eye, GitCompare, Star, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -357,8 +357,18 @@ export function PropertyDetails() {
 
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{property.title}</h1>
-            <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+            <div className="flex items-center gap-2 mt-2 text-muted-foreground flex-wrap">
               <MapPin className="w-5 h-5" /><span>{property.location}</span>
+              {property.google_maps_link && (
+                <a
+                  href={property.google_maps_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline text-sm font-medium ml-2"
+                >
+                  <MapPin className="w-4 h-4" />Get Directions
+                </a>
+              )}
             </div>
           </div>
 
@@ -366,6 +376,20 @@ export function PropertyDetails() {
             <h2 className="text-xl font-semibold mb-4">Description</h2>
             <p className="text-muted-foreground whitespace-pre-wrap">{property.description}</p>
           </Card>
+
+          {property.amenities?.length > 0 && (
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Amenities</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {property.amenities.map((item) => (
+                  <div key={item} className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {similarProperties.length > 0 && (
             <div>

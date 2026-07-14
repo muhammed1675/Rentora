@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent } from '../components/ui/dialog';
 import {
   Search, Shield, Coins, Calendar, ArrowRight, Lock,
-  Building2, Users, CheckCircle2, MessageSquare,
+  Building2, Users, CheckCircle2, MessageSquare, Home as HomeIcon, Building,
   ChevronRight as ChevronRightIcon, ShoppingBag, Sparkles
 } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import { AppBanner } from '../components/AppBanner';
 
 export function Home() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
 
@@ -132,6 +133,54 @@ export function Home() {
                 <p className="text-sm font-medium text-foreground/60 mt-1">{stat.label}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Browse by Property Type ──────────────────── */}
+      <section className="py-14 bg-background border-b border-border/40" aria-label="Browse student housing by property type">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Browse by Property Type</h2>
+            <p className="text-muted-foreground mt-2">Pick what you're looking for to jump straight to it</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            <button
+              onClick={() => navigate('/browse?property_type=hostel')}
+              className="group flex items-center gap-4 p-5 rounded-xl border border-border/60 bg-card hover:border-primary hover:shadow-md transition-all text-left"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                <HomeIcon className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold">Hostels</p>
+                <p className="text-xs text-muted-foreground">Shared student housing</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/browse?property_type=apartment')}
+              className="group flex items-center gap-4 p-5 rounded-xl border border-border/60 bg-card hover:border-primary hover:shadow-md transition-all text-left"
+            >
+              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
+                <Building className="w-6 h-6 text-secondary" />
+              </div>
+              <div>
+                <p className="font-semibold">Apartments</p>
+                <p className="text-xs text-muted-foreground">Self-contained units</p>
+              </div>
+            </button>
+            <button
+              onClick={() => navigate('/browse')}
+              className="group flex items-center gap-4 p-5 rounded-xl border border-border/60 bg-card hover:border-primary hover:shadow-md transition-all text-left"
+            >
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-muted/70 transition-colors">
+                <Search className="w-6 h-6 text-foreground/70" />
+              </div>
+              <div>
+                <p className="font-semibold">All Listings</p>
+                <p className="text-xs text-muted-foreground">See everything available</p>
+              </div>
+            </button>
           </div>
         </div>
       </section>

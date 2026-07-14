@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, maintenanceAPI, userAPI } from '../lib/api';
+import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, maintenanceAPI, userAPI, storageAPI } from '../lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -99,14 +100,38 @@ export function Profile() {
     }
   };
 
-  const handleConfirmMoveIn = async (rentPaymentId) => {
-    if (!window.confirm('Confirm you have moved in / received the keys? This releases the rent to the agent.')) return;
+  const [moveInDialogPayment, setMoveInDialogPayment] = useState(null);
+  const [moveInPhotoFile, setMoveInPhotoFile] = useState(null);
+  const [moveInPhotoPreview, setMoveInPhotoPreview] = useState(null);
+  const [confirmingMoveIn, setConfirmingMoveIn] = useState(false);
+
+  const openMoveInDialog = (payment) => {
+    setMoveInDialogPayment(payment);
+    setMoveInPhotoFile(null);
+    setMoveInPhotoPreview(null);
+  };
+
+  const handleMoveInPhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMoveInPhotoFile(file);
+    setMoveInPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleConfirmMoveIn = async () => {
+    if (!moveInDialogPayment) return;
+    if (!moveInPhotoFile) { toast.error('Please upload a photo of yourself at the property to confirm move-in'); return; }
+    setConfirmingMoveIn(true);
     try {
-      await rentAPI.confirmMoveIn(rentPaymentId, user.id);
-      toast.success('Move-in confirmed. Rent has been released to the agent.');
+      const uploadRes = await storageAPI.uploadImage(moveInPhotoFile, 'move-in-photos');
+      await rentAPI.confirmMoveIn(moveInDialogPayment.id, user.id, uploadRes.data.url);
+      toast.success('Move-in confirmed. Your rent has been released to the property owner.');
+      setMoveInDialogPayment(null);
       fetchData();
     } catch (e) {
       toast.error(e.message || 'Failed to confirm move-in');
+    } finally {
+      setConfirmingMoveIn(false);
     }
   };
 
@@ -333,7 +358,7 @@ export function Profile() {
                       {rp.status === 'held' && (
                         <Button
                           size="sm"
-                          onClick={() => handleConfirmMoveIn(rp.id)}
+                          onClick={() => openMoveInDialog(rp)}
                           className="gap-1"
                           data-testid={`confirm-movein-${rp.id}`}
                         >
@@ -664,6 +689,36 @@ export function Profile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!moveInDialogPayment} onOpenChange={(open) => { if (!open) setMoveInDialogPayment(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Move-In</DialogTitle>
+            <DialogDescription>
+              Upload a photo of yourself at the property to confirm you've moved in. This releases your rent to the property owner and your agent fee to the agent — it can't be undone, so please only confirm once you've actually moved in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="move-in-photo">Photo at the property *</Label>
+            <Input
+              id="move-in-photo"
+              type="file"
+              accept="image/*"
+              onChange={handleMoveInPhotoChange}
+              data-testid="move-in-photo-input"
+            />
+            {moveInPhotoPreview && (
+              <img src={moveInPhotoPreview} alt="Move-in preview" className="w-full max-h-64 object-cover rounded-lg border" />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveInDialogPayment(null)}>Cancel</Button>
+            <Button onClick={handleConfirmMoveIn} disabled={confirmingMoveIn || !moveInPhotoFile} data-testid="move-in-confirm-submit">
+              {confirmingMoveIn ? 'Confirming...' : 'Confirm Move-In'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,276 +1,369 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, ownerPayoutAPI, rentAPI } from '../lib/api';
+import { propertyAPI, inspectionAPI, storageAPI, balanceAPI, withdrawalAPI, rentAPI } from '../lib/api';
+import { downloadReceiptPNG } from '../lib/receipt';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import {
-  LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
-  CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp, Coins,
-  Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
-  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock
-} from 'lucide-react';
+import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil, Phone, Wallet, TrendingUp, ArrowDownCircle, EyeOff, Eye, Lock, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function AdminDashboard() {
-  const navigate = useNavigate();
-  const { user, isAuthenticated, isAdmin } = useAuth();
+const FALLBACK_BANKS = [
+  { code: '044', name: 'Access Bank' }, { code: '050', name: 'Ecobank Nigeria' },
+  { code: '070', name: 'Fidelity Bank' }, { code: '011', name: 'First Bank of Nigeria' },
+  { code: '214', name: 'FCMB' }, { code: '058', name: 'Guaranty Trust Bank' },
+  { code: '082', name: 'Keystone Bank' }, { code: '526', name: 'Kuda Bank' },
+  { code: '090405', name: 'Moniepoint MFB' }, { code: '999992', name: 'OPay' },
+  { code: '120001', name: 'PalmPay' }, { code: '076', name: 'Polaris Bank' },
+  { code: '101', name: 'Providus Bank' }, { code: '221', name: 'Stanbic IBTC Bank' },
+  { code: '232', name: 'Sterling Bank' }, { code: '032', name: 'Union Bank' },
+  { code: '033', name: 'UBA' }, { code: '035', name: 'Wema Bank' }, { code: '057', name: 'Zenith Bank' },
+];
 
-  const [stats, setStats] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [agents, setAgents] = useState([]);
-  const [verifications, setVerifications] = useState([]);
-  const [properties, setProperties] = useState([]);
-  const [inspections, setInspections] = useState([]);
-  const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [selectedVerification, setSelectedVerification] = useState(null);
-  const [selectedAgent, setSelectedAgent] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [agentSearch, setAgentSearch] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, property: null, deleting: false });
-  const [messages, setMessages] = useState([]);
-  const [selectedMessage, setSelectedMessage] = useState(null);
-  const [bankRequests, setBankRequests] = useState([]);
-  const [bankRejectNote, setBankRejectNote] = useState('');
-  const [bankRejectId, setBankRejectId] = useState(null);
-  const [agentBankDetails, setAgentBankDetails] = useState([]);
-  const [previewProperty, setPreviewProperty] = useState(null);
-  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
-  const [ownerPayouts, setOwnerPayouts] = useState([]);
-  const [rentPayments, setRentPayments] = useState([]);
-  const [agentBalances, setAgentBalances] = useState([]);
-  const [rejectingWithdrawal, setRejectingWithdrawal] = useState(null);
-  const [rejectNote, setRejectNote] = useState('');
-  const [replyText, setReplyText] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
+// ── Lightbox ────────────────────────────────────────────────────
+function Lightbox({ images, startIndex, onClose }) {
+  const [current, setCurrent] = useState(startIndex);
+  const prev = () => setCurrent(i => (i - 1 + images.length) % images.length);
+  const next = () => setCurrent(i => (i + 1) % images.length);
 
   useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors z-10">
+        <X className="w-5 h-5" />
+      </button>
+      {images.length > 1 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm bg-black/40 px-3 py-1 rounded-full">
+          {current + 1} / {images.length}
+        </div>
+      )}
+      {images.length > 1 && (
+        <button onClick={(e) => { e.stopPropagation(); prev(); }} className="absolute left-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors">
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      )}
+      <img src={images[current]} alt={`Property image ${current + 1}`} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+      {images.length > 1 && (
+        <button onClick={(e) => { e.stopPropagation(); next(); }} className="absolute right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors">
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      )}
+      {images.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          {images.map((img, i) => (
+            <button key={i} onClick={(e) => { e.stopPropagation(); setCurrent(i); }}
+              className={`w-12 h-12 rounded-md overflow-hidden border-2 transition-all ${i === current ? 'border-white scale-110' : 'border-white/30 opacity-60 hover:opacity-100'}`}>
+              <img src={img} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ──────────────────────────────────────────────
+const AMENITY_OPTIONS = [
+  'Kitchen', 'Private Toilet', 'Private Bathroom', 'Shared Toilet', 'Shared Bathroom',
+  'Water Supply', 'Electricity (PHCN)', 'Generator/Power Backup', 'Security', 'Fence & Gate',
+  'Parking Space', 'WiFi/Internet', 'Furnished', 'Wardrobe', 'Tiled Floor', 'POP Ceiling',
+];
+
+export function AgentDashboard() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, isAgent, isAdmin } = useAuth();
+  const fileInputRef = useRef(null);
+
+  // Properties & inspections
+  const [properties, setProperties] = useState([]);
+  const [rentPaymentsByProperty, setRentPaymentsByProperty] = useState({});
+  const [inspections, setInspections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showPropertyDialog, setShowPropertyDialog] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
+  const [formData, setFormData] = useState({
+    title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '',
+    property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
+    owner_full_name: '', owner_phone: '', owner_bank_name: '', owner_account_number: '', owner_account_name: '',
+    google_maps_link: '', amenities: [],
+  });
+
+  // Bank details
+  const [banks, setBanks] = useState(FALLBACK_BANKS);
+  const [banksLoading, setBanksLoading] = useState(true);
+  const [bankDetails, setBankDetails] = useState(null);       // approved details
+  const [pendingBankDetails, setPendingBankDetails] = useState(null); // pending change
+  const [editingBank, setEditingBank] = useState(false);
+  const [bankForm, setBankForm] = useState({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
+  const [savingBank, setSavingBank] = useState(false);
+  const [balance, setBalance] = useState({ total_earned: 0, total_withdrawn: 0, available: 0 });
+  const [withdrawalRequests, setWithdrawalRequests] = useState([]);
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
+
+  // ── Load data on mount ───────────────────────────────────────
+  useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
-    if (!isAdmin) { toast.error('Access denied'); navigate('/'); return; }
+    if (!isAgent && !isAdmin) { toast.error('Access denied'); navigate('/'); return; }
     fetchData();
-  }, [isAuthenticated, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isAgent, isAdmin, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (user) {
+      fetchBankDetails();
+      loadBanks();
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, ownerPayoutsRes, rentPaymentsRes] = await Promise.all([
-        adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(),
-        propertyAPI.getAllAdmin(), inspectionAPI.getAll(), transactionAPI.getAll(),
-        contactAPI.getAll(), withdrawalAPI.getAll(), balanceAPI.getAllBalances(),
-        ownerPayoutAPI.getAll(), rentAPI.getAllForAdmin(),
+      const [propertiesRes, inspectionsRes, balanceRes, withdrawalsRes, rentPaymentsRes] = await Promise.all([
+        propertyAPI.getMyListings(user.id),
+        inspectionAPI.getAssigned(user.id),
+        balanceAPI.getMyBalance(user.id),
+        withdrawalAPI.getMyRequests(user.id),
+        rentAPI.getPaymentsForAgent(user.id).catch(() => ({ data: [] })),
       ]);
-      const allUsers = usersRes.data || [];
-      setStats(statsRes.data);
-      setUsers(allUsers);
-      setAgents(allUsers.filter(u => u.role === 'agent')); // phone already on user object
-      // Enrich verifications with phone from users
-      const enrichedVerifs = (verificationsRes.data || []).map(v => ({
-        ...v,
-        user_phone: allUsers.find(u => u.id === v.user_id)?.phone || null,
-      }));
-      setVerifications(enrichedVerifs);
       setProperties(propertiesRes.data);
       setInspections(inspectionsRes.data);
-      setTransactions(txRes.data);
-      setMessages(messagesRes.data);
+      if (balanceRes?.data) setBalance(balanceRes.data);
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
-      if (balancesRes?.data) setAgentBalances(balancesRes.data);
-      if (ownerPayoutsRes?.data) setOwnerPayouts(ownerPayoutsRes.data);
-      if (rentPaymentsRes?.data) setRentPayments(rentPaymentsRes.data);
-      // Load bank change requests (no FK join - enrich from allUsers instead)
-      try {
-        const { data: bankReqs, error: bankErr } = await supabase
-          .from('agent_bank_change_requests')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (bankErr) console.error('Bank requests error:', bankErr);
-        // Enrich with user info from already-loaded users
-        const enriched = (bankReqs || []).map(r => ({
-          ...r,
-          users: allUsers.find(u => u.id === r.user_id) || null,
-        }));
-        setBankRequests(enriched);
-      } catch (e) { console.error('Bank requests fetch failed:', e); }
-      // Load agent bank details (source of truth for bank display)
-      try {
-        const { data: bankDetails } = await supabase
-          .from('agent_bank_details')
-          .select('*');
-        setAgentBankDetails(bankDetails || []);
-      } catch (e) { console.error('agent_bank_details fetch failed:', e); }
+      // If a property has both a held and a released record (shouldn't
+      // normally happen), prefer 'released' since it's the more final state.
+      const paymentMap = {};
+      for (const p of (rentPaymentsRes?.data || [])) {
+        if (!paymentMap[p.property_id] || p.status === 'released') paymentMap[p.property_id] = p;
+      }
+      setRentPaymentsByProperty(paymentMap);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast.error('Failed to load dashboard data');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUpdateRole = async (userId, role) => {
-    if (userId === user.id) { toast.error('You cannot change your own role.'); return; }
-    try { await userAPI.updateRole(userId, role); toast.success('Role updated'); fetchData(); }
-    catch { toast.error('Failed to update role'); }
-  };
-
-  const handleSuspendUser = async (userId, suspended) => {
-    if (userId === user.id) { toast.error('You cannot suspend your own account.'); return; }
-    try { await userAPI.suspend(userId, suspended); toast.success(suspended ? 'User suspended' : 'User unsuspended'); fetchData(); }
-    catch { toast.error('Failed to update user'); }
-  };
-
-  const handleReviewVerification = async (requestId, status, verif = null) => {
-    // verif can be passed directly (from inline cards) or fall back to selectedVerification (from dialog)
-    const v = verif || selectedVerification;
+  const fetchBankDetails = async () => {
+    if (!user) return;
     try {
-      await verificationAPI.review(requestId, status, user.id);
-      toast.success(`Verification ${status === 'approved' ? 'approved ✓' : 'rejected'}`);
-      // If approved and has bank details, write to agent_bank_details
-      if (status === 'approved' && v?.bank_name) {
-        await supabase
-          .from('agent_bank_details')
-          .upsert({
-            user_id: v.user_id,
-            bank_code: v.bank_code,
-            bank_name: v.bank_name,
-            account_number: v.account_number,
-            account_name: v.account_name,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' });
-      }
-      // Open email client to notify agent
-      if (v) {
-        const isApproved = status === 'approved';
-        const subject = isApproved
-          ? 'Your Rentora Agent Account Has Been Approved!'
-          : 'Update on Your Rentora Agent Application';
-        const body = isApproved
-          ? `Hi ${v.user_name},\n\nCongratulations! Your agent verification has been approved on Rentora.\n\nYou can now log in and start listing properties on the platform. Head to your Agent Dashboard to add your first property.\n\nWelcome aboard!\n\nBest regards,\nRentora Admin Team`
-          : `Hi ${v.user_name},\n\nThank you for applying to become an agent on Rentora.\n\nUnfortunately, we were unable to approve your application at this time. Please review your submitted documents and feel free to reapply.\n\nIf you have any questions, reply to this email.\n\nBest regards,\nRentora Admin Team`;
-        window.open(`mailto:${v.user_email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-      }
-      setSelectedVerification(null);
-      fetchData();
-    } catch { toast.error('Failed to review'); }
+      // Use .limit(1) + data[0] instead of .maybeSingle() to avoid body-stream-read error
+      const bankRes = await supabase
+        .from('agent_bank_details')
+        .select('bank_code, bank_name, account_number, account_name')
+        .eq('user_id', user.id)
+        .limit(1);
+      const bankRow = bankRes.data?.[0] || null;
+      if (bankRow?.bank_name) setBankDetails(bankRow);
+
+      const pendingRes = await supabase
+        .from('agent_bank_change_requests')
+        .select('bank_code, bank_name, account_number, account_name, created_at')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const pending = pendingRes.data?.[0] || null;
+      if (pending?.bank_name) setPendingBankDetails(pending);
+    } catch (e) { /* ignore */ }
   };
 
-  const handleBankRequest = async (requestId, action, note = '') => {
+  const loadBanks = async () => {
     try {
+      const url = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/resolve-bank?list=true`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}` },
+      });
+      const json = await res.json();
+      if (json.status && Array.isArray(json.data)) {
+        setBanks(json.data.filter(b => b.name && b.code).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    } catch (e) { /* keep fallback */ }
+    finally { setBanksLoading(false); }
+  };
+
+  const handleSaveBankDetails = async () => {
+    if (!bankForm.bank_code) { toast.error('Please select your bank'); return; }
+    if (bankForm.account_number.length !== 10) { toast.error('Account number must be 10 digits'); return; }
+    if (!bankForm.account_name.trim()) { toast.error('Please enter your account name'); return; }
+    setSavingBank(true);
+    try {
+      // Insert a pending bank change request for admin to approve
       const { error } = await supabase
         .from('agent_bank_change_requests')
-        .update({ status: action, admin_note: note || null, updated_at: new Date().toISOString() })
-        .eq('id', requestId);
+        .insert({
+          user_id: user.id,
+          bank_code: bankForm.bank_code,
+          bank_name: bankForm.bank_name,
+          account_number: bankForm.account_number,
+          account_name: bankForm.account_name.trim().toUpperCase(),
+          status: 'pending',
+        });
       if (error) throw error;
+      setPendingBankDetails({ ...bankForm, account_name: bankForm.account_name.trim().toUpperCase() });
+      setEditingBank(false);
+      setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
+      toast.success('Bank details submitted — pending admin approval');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to submit bank details. Please try again.');
+    } finally {
+      setSavingBank(false);
+    }
+  };
 
-      if (action === 'approved') {
-        const req = bankRequests.find(r => r.id === requestId);
-        if (req) {
-          // Upsert into dedicated agent_bank_details table (source of truth)
-          await supabase
-            .from('agent_bank_details')
-            .upsert({
-              user_id: req.user_id,
-              bank_code: req.bank_code,
-              bank_name: req.bank_name,
-              account_number: req.account_number,
-              account_name: req.account_name,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'user_id' });
-        }
-        toast.success('Bank details approved — agent can now receive payments');
-      } else {
-        toast.success('Bank request rejected — agent has been notified');
+  // ── Property handlers ────────────────────────────────────────
+  const openLightbox = (images, index = 0) => setLightbox({ open: true, images, index });
+  const closeLightbox = () => setLightbox({ open: false, images: [], index: 0 });
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    if (formData.images.length + files.length > 5) { toast.error('Maximum 5 images allowed'); return; }
+    setUploadingImage(true);
+    try {
+      const uploadedUrls = [];
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) { toast.error(`${file.name} is not an image`); continue; }
+        if (file.size > 5 * 1024 * 1024) { toast.error(`${file.name} is too large. Max 5MB`); continue; }
+        const result = await storageAPI.uploadImage(file, 'property-images');
+        uploadedUrls.push(result.data.url);
       }
-      setBankRejectNote('');
-      setBankRejectId(null);
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to process request');
+      if (uploadedUrls.length > 0) {
+        setFormData(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
+        toast.success(`${uploadedUrls.length} image${uploadedUrls.length > 1 ? 's' : ''} uploaded`);
+      }
+    } catch (error) {
+      toast.error('Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleApproveProperty = async (propertyId, status) => {
-    try { await propertyAPI.approve(propertyId, status, user.id); toast.success(`Property ${status}`); fetchData(); }
-    catch { toast.error('Failed to update property'); }
+  const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
+
+  const resetForm = () => {
+    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', owner_bank_name: '', owner_account_number: '', owner_account_name: '', google_maps_link: '', amenities: [] });
+    setEditingProperty(null);
   };
 
-  // Only admins can do this — agents are blocked from reopening a property
-  // once any rent payment for it has been held or released (prevents an
-  // agent double-renting an already-occupied room). Use this once a
-  // tenancy has genuinely ended and the listing should go live again.
-  const handleRelistProperty = async (property) => {
-    if (!window.confirm(`Relist "${property.title}" as available? Only do this if you've confirmed the previous tenancy has actually ended.`)) return;
-    try {
-      await propertyAPI.update(property.id, { availability: 'available' });
-      toast.success('Property relisted as available');
-      fetchData();
-    } catch (err) {
-      toast.error(err.message || 'Failed to relist property');
+  const handleOpenDialog = (property = null) => {
+    if (property) {
+      setEditingProperty(property);
+      setFormData({
+        title: property.title, description: property.description, price: property.price.toString(),
+        caution_fee: property.caution_fee ? property.caution_fee.toString() : '',
+        inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
+        location: property.location, property_type: property.property_type, images: property.images || [],
+        contact_name: property.contact_name, contact_phone: property.contact_phone,
+        owner_full_name: property.owner_full_name || '', owner_phone: property.owner_phone || '',
+        owner_bank_name: property.owner_bank_name || '', owner_account_number: property.owner_account_number || '',
+        owner_account_name: property.owner_account_name || '',
+        google_maps_link: property.google_maps_link || '', amenities: property.amenities || [],
+      });
+    } else { resetForm(); }
+    setShowPropertyDialog(true);
+  };
+
+  const handleSubmitProperty = async () => {
+    if (!formData.title || !formData.price || !formData.location || !formData.contact_name || !formData.contact_phone) {
+      toast.error('Please fill in all required fields'); return;
     }
-  };
-
-  const confirmDeleteProperty = (property) => setDeleteConfirm({ open: true, property, deleting: false });
-
-  const handleDeleteProperty = async () => {
-    if (!deleteConfirm.property) return;
-    setDeleteConfirm(prev => ({ ...prev, deleting: true }));
+    if (!formData.owner_full_name || !formData.owner_phone || !formData.owner_bank_name || !formData.owner_account_number || !formData.owner_account_name) {
+      toast.error('Please fill in the property owner\'s payout details — rent is paid directly to the owner\'s bank account.'); return;
+    }
     try {
-      await propertyAPI.delete(deleteConfirm.property.id);
-      toast.success('Property deleted successfully');
-      setDeleteConfirm({ open: false, property: null, deleting: false });
+      const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
+      const priceVal = parseInt(formData.price);
+
+      // Warn if another agent already has a listing that looks like the
+      // same property — same type, similar price/title/location.
+      const dupRes = await propertyAPI.checkPossibleDuplicates({
+        title: formData.title,
+        location: formData.location,
+        price: priceVal,
+        propertyType: formData.property_type,
+        agentId: user.id,
+        excludePropertyId: editingProperty?.id,
+      });
+      if (dupRes.data.length > 0) {
+        const match = dupRes.data[0];
+        const proceed = window.confirm(
+          `This looks similar to an existing listing — "${match.title}" (${match.location}) posted by ${match.uploaded_by_agent_name}.\n\nIf this is a different property, click OK to continue. If it's the same house, please don't post a duplicate.`
+        );
+        if (!proceed) return;
+      }
+
+      const data = { ...formData, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
+      if (editingProperty) {
+        // Any edit to an existing listing's details must go back through admin
+        // approval — status: 'pending' is enough to pull it out of "approved"
+        // (and off Browse) until reviewed. approved_by_admin_id is NOT sent
+        // here — the DB only allows admins to change that column, and an
+        // agent's own edit will be rejected if it's included.
+        await propertyAPI.update(editingProperty.id, { ...data, status: 'pending' });
+        toast.success('Property updated — pending admin re-approval');
+      } else {
+        await propertyAPI.create(data, user);
+        toast.success('Property submitted for approval');
+      }
+      setShowPropertyDialog(false);
+      resetForm();
       fetchData();
     } catch (error) {
-      toast.error(error.message || 'Failed to delete property');
-      setDeleteConfirm(prev => ({ ...prev, deleting: false }));
+      toast.error(error.message || 'Failed to save property');
     }
   };
 
-  const handleMarkRead = async (id) => {
+  const handleMarkCompleted = async (inspectionId) => {
     try {
-      await contactAPI.markRead(id);
-      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'read' } : m));
-      if (selectedMessage?.id === id) setSelectedMessage(prev => ({ ...prev, status: 'read' }));
-    } catch { toast.error('Failed to mark as read'); }
+      // Just marks that the physical inspection took place. Agent payout
+      // already happened via the DB trigger when payment_status turned
+      // 'completed' (see credit_agent_balance() in supabase_migration_v2.sql) —
+      // this used to ALSO manually credit a hardcoded ₦2,100 here, which
+      // double-paid the agent on every completed inspection. Removed.
+      await inspectionAPI.update(inspectionId, { status: 'completed' });
+      toast.success('Inspection marked as completed');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to update inspection');
+    }
   };
 
-  const handleDeleteMessage = async (id) => {
+  const handleToggleAvailability = async (property) => {
+    const isUnavailable = property.availability === 'unavailable';
+    const newAvailability = isUnavailable ? 'available' : 'unavailable';
+    const label = isUnavailable ? 'marked as available again' : 'marked as unavailable';
     try {
-      await contactAPI.delete(id);
-      setMessages(prev => prev.filter(m => m.id !== id));
-      if (selectedMessage?.id === id) setSelectedMessage(null);
-      toast.success('Message deleted');
-    } catch { toast.error('Failed to delete message'); }
-  };
-
-  const handleReply = async (msg) => {
-    if (!replyText.trim()) { toast.error('Please write a reply first'); return; }
-    setSendingReply(true);
-    try {
-      const res = await fetch('/api/send-reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: msg.email,
-          toName: msg.name,
-          subject: msg.subject,
-          message: replyText.trim(),
-          originalMessage: msg.message,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to send');
-      toast.success(`Reply sent to ${msg.name}!`);
-      setReplyText('');
+      await propertyAPI.update(property.id, { availability: newAvailability });
+      toast.success(`Property ${label}.`);
+      fetchData();
     } catch (err) {
-      toast.error('Failed to send reply. Check your email config.');
-    } finally {
-      setSendingReply(false);
+      // The DB blocks reopening a property while a rent payment is held in
+      // escrow for it (see trg_prevent_reopening_reserved_property) — surface
+      // that reason directly rather than a generic failure message.
+      toast.error(err.message || 'Failed to update property availability');
     }
   };
 
@@ -279,1505 +372,652 @@ export function AdminDashboard() {
     toast.success(`${label} copied`);
   };
 
-  // Get agent's bank + verification data. Bank from agent_bank_details (source of truth),
-  // other fields (address, id_card_url) from agent_verification_requests.
-  const getAgentVerification = (agentId) => {
-    const bankRow = agentBankDetails.find(b => b.user_id === agentId);
-    const verifRow = verifications.find(v => v.user_id === agentId && v.status === 'approved')
-      || verifications.find(v => v.user_id === agentId);
-    // Merge: verifRow for doc URLs/address, bankRow for bank fields
-    if (!verifRow && !bankRow) return null;
-    return {
-      ...(verifRow || {}),
-      ...(bankRow ? {
-        bank_code: bankRow.bank_code,
-        bank_name: bankRow.bank_name,
-        account_number: bankRow.account_number,
-        account_name: bankRow.account_name,
-      } : {}),
-    };
-  };
-
-  const getAgentPropertyCount = (agentId) =>
-    properties.filter(p => p.uploaded_by_agent_id === agentId).length;
-
-  const getAgentInspectionCount = (agentId) =>
-    inspections.filter(i => i.agent_id === agentId).length;
-
   const formatPrice = (price) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
-
   const getStatusBadge = (status) => ({
     pending: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-green-100 text-green-800',
     rejected: 'bg-red-100 text-red-800',
-    completed: 'bg-green-100 text-green-800',
     assigned: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800'
   }[status] || 'bg-gray-100 text-gray-800');
 
-  const filteredUsers = users.filter(u =>
-    !searchTerm ||
-    u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  if (!isAuthenticated || (!isAgent && !isAdmin)) return null;
 
-  const filteredAgents = agents.filter(a =>
-    !agentSearch ||
-    a.full_name?.toLowerCase().includes(agentSearch.toLowerCase()) ||
-    a.email?.toLowerCase().includes(agentSearch.toLowerCase())
-  );
+  const handleWithdraw = async () => {
+    const amt = parseFloat(withdrawAmount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (amt > balance.available) { toast.error('Amount exceeds available balance'); return; }
+    if (amt > withdrawalAPI.MAX_WITHDRAWAL_AMOUNT) { toast.error(`Maximum withdrawal is ₦${withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request`); return; }
+    if (!bankDetails?.account_number) { toast.error('Add your bank account first (Bank Details tab)'); return; }
+    setSubmittingWithdrawal(true);
+    try {
+      await withdrawalAPI.request({
+        agentId: user.id,
+        agentName: user.full_name || user.email,
+        agentEmail: user.email,
+        amount: amt,
+        bankName: bankDetails.bank_name,
+        accountNumber: bankDetails.account_number,
+        accountName: bankDetails.account_name,
+      });
+      toast.success('Withdrawal request submitted! Admin will process it shortly.');
+      setShowWithdrawDialog(false);
+      setWithdrawAmount('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit withdrawal request');
+    } finally {
+      setSubmittingWithdrawal(false);
+    }
+  };
 
-  if (!isAuthenticated || !isAdmin) return null;
+  // Once an existing listing already has owner payout details filled in,
+  // they're locked (mirrors the DB trigger) — only support/admin can change
+  // them from here on, to protect the owner from an agent quietly
+  // redirecting the payout to a different account.
+  const ownerDetailsLocked = !!(
+    editingProperty?.owner_full_name && editingProperty?.owner_bank_name && editingProperty?.owner_account_number
+  );
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="admin-dashboard">
+    <div className="container mx-auto px-4 py-6" data-testid="agent-dashboard">
+      {lightbox.open && <Lightbox images={lightbox.images} startIndex={lightbox.index} onClose={closeLightbox} />}
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage users, properties, and operations</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Agent Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Manage your properties and inspections</p>
         </div>
-        <Button onClick={fetchData} variant="outline" size="sm" className="gap-2">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
+        <Button
+          onClick={() => {
+            if (user?.suspended) { toast.error('Your account is suspended.'); return; }
+            handleOpenDialog();
+          }}
+          className="gap-2" disabled={user?.suspended} data-testid="add-property-btn">
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Add Property</span>
+          <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="overflow-x-auto mb-6 -mx-4 px-4">
-          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 gap-1 h-auto p-1">
-            <TabsTrigger value="overview" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <LayoutDashboard className="w-4 h-4 shrink-0" /> Overview
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Users className="w-4 h-4 shrink-0" /> Users
-              {users.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{users.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="agents" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <UserCog className="w-4 h-4 shrink-0" /> Agents
-              {agents.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{agents.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="verification" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Shield className="w-4 h-4 shrink-0" /> Verify
-              {stats?.pending_verifications > 0 && <Badge variant="destructive" className="ml-1 text-xs px-1.5">{stats.pending_verifications}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="properties" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Building2 className="w-4 h-4 shrink-0" /> Properties
-              {stats?.pending_properties > 0 && <Badge variant="destructive" className="ml-1 text-xs px-1.5">{stats.pending_properties}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="inspections" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Calendar className="w-4 h-4 shrink-0" /> Inspections
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Receipt className="w-4 h-4 shrink-0" /> Transactions
-            </TabsTrigger>
-            <TabsTrigger value="payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Wallet className="w-4 h-4" /><span>Agent Payouts</span>
-              {withdrawalRequests.filter(r => r.status === 'pending').length > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{withdrawalRequests.filter(r => r.status === 'pending').length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="owner-payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <CreditCard className="w-4 h-4" /><span>Owner Payouts</span>
-              {ownerPayouts.filter(p => p.status === 'pending').length > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{ownerPayouts.filter(p => p.status === 'pending').length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="escrow" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Lock className="w-4 h-4" /><span>Escrow</span>
-              {rentPayments.filter(p => p.status === 'held').length > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs bg-amber-500 text-white">{rentPayments.filter(p => p.status === 'held').length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <MessageSquare className="w-4 h-4 shrink-0" /> Messages
-              {messages.filter(m => m.status === 'unread').length > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs px-1.5">
-                  {messages.filter(m => m.status === 'unread').length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+      {user?.suspended && (
+        <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
+            <XCircle className="w-4 h-4 text-red-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-red-800 text-sm">Account Suspended</p>
+            <p className="text-xs text-red-600 mt-0.5">Your account has been suspended. Contact support for more information.</p>
+          </div>
         </div>
+      )}
 
-        {/* ── Overview ── */}
-        <TabsContent value="overview">
-          {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[...Array(8)].map(i => <Card key={i} className="p-4 animate-pulse"><div className="h-14 bg-muted rounded" /></Card>)}
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Users</p><p className="text-2xl font-bold mt-1">{stats?.total_users || 0}</p></div><Users className="w-6 h-6 text-primary opacity-70" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Agents</p><p className="text-2xl font-bold mt-1">{stats?.total_agents || 0}</p></div><UserCheck className="w-6 h-6 text-secondary opacity-70" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Properties</p><p className="text-2xl font-bold mt-1">{stats?.total_properties || 0}</p></div><Building2 className="w-6 h-6 text-primary opacity-70" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Inspections</p><p className="text-2xl font-bold mt-1">{stats?.total_inspections || 0}</p></div><Calendar className="w-6 h-6 text-secondary opacity-70" /></div></Card>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Properties</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_properties || 0}</p></Card>
-                <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Verifications</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_verifications || 0}</p></Card>
-                <Card className="p-4 border-green-200 bg-green-50"><p className="text-xs text-green-700 font-medium">Approved Properties</p><p className="text-2xl font-bold mt-1 text-green-900">{stats?.approved_properties || 0}</p></Card>
-                <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Completed Inspections</p><p className="text-2xl font-bold mt-1 text-blue-900">{stats?.completed_inspections || 0}</p></Card>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Coins className="w-5 h-5 text-primary" /></div><div><p className="text-xs text-muted-foreground">Token Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.token_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><Wallet className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Rent Service Fee</p><p className="text-xl font-bold">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><ArrowDownCircle className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Withdrawal Fee</p><p className="text-xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4 bg-primary text-white"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><TrendingUp className="w-5 h-5" /></div><div><p className="text-xs opacity-80">Total Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p></div></div></Card>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Rentora revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
-                <Card className="p-4 border-amber-300 bg-amber-50"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Lock className="w-5 h-5 text-amber-700" /></div><div><p className="text-xs text-amber-700 font-medium">Total Escrow Held <span className="italic font-normal">(awaiting move-in / release)</span></p><p className="text-xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p></div></div></Card>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Token Transactions</p><p className="text-2xl font-bold mt-1">{transactions.token_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.token_transactions.filter(t => t.status === 'completed').length} completed</p></div><Coins className="w-6 h-6 text-primary opacity-60" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.inspection_transactions.filter(t => t.status === 'completed').length} completed</p></div><Receipt className="w-6 h-6 text-secondary opacity-60" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Rent Transactions</p><p className="text-2xl font-bold mt-1">{stats?.total_rent_payments || 0}</p><p className="text-xs text-muted-foreground mt-0.5">{stats?.held_rent_payments || 0} held · {stats?.released_rent_payments || 0} released</p></div><Home className="w-6 h-6 text-primary opacity-60" /></div></Card>
-                <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Inspections</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_inspections || 0}</p><p className="text-xs text-yellow-600 mt-0.5">awaiting completion</p></Card>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Unread Messages</p><p className="text-2xl font-bold mt-1 text-blue-900">{messages.filter(m => m.status === 'unread').length}</p><p className="text-xs text-blue-600 mt-0.5">need response</p></Card>
-              </div>
-            </>
-          )}
-        </TabsContent>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <Card className="p-4"><p className="text-2xl font-bold">{properties.length}</p><p className="text-sm text-muted-foreground">Total Properties</p></Card>
+        <Card className="p-4"><p className="text-2xl font-bold text-green-600">{properties.filter(p => p.status === 'approved').length}</p><p className="text-sm text-muted-foreground">Approved</p></Card>
+        <Card className="p-4"><p className="text-2xl font-bold text-yellow-600">{properties.filter(p => p.status === 'pending').length}</p><p className="text-sm text-muted-foreground">Pending</p></Card>
+        <Card className="p-4"><p className="text-2xl font-bold">{inspections.length}</p><p className="text-sm text-muted-foreground">Inspections</p></Card>
+      </div>
 
-        {/* ── Users ── */}
-        <TabsContent value="users">
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search users..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
-          </div>
-          <div className="sm:hidden space-y-3">
-            {filteredUsers.map((u) => (
-              <Card key={u.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate">{u.full_name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                    <Badge variant={u.suspended ? 'destructive' : 'outline'} className="mt-2 text-xs">{u.suspended ? 'Suspended' : 'Active'}</Badge>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
-                      <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
-                    </Select>
-                    {u.id === user.id ? (
-                      <span className="text-xs text-muted-foreground italic px-1">You</span>
-                    ) : (
-                      <Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" className="h-8 text-xs gap-1" onClick={() => handleSuspendUser(u.id, !u.suspended)}>
-                        <Ban className="w-3 h-3" /> {u.suspended ? 'Unsuspend' : 'Suspend'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-          <Card className="hidden sm:block overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {filteredUsers.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.full_name}</TableCell>
-                    <TableCell className="text-sm">{u.email}</TableCell>
-                    <TableCell>
-                      <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
-                        <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell><Badge variant={u.suspended ? 'destructive' : 'outline'}>{u.suspended ? 'Suspended' : 'Active'}</Badge></TableCell>
-                    <TableCell>{u.id === user.id ? <span className="text-xs text-muted-foreground italic">You</span> : <Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" onClick={() => handleSuspendUser(u.id, !u.suspended)}><Ban className="w-4 h-4" /></Button>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
+      {/* Tabs */}
+      <Tabs defaultValue="properties">
+        <TabsList className="mb-5 w-full grid grid-cols-4">
+          <TabsTrigger value="properties" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">My </span><span className="hidden sm:inline">Properties</span></TabsTrigger>
+          <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned Inspections</span></TabsTrigger>
+          <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Bank Details</span></TabsTrigger>
+          <TabsTrigger value="earnings" className="gap-1.5 text-xs sm:text-sm"><Wallet className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Earnings</span></TabsTrigger>
+        </TabsList>
 
-        {/* ── Agents ── */}
-        <TabsContent value="agents">
-          {/* Pending Bank Change Requests */}
-          {bankRequests.filter(r => r.status === 'pending').length > 0 && (
-            <Card className="mb-5 border-orange-200 bg-orange-50/50">
-              <div className="p-4 border-b border-orange-200">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-orange-600" />
-                  <h3 className="font-semibold text-orange-800">Pending Bank Change Requests</h3>
-                  <Badge className="bg-orange-500 text-white text-xs ml-1">{bankRequests.filter(r => r.status === 'pending').length}</Badge>
-                </div>
-                <p className="text-xs text-orange-600 mt-0.5">Agents are requesting to update their payout bank details</p>
-              </div>
-              <div className="divide-y divide-orange-100">
-                {bankRequests.filter(r => r.status === 'pending').map(req => {
-                  const registeredName = (req.users?.full_name || '').toUpperCase().trim();
-                  const acctName = (req.account_name || '').toUpperCase().trim();
-                  const rWords = registeredName.split(' ').filter(Boolean);
-                  const aWords = acctName.split(' ').filter(Boolean);
-                  const matches = rWords.filter(w => aWords.includes(w)).length;
-                  const nameMatch = matches >= 2 || (rWords.length === 1 && aWords.includes(rWords[0]));
-                  return (
-                    <div key={req.id} className="p-4 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <p className="font-semibold text-sm">{req.users?.full_name || agents.find(a => a.id === req.user_id)?.full_name || 'Unknown Agent'}</p>
-                          <p className="text-xs text-muted-foreground">{req.users?.email || agents.find(a => a.id === req.user_id)?.email} · {new Date(req.created_at).toLocaleString()}</p>
-                        </div>
-                        <Badge className={nameMatch ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'}>
-                          {nameMatch ? '✓ Names match' : '⚠ Name mismatch'}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-white rounded-lg border p-3">
-                        <div>
-                          <span className="text-muted-foreground block">Registered Name</span>
-                          <span className="font-bold">{registeredName || '—'}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">Account Name</span>
-                          <span className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>{req.account_name}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">Bank · Account No.</span>
-                          <span className="font-semibold">{req.bank_name}</span>
-                          <span className="font-mono block">{req.account_number}</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5 justify-center">
-                          <Button size="sm" className="h-7 gap-1 bg-green-600 hover:bg-green-700 text-white text-xs"
-                            onClick={() => setSelectedAgent(agents.find(a => a.id === req.user_id) || { id: req.user_id, full_name: req.users?.full_name, email: req.users?.email, verification: verifications.find(v => v.user_id === req.user_id && v.status === 'approved') })}>
-                            <Eye className="w-3 h-3" /> View Agent
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search agents..." value={agentSearch} onChange={(e) => setAgentSearch(e.target.value)} className="pl-10" />
-          </div>
-
-          {filteredAgents.length === 0 ? (
-            <Card className="p-12 text-center">
-              <UserCog className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="font-semibold">No agents yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Approved agents will appear here</p>
-            </Card>
-          ) : (
-            <>
-              {/* Mobile cards */}
-              <div className="sm:hidden space-y-3">
-                {filteredAgents.map((a) => {
-                  const verification = getAgentVerification(a.id);
-                  return (
-                    <Card key={a.id} className="p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-sm">{a.full_name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{a.email}</p>
-                        </div>
-                        <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => setSelectedAgent({ ...a, verification })}>
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>{getAgentPropertyCount(a.id)} properties</span>
-                        <span>{getAgentInspectionCount(a.id)} inspections</span>
-                        {verification?.bank_name && <span className="text-green-600 font-medium">✓ Bank linked</span>}
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              {/* Desktop table */}
-              <Card className="hidden sm:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Agent</TableHead>
-                      <TableHead>Bank</TableHead>
-                      <TableHead>Account Number</TableHead>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead className="text-center">Properties</TableHead>
-                      <TableHead className="text-center">Inspections</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAgents.map((a) => {
-                      const verification = getAgentVerification(a.id);
-                      return (
-                        <TableRow key={a.id}>
-                          <TableCell>
-                            <p className="font-medium text-sm">{a.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{a.email}</p>
-                          </TableCell>
-                          <TableCell className="text-sm">{verification?.bank_name || <span className="text-muted-foreground/40">—</span>}</TableCell>
-                          <TableCell>
-                            {verification?.account_number ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-sm">{verification.account_number}</span>
-                                <button onClick={() => copyToClipboard(verification.account_number, 'Account number')} className="text-muted-foreground hover:text-foreground transition-colors">
-                                  <Copy className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ) : <span className="text-muted-foreground/40">—</span>}
-                          </TableCell>
-                          <TableCell className="text-sm font-medium">{verification?.account_name || <span className="text-muted-foreground/40">—</span>}</TableCell>
-                          <TableCell className="text-center text-sm">{getAgentPropertyCount(a.id)}</TableCell>
-                          <TableCell className="text-center text-sm">{getAgentInspectionCount(a.id)}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline" className="h-7 px-2 gap-1" onClick={() => setSelectedAgent({ ...a, verification })}>
-                              <Eye className="w-3.5 h-3.5" /> View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </Card>
-            </>
-          )}
-        </TabsContent>
-
-        {/* ── Verification ── */}
-        <TabsContent value="verification">
-          <div className="space-y-4">
-            {verifications.filter(v => v.status === 'pending').length === 0 ? (
-              <Card className="p-12 text-center">
-                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                <p className="font-semibold text-green-700">All caught up!</p>
-                <p className="text-sm text-muted-foreground mt-1">No pending verification requests</p>
-              </Card>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  {verifications.filter(v => v.status === 'pending').length} pending request{verifications.filter(v => v.status === 'pending').length !== 1 ? 's' : ''}
-                </p>
-                <div className="space-y-4">
-                  {verifications.filter(v => v.status === 'pending').map((v) => {
-                    const idName = (v.user_name || '').toUpperCase().trim();
-                    const acctName = (v.account_name || '').toUpperCase().trim();
-                    const idWords = idName.split(' ').filter(Boolean);
-                    const acctWords = acctName.split(' ').filter(Boolean);
-                    const matches = idWords.filter(w => acctWords.includes(w)).length;
-                    const nameMatch = matches >= 2 || (idWords.length === 1 && acctWords.includes(idWords[0]));
-                    return (
-                      <Card key={v.id} className="overflow-hidden border-yellow-200">
-                        {/* Header */}
-                        <div className="flex items-center justify-between gap-3 px-5 py-4 bg-yellow-50/60 border-b border-yellow-200">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
-                              <User className="w-5 h-5 text-yellow-700" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-sm">{v.user_name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{v.user_email}</p>
-                              {v.user_phone && (
-                                <a href={`tel:${v.user_phone}`} className="text-xs text-primary font-medium flex items-center gap-1 mt-0.5 hover:underline">
-                                  <Phone className="w-3 h-3" /> {v.user_phone}
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 shrink-0">Pending</Badge>
-                        </div>
-
-                        <div className="p-5 space-y-4">
-                          {/* Address */}
-                          {v.address && (
-                            <div>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Address</p>
-                              <p className="text-sm text-foreground/80">{v.address}</p>
-                            </div>
-                          )}
-
-                          {/* Bank details */}
-                          {v.bank_name && (
-                            <div>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Bank Account</p>
-                              <div className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs mb-2 ${nameMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                {nameMatch
-                                  ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
-                                  : <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />}
-                                <p className={`font-semibold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>
-                                  {nameMatch ? 'Name matches ID' : 'Name mismatch — verify carefully'}
-                                </p>
-                              </div>
-                              <div className="grid grid-cols-3 gap-3 text-xs bg-muted/30 rounded-lg border p-3">
-                                <div><span className="text-muted-foreground block mb-0.5">Bank</span><span className="font-semibold">{v.bank_name}</span></div>
-                                <div>
-                                  <span className="text-muted-foreground block mb-0.5">Account No.</span>
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-mono font-bold">{v.account_number}</span>
-                                    <button onClick={() => copyToClipboard(v.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>
-                                  </div>
-                                </div>
-                                <div><span className="text-muted-foreground block mb-0.5">Account Name</span><span className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>{v.account_name}</span></div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Documents */}
-                          <div className="grid grid-cols-2 gap-3">
-                            {v.id_card_url && (
-                              <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">ID Card</p>
-                                <a href={v.id_card_url} target="_blank" rel="noreferrer">
-                                  <img src={v.id_card_url} alt="ID Card" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
-                                </a>
-                              </div>
-                            )}
-                            {v.selfie_url && (
-                              <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Selfie with ID</p>
-                                <a href={v.selfie_url} target="_blank" rel="noreferrer">
-                                  <img src={v.selfie_url} alt="Selfie" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                          {v.agreement_url && (
-                            <a href={v.agreement_url} target="_blank" rel="noreferrer"
-                              className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
-                              <FileText className="w-6 h-6 text-primary shrink-0" />
-                              <div><p className="text-sm font-medium text-primary">View Signed Agreement PDF</p><p className="text-xs text-muted-foreground">Opens in new tab</p></div>
-                            </a>
-                          )}
-
-                          {/* Action buttons */}
-                          <div className="flex gap-2 pt-1">
-                            <Button className="flex-1 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => handleReviewVerification(v.id, 'approved', v)}>
-                              <CheckCircle2 className="w-4 h-4" /> Approve
-                            </Button>
-                            <Button variant="destructive" className="flex-1 gap-1.5"
-                              onClick={() => handleReviewVerification(v.id, 'rejected', v)}>
-                              <XCircle className="w-4 h-4" /> Reject
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* ── Properties ── */}
+        {/* ── Properties Tab ── */}
         <TabsContent value="properties">
-          <div className="space-y-4">
-            {properties.filter(p => p.status === 'pending').length > 0 && (
-              <div className="mb-2">
-                <h3 className="font-semibold mb-3 text-yellow-800 text-sm">⏳ Pending Approval</h3>
-                <div className="space-y-3">
-                  {properties.filter(p => p.status === 'pending').map((p) => {
-                    const dupMatch = p.possible_duplicate_of ? properties.find(x => x.id === p.possible_duplicate_of) : null;
-                    return (
-                    <Card key={p.id} className="overflow-hidden border-yellow-200">
-                      <div className="flex">
-                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-24 sm:w-32 object-cover flex-shrink-0" style={{ minHeight: '100px' }} />
-                        <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '100px' }}>
-                          <div>
-                            <h4 className="font-semibold text-sm line-clamp-1">{p.title}</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-1">{p.location}</p>
-                            <p className="text-primary font-bold text-sm mt-1">{formatPrice(p.price)}/yr</p>
-                            <p className="text-xs text-muted-foreground">By: {p.uploaded_by_agent_name}</p>
-                            {dupMatch && (
-                              <p className="text-xs text-red-600 font-medium mt-1">
-                                ⚠ Possible duplicate of "{dupMatch.title}" by {dupMatch.uploaded_by_agent_name}
-                              </p>
-                            )}
+          {loading ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => (
+                <Card key={i} className="overflow-hidden">
+                  <div className="flex" style={{ height: '110px' }}>
+                    <div className="w-28 bg-muted animate-pulse flex-shrink-0" />
+                    <div className="flex-1 p-3 space-y-2">
+                      <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : properties.length > 0 ? (
+            <div className="space-y-3">
+              {properties.map((property) => {
+                const paidRecord = rentPaymentsByProperty[property.id];
+                return (
+                <Card key={property.id} className="overflow-hidden">
+                  <div className="flex">
+                    <div className="relative group flex-shrink-0 w-28 sm:w-32" style={{ minHeight: '110px' }}>
+                      {property.images?.[0] ? (
+                        <>
+                          <img src={property.images[0]} alt="" className="absolute inset-0 w-full h-full object-cover cursor-pointer" onClick={() => openLightbox(property.images, 0)} />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-end justify-center pb-2 transition-all cursor-pointer" onClick={() => openLightbox(property.images, 0)}>
+                            <span className="text-white text-xs font-medium bg-black/60 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <Expand className="w-3 h-3" /> View
+                            </span>
                           </div>
-                          <div className="flex gap-2 mt-2 flex-wrap">
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => setPreviewProperty(p)}><Eye className="w-3 h-3" /> Preview</Button>
-                            <Button size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3 h-3" /> Approve</Button>
-                            <Button size="sm" variant="destructive" className="h-7 px-2 text-xs gap-1" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3 h-3" /> Reject</Button>
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3 h-3" /> Delete</Button>
-                          </div>
+                          {property.images.length > 1 && (
+                            <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded font-medium pointer-events-none">+{property.images.length - 1}</span>
+                          )}
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 bg-muted flex items-center justify-center">
+                          <Image className="w-7 h-7 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '110px' }}>
+                      <div className="flex items-start gap-2">
+                        <h3 className="font-semibold text-sm leading-snug line-clamp-2 flex-1 min-w-0">{property.title}</h3>
+                        <Badge className={`${getStatusBadge(property.status)} text-xs capitalize shrink-0 whitespace-nowrap`}>{property.status}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{property.location}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-primary font-bold text-sm truncate">{formatPrice(property.price)}<span className="text-xs font-normal text-muted-foreground">/yr</span></p>
+                        <div className="flex gap-1.5 shrink-0 items-center">
+                          <Button variant="outline" size="sm"
+                            onClick={() => { if (user?.suspended) { toast.error('Your account is suspended.'); return; } handleOpenDialog(property); }}
+                            disabled={user?.suspended} className="h-7 px-2.5 text-xs gap-1">
+                            <Edit className="w-3 h-3" /> Edit
+                          </Button>
+                          {paidRecord ? (
+                            <Badge
+                              variant="secondary"
+                              className="h-7 px-2.5 text-xs gap-1 bg-green-100 text-green-700 hover:bg-green-100 cursor-help"
+                              title={paidRecord.status === 'held'
+                                ? "Payment held in escrow — awaiting the renter's move-in confirmation. This listing is locked and can't be reopened until then."
+                                : "Rent has been paid and released — this property is occupied. Contact support@rentora.com.ng if it needs to be relisted."}
+                            >
+                              <Lock className="w-3 h-3" />
+                              {paidRecord.status === 'held' ? 'Payment Held' : 'Taken (Paid)'}
+                            </Badge>
+                          ) : (
+                            <Button variant="outline" size="sm"
+                              onClick={() => handleToggleAvailability(property)}
+                              disabled={user?.suspended}
+                              className={`h-7 px-2.5 text-xs gap-1 ${property.availability === 'unavailable' ? 'text-green-600 border-green-300 hover:bg-green-50' : 'text-orange-600 border-orange-300 hover:bg-orange-50'}`}>
+                              {property.availability === 'unavailable'
+                                ? <><Eye className="w-3 h-3" /> Available</>
+                                : <><EyeOff className="w-3 h-3" /> Unavailable</>
+                              }
+                            </Button>
+                          )}
                         </div>
                       </div>
-                    </Card>
-                    );
-                  })}
+                    </div>
+                  </div>
+                </Card>
+                );
+              })}
+            </div>
+
+          ) : (
+            <Card className="p-10 text-center">
+              <Building2 className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+              <h3 className="font-semibold">No Properties Yet</h3>
+              <p className="text-sm text-muted-foreground mt-1 mb-4">Add your first property listing to get started</p>
+              <Button onClick={() => { if (user?.suspended) { toast.error('Account suspended.'); return; } handleOpenDialog(); }} disabled={user?.suspended} className="gap-2">
+                <Plus className="w-4 h-4" /> Add Property
+              </Button>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── Inspections Tab ── */}
+        <TabsContent value="inspections">
+          {inspections.length > 0 ? (
+            <div className="space-y-3">
+              {inspections.map((inspection) => (
+                <Card key={inspection.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold line-clamp-1">{inspection.property_title}</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">Tenant: {inspection.user_name}</p>
+                      <p className="text-sm text-muted-foreground">Date: {inspection.inspection_date}</p>
+                      {inspection.payment_status === 'completed' && inspection.user_phone && (
+                        <a href={`tel:${inspection.user_phone}`}
+                          className="inline-flex items-center gap-1.5 mt-2 text-primary font-semibold text-sm hover:underline">
+                          <Phone className="w-3.5 h-3.5" /> {inspection.user_phone}
+                        </a>
+                      )}
+                      {inspection.payment_status === 'completed' && !inspection.user_phone && (
+                        <p className="text-xs text-muted-foreground mt-1">User phone not available</p>
+                      )}
+                      {inspection.payment_status !== 'completed' && (
+                        <p className="text-xs text-yellow-600 mt-1">⏳ Awaiting payment</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <Badge className={getStatusBadge(inspection.status)}>{inspection.status}</Badge>
+                      {inspection.payment_status === 'completed' && inspection.user_phone && (
+                        <a href={`tel:${inspection.user_phone}`}>
+                          <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
+                            <Phone className="w-3 h-3" /> Call User
+                          </Button>
+                        </a>
+                      )}
+                      {inspection.status !== 'completed' && inspection.payment_status === 'completed' && (
+                        <Button size="sm" onClick={() => handleMarkCompleted(inspection.id)} className="gap-1.5 h-7 text-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-10 text-center">
+              <Calendar className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+              <h3 className="font-semibold">No Inspections Assigned</h3>
+              <p className="text-sm text-muted-foreground mt-1">Inspections assigned to you will appear here</p>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── Bank Details Tab ── */}
+        <TabsContent value="bank">
+          <Card className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Payout Bank Account</h3>
+                  <p className="text-xs text-muted-foreground">Used to receive inspection fee payouts</p>
+                </div>
+              </div>
+              {!editingBank && !pendingBankDetails && (
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 shrink-0" onClick={() => {
+                  setBankForm(bankDetails || { bank_code: '', bank_name: '', account_number: '', account_name: '' });
+                  setEditingBank(true);
+                }}>
+                  <Pencil className="w-3.5 h-3.5" /> {bankDetails ? 'Edit' : 'Add'}
+                </Button>
+              )}
+            </div>
+
+            {/* Pending change notice */}
+            {pendingBankDetails && !editingBank && (
+              <div className="mb-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                <p className="text-xs font-semibold text-yellow-800 mb-2">⏳ Change Pending Admin Approval</p>
+                <div className="space-y-1 text-xs text-yellow-700">
+                  <p><span className="font-medium">Bank:</span> {pendingBankDetails.bank_name}</p>
+                  <p><span className="font-medium">Account:</span> {pendingBankDetails.account_number}</p>
+                  <p><span className="font-medium">Name:</span> {pendingBankDetails.account_name}</p>
                 </div>
               </div>
             )}
-            <h3 className="font-semibold text-sm mb-3">All Properties</h3>
-            <div className="sm:hidden space-y-3">
-              {properties.map((p) => (
-                <Card key={p.id} className="overflow-hidden">
-                  <div className="flex">
-                    <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-24 object-cover flex-shrink-0" style={{ minHeight: '96px' }} />
-                    <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '96px' }}>
-                      <div>
-                        <div className="flex items-start justify-between gap-1">
-                          <h4 className="font-semibold text-sm line-clamp-1 flex-1 min-w-0">{p.title}</h4>
-                          <Badge className={`${getStatusBadge(p.status)} text-xs shrink-0 capitalize`}>{p.status}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{p.location}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{p.property_type} · {formatPrice(p.price)}/yr</p>
-                        <p className="text-xs text-muted-foreground">By: {p.uploaded_by_agent_name}</p>
-                      </div>
-                      <div className="flex gap-1.5 mt-1 flex-wrap">
-                        {p.status === 'pending' && (<><Button size="sm" className="h-6 px-2 text-xs" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3 h-3" /></Button><Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3 h-3" /></Button></>)}
-                        <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3 h-3" /></Button>
-                      </div>
+
+            {!editingBank ? (
+              bankDetails?.bank_name ? (
+                <div className="space-y-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                  <p className="text-xs font-semibold text-blue-600 mb-1">Current Approved Details</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Bank</span>
+                    <span className="text-sm font-semibold">{bankDetails.bank_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Account Number</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-bold">{bankDetails.account_number}</span>
+                      <button onClick={() => copyToClipboard(bankDetails.account_number, 'Account number')} className="text-muted-foreground hover:text-primary transition-colors">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                </Card>
-              ))}
-            </div>
-            <Card className="hidden sm:block overflow-x-auto">
-              <Table>
-                <TableHeader><TableRow><TableHead>Property</TableHead><TableHead>Type</TableHead><TableHead>Price</TableHead><TableHead>Agent</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-                <TableBody>{properties.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell><div className="flex items-center gap-3"><img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-12 h-12 rounded object-cover shrink-0" /><div className="min-w-0"><p className="font-medium text-sm truncate max-w-[140px]">{p.title}</p><p className="text-xs text-muted-foreground truncate max-w-[140px]">{p.location}</p></div></div></TableCell>
-                    <TableCell className="capitalize text-sm">{p.property_type}</TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">{formatPrice(p.price)}</TableCell>
-                    <TableCell className="text-sm">{p.uploaded_by_agent_name}</TableCell>
-                    <TableCell><Badge className={`${getStatusBadge(p.status)} capitalize`}>{p.status}</Badge></TableCell>
-                    <TableCell><div className="flex gap-1.5">{p.status === 'pending' && (<><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setPreviewProperty(p)}><Eye className="w-3.5 h-3.5" /></Button><Button size="sm" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3.5 h-3.5" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3.5 h-3.5" /></Button></>)}<Button variant="destructive" size="sm" className="h-7 px-2" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3.5 h-3.5" /></Button></div></TableCell>
-                  </TableRow>
-                ))}</TableBody>
-              </Table>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── Inspections ── */}
-        <TabsContent value="inspections">
-          <div className="sm:hidden space-y-3">
-            {inspections.map((i) => (
-              <Card key={i.id} className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm line-clamp-1">{i.property_title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">User: {i.user_name}</p>
-                    <p className="text-xs text-muted-foreground">Agent: {i.agent_name || 'Unassigned'}</p>
-                    <p className="text-xs text-muted-foreground">Date: {i.inspection_date}</p>
+                  <div className="flex items-center justify-between border-t border-blue-200 pt-3">
+                    <span className="text-xs text-muted-foreground font-medium">Account Name</span>
+                    <span className="text-sm font-bold text-blue-800">{bankDetails.account_name}</span>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <Badge className={`${getStatusBadge(i.status)} text-xs capitalize`}>{i.status}</Badge>
-                    <Badge className={`${getStatusBadge(i.payment_status)} text-xs capitalize`}>{i.payment_status}</Badge>
-                  </div>
+                  {!pendingBankDetails && (
+                    <Button variant="outline" size="sm" className="w-full mt-2 gap-1.5" onClick={() => {
+                      setBankForm(bankDetails);
+                      setEditingBank(true);
+                    }}>
+                      <Pencil className="w-3.5 h-3.5" /> Request Change
+                    </Button>
+                  )}
                 </div>
-              </Card>
-            ))}
-          </div>
-          <Card className="hidden sm:block overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow><TableHead>Property</TableHead><TableHead>User</TableHead><TableHead>Agent</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead>Payment</TableHead></TableRow></TableHeader>
-              <TableBody>{inspections.map((i) => (
-                <TableRow key={i.id}>
-                  <TableCell className="font-medium text-sm">{i.property_title}</TableCell>
-                  <TableCell className="text-sm">{i.user_name}</TableCell>
-                  <TableCell className="text-sm">{i.agent_name || 'Unassigned'}</TableCell>
-                  <TableCell className="text-sm">{i.inspection_date}</TableCell>
-                  <TableCell><Badge className={getStatusBadge(i.status)}>{i.status}</Badge></TableCell>
-                  <TableCell><Badge className={getStatusBadge(i.payment_status)}>{i.payment_status}</Badge></TableCell>
-                </TableRow>
-              ))}</TableBody>
-            </Table>
+              ) : !pendingBankDetails ? (
+                <div className="text-center py-8">
+                  <CreditCard className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="font-medium text-sm">No bank details on file</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">Add your bank account to receive inspection payouts</p>
+                  <Button size="sm" onClick={() => { setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' }); setEditingBank(true); }} className="gap-1.5">
+                    <Plus className="w-4 h-4" /> Add Bank Account
+                  </Button>
+                </div>
+              ) : null
+            ) : (
+              /* ── Edit Form (manual input) ── */
+              <div className="space-y-4">
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
+                  Changes will be reviewed by admin before going live.
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Bank <span className="text-destructive">*</span></Label>
+                  <Select
+                    value={bankForm.bank_code}
+                    onValueChange={(val) => {
+                      const selected = banks.find(b => b.code === val);
+                      setBankForm(prev => ({ ...prev, bank_code: val, bank_name: selected?.name || '' }));
+                    }}
+                    disabled={banksLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={banksLoading ? 'Loading banks...' : 'Select your bank...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {banks.map(bank => (
+                        <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Account Number <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="text" inputMode="numeric" maxLength={10}
+                    value={bankForm.account_number}
+                    onChange={(e) => setBankForm(prev => ({ ...prev, account_number: e.target.value.replace(/\D/g, '') }))}
+                    placeholder="10-digit account number"
+                  />
+                  {bankForm.account_number?.length > 0 && bankForm.account_number.length < 10 && (
+                    <p className="text-xs text-muted-foreground">{10 - bankForm.account_number.length} more digit{10 - bankForm.account_number.length !== 1 ? 's' : ''} needed</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Account Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    value={bankForm.account_name}
+                    onChange={(e) => setBankForm(prev => ({ ...prev, account_name: e.target.value }))}
+                    placeholder="Enter your account name exactly as on the account"
+                  />
+                  <p className="text-xs text-muted-foreground">Type the name as it appears on your bank account</p>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" className="flex-1" onClick={() => {
+                    setEditingBank(false);
+                    setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' });
+                  }}>Cancel</Button>
+                  <Button className="flex-1" onClick={handleSaveBankDetails} disabled={savingBank}>
+                    {savingBank ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</> : 'Submit for Approval'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </TabsContent>
 
-        {/* ── Transactions ── */}
-        <TabsContent value="transactions">
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Card className="p-4 bg-primary/5 border-primary/20"><p className="text-xs text-muted-foreground">Token Transactions</p><p className="text-2xl font-bold mt-1">{transactions.token_transactions.length}</p></Card>
-              <Card className="p-4 bg-green-50 border-green-200"><p className="text-xs text-green-700 font-medium">Completed Token Tx</p><p className="text-2xl font-bold mt-1 text-green-900">{transactions.token_transactions.filter(t => t.status === 'completed').length}</p><p className="text-xs text-green-600 font-medium mt-0.5">{formatPrice(transactions.token_transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (t.amount || 0), 0))}</p></Card>
-              <Card className="p-4 bg-blue-50 border-blue-200"><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p></Card>
-              <Card className="p-4 bg-green-50 border-green-200"><p className="text-xs text-green-700 font-medium">Completed Inspection Tx</p><p className="text-2xl font-bold mt-1 text-green-900">{transactions.inspection_transactions.filter(t => t.status === 'completed').length}</p><p className="text-xs text-green-600 font-medium mt-0.5">{formatPrice(transactions.inspection_transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (t.amount || 0), 0))}</p></Card>
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm mb-3">Token Transactions</h3>
-              <div className="sm:hidden space-y-3">{transactions.token_transactions.map((tx) => (<Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-mono text-xs text-muted-foreground truncate">{tx.reference}</p><p className="font-semibold text-sm mt-1">{tx.tokens_added} Tokens</p><p className="text-sm font-bold text-primary">{formatPrice(tx.amount)}</p></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge className={`${getStatusBadge(tx.status)} text-xs`}>{tx.status}</Badge><p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p></div></div></Card>))}{transactions.token_transactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No token transactions yet</p>}</div>
-              <Card className="hidden sm:block overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Tokens</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{transactions.token_transactions.map((tx) => (<TableRow key={tx.id}><TableCell className="font-mono text-sm">{tx.reference}</TableCell><TableCell>{tx.tokens_added}</TableCell><TableCell>{formatPrice(tx.amount)}</TableCell><TableCell><Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge></TableCell><TableCell className="text-sm text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</TableCell></TableRow>))}</TableBody></Table></Card>
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm mb-3">Inspection Transactions</h3>
-              <div className="sm:hidden space-y-3">{transactions.inspection_transactions.map((tx) => (<Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-mono text-xs text-muted-foreground truncate">{tx.reference}</p><p className="text-sm font-bold text-primary mt-1">{formatPrice(tx.amount)}</p></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge className={`${getStatusBadge(tx.status)} text-xs`}>{tx.status}</Badge><p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p></div></div></Card>))}{transactions.inspection_transactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No inspection transactions yet</p>}</div>
-              <Card className="hidden sm:block overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{transactions.inspection_transactions.map((tx) => (<TableRow key={tx.id}><TableCell className="font-mono text-sm">{tx.reference}</TableCell><TableCell>{formatPrice(tx.amount)}</TableCell><TableCell><Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge></TableCell><TableCell className="text-sm text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</TableCell></TableRow>))}</TableBody></Table></Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ── Messages ── */}
-        <TabsContent value="messages">
-          {messages.length === 0 ? (
-            <Card className="p-12 text-center border-border/60"><div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4"><Inbox className="w-7 h-7 text-foreground/30" /></div><h3 className="font-semibold">No Messages Yet</h3><p className="text-sm text-foreground/55 mt-1">Messages submitted via the Contact page will appear here</p></Card>
-          ) : (
-            <div className="grid sm:grid-cols-5 gap-4">
-              <div className="sm:col-span-2 space-y-2">
-                {messages.map((m) => (
-                  <Card key={m.id} onClick={() => { setSelectedMessage(m); if (m.status === 'unread') handleMarkRead(m.id); }}
-                    className={`p-4 cursor-pointer transition-all border ${selectedMessage?.id === m.id ? 'border-primary bg-primary/5' : m.status === 'unread' ? 'border-blue-200 bg-blue-50/40 hover:border-blue-300' : 'border-border/60 hover:border-border'}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">{m.status === 'unread' && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />}<p className={`text-sm truncate ${m.status === 'unread' ? 'font-bold' : 'font-semibold'}`}>{m.name}</p></div>
-                        <p className="text-xs text-foreground/55 truncate mt-0.5">{m.subject}</p>
-                        <p className="text-xs text-foreground/40 line-clamp-1 mt-0.5">{m.message}</p>
-                      </div>
-                      <div className="shrink-0 flex flex-col items-end gap-1"><p className="text-xs text-foreground/40 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString()}</p><Badge className={m.status === 'unread' ? 'bg-blue-100 text-blue-700 text-xs' : 'bg-gray-100 text-gray-600 text-xs'}>{m.status}</Badge></div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-              <div className="sm:col-span-3">
-                {selectedMessage ? (
-                  <Card className="p-6 border-border/60">
-                    <div className="flex items-start justify-between gap-3 mb-5">
-                      <div className="min-w-0 flex-1"><h3 className="font-bold text-lg leading-tight">{selectedMessage.subject}</h3><p className="text-xs text-foreground/50 mt-1">{new Date(selectedMessage.created_at).toLocaleString()}</p></div>
-                      <Button variant="destructive" size="sm" className="h-7 px-2 shrink-0" onClick={() => handleDeleteMessage(selectedMessage.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 mb-5">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><User className="w-5 h-5 text-primary" /></div>
-                      <div className="min-w-0 flex-1"><p className="font-semibold text-sm">{selectedMessage.name}</p><p className="text-xs text-foreground/55 truncate">{selectedMessage.email}</p></div>
-                    </div>
-                    <div className="bg-white border border-border/50 rounded-lg p-4 min-h-[120px]"><p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedMessage.message}</p></div>
-                    {/* Inline reply composer */}
-                    <div className="mt-4 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reply to {selectedMessage.name}</p>
-                      <Textarea
-                        value={replyText}
-                        onChange={e => setReplyText(e.target.value)}
-                        placeholder={`Write your reply to ${selectedMessage.name}...`}
-                        rows={4}
-                        className="resize-none text-sm"
-                      />
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-muted-foreground">Sends to: <span className="font-medium">{selectedMessage.email}</span></p>
-                        <Button size="sm" className="gap-1.5" onClick={() => handleReply(selectedMessage)} disabled={sendingReply || !replyText.trim()}>
-                          <Mail className="w-3.5 h-3.5" />
-                          {sendingReply ? 'Sending...' : 'Send Reply'}
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ) : (
-                  <Card className="p-12 text-center border-border/60"><MailOpen className="w-12 h-12 text-foreground/20 mx-auto mb-3" /><p className="text-sm text-foreground/50">Select a message to read it</p></Card>
-                )}
-              </div>
-            </div>
-          )}
-
-        </TabsContent>
-
-        {/* ── Payouts Tab ── */}
-        <TabsContent value="payouts">
-          {/* Summary cards */}
+        {/* ── Earnings Tab ── */}
+        <TabsContent value="earnings">
+          {/* Balance Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-            <Card className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Pending Requests</p>
-              <p className="text-2xl font-bold text-orange-500">{withdrawalRequests.filter(r => r.status === 'pending').length}</p>
+            <Card className="p-5 bg-gradient-to-br from-green-500 to-green-700 text-white col-span-1 sm:col-span-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-4 h-4 opacity-80" />
+                <p className="text-sm opacity-90">Available Balance</p>
+              </div>
+              <p className="text-3xl font-bold">₦{balance.available.toLocaleString('en-NG')}</p>
             </Card>
-            <Card className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Total Paid Out</p>
-              <p className="text-2xl font-bold text-green-600">
-                ₦{withdrawalRequests.filter(r => r.status === 'paid').reduce((s, r) => s + Number(r.amount), 0).toLocaleString('en-NG')}
-              </p>
+            <Card className="p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <p className="text-sm text-muted-foreground">Total Earned</p>
+              </div>
+              <p className="text-2xl font-bold">₦{balance.total_earned.toLocaleString('en-NG')}</p>
             </Card>
-            <Card className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Total Agent Earnings</p>
-              <p className="text-2xl font-bold">
-                ₦{agentBalances.reduce((s, b) => s + Number(b.total_earned || 0), 0).toLocaleString('en-NG')}
-              </p>
+            <Card className="p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <ArrowDownCircle className="w-4 h-4 text-blue-600" />
+                <p className="text-sm text-muted-foreground">Total Withdrawn</p>
+              </div>
+              <p className="text-2xl font-bold">₦{balance.total_withdrawn.toLocaleString('en-NG')}</p>
             </Card>
           </div>
 
-          {/* Pending requests */}
-          <h3 className="font-semibold mb-3">Pending Withdrawals</h3>
-          {withdrawalRequests.filter(r => r.status === 'pending').length === 0 ? (
-            <Card className="p-8 text-center text-muted-foreground mb-6">No pending withdrawal requests</Card>
-          ) : (
-            <div className="space-y-3 mb-6">
-              {withdrawalRequests.filter(r => r.status === 'pending').map(req => {
-                const agentBal = agentBalances.find(b => b.agent_id === req.agent_id);
-                return (
-                  <Card key={req.id} className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="font-semibold">{req.agent_name}</p>
-                        <p className="text-sm text-muted-foreground">{req.agent_email}</p>
-                        <p className="text-lg font-bold text-green-600">₦{Number(req.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">requested</span></p>
-                        <div className="text-xs text-muted-foreground">
-                          Fee (3.5%): -₦{Number(req.fee_amount || 0).toLocaleString('en-NG')}
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">
-                          Pay out: ₦{Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}
-                        </p>
-                        {agentBal && (
-                          <p className="text-xs text-muted-foreground">
-                            Available: ₦{(Number(agentBal.total_earned) - Number(agentBal.total_withdrawn)).toLocaleString('en-NG')}
-                          </p>
-                        )}
-                        <div className="mt-2 p-2 rounded bg-muted text-xs space-y-0.5">
-                          <p className="font-medium">Bank Details</p>
-                          <p>{req.bank_name} — {req.account_number}</p>
-                          <p>{req.account_name}</p>
-                          <button onClick={() => { navigator.clipboard.writeText(req.account_number); toast.success('Copied!'); }}
-                            className="text-primary underline text-xs mt-1">Copy account number</button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{new Date(req.requested_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                      </div>
-                      <div className="flex flex-col gap-2 shrink-0">
-                        <Button size="sm" className="gap-1.5"
-                          onClick={async () => {
-                            try {
-                              await withdrawalAPI.markPaid(req.id, user.id);
-                              toast.success('Marked as paid');
-                              fetchData();
-                            } catch(e) { toast.error(e.message); }
-                          }}>
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Mark Paid
-                        </Button>
-                        {rejectingWithdrawal === req.id ? (
-                          <div className="space-y-1">
-                            <Input placeholder="Reason (optional)" value={rejectNote} onChange={e => setRejectNote(e.target.value)} className="h-8 text-xs" />
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="destructive" className="flex-1 text-xs"
-                                onClick={async () => {
-                                  try {
-                                    await withdrawalAPI.reject(req.id, user.id, rejectNote);
-                                    toast.success('Request rejected');
-                                    setRejectingWithdrawal(null);
-                                    setRejectNote('');
-                                    fetchData();
-                                  } catch(e) { toast.error(e.message); }
-                                }}>Confirm</Button>
-                              <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => { setRejectingWithdrawal(null); setRejectNote(''); }}>Cancel</Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Button size="sm" variant="outline" className="gap-1.5 text-destructive border-destructive/40"
-                            onClick={() => setRejectingWithdrawal(req.id)}>
-                            <XCircle className="w-3.5 h-3.5" /> Reject
-                          </Button>
-                        )}
-                      </div>
+          {/* Withdraw button */}
+          <div className="flex justify-end mb-4">
+            <Button
+              onClick={() => setShowWithdrawDialog(true)}
+              disabled={balance.available <= 0}
+              className="gap-2"
+            >
+              <ArrowDownCircle className="w-4 h-4" /> Request Withdrawal
+            </Button>
+          </div>
+
+          {/* Withdrawal history */}
+          <Card className="p-4 sm:p-6">
+            <h3 className="font-semibold mb-4">Withdrawal History</h3>
+            {withdrawalRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No withdrawal requests yet</p>
+            ) : (
+              <div className="space-y-3">
+                {withdrawalRequests.map(req => (
+                  <div key={req.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
+                    <div>
+                      <p className="font-medium text-sm">₦{Number(req.amount).toLocaleString('en-NG')}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(req.requested_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
-          {/* History */}
-          <h3 className="font-semibold mb-3">History</h3>
-          <Card className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {withdrawalRequests.filter(r => r.status !== 'pending').length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No history yet</TableCell></TableRow>
-                ) : withdrawalRequests.filter(r => r.status !== 'pending').map(req => (
-                  <TableRow key={req.id}>
-                    <TableCell className="font-medium">{req.agent_name}</TableCell>
-                    <TableCell>₦{Number(req.amount).toLocaleString('en-NG')}</TableCell>
-                    <TableCell><Badge variant={req.status === 'paid' ? 'default' : 'destructive'} className="capitalize">{req.status}</Badge></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{new Date(req.requested_at).toLocaleDateString('en-NG')}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{req.notes || '—'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="owner-payouts">
-          <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
-            Rent is paid directly to the property owner's bank account, not the agent. Each row below is an amount owed to an <strong>owner</strong> (not an agent) — verify the bank details carefully before transferring, since owners aren't platform users and can't confirm receipt in-app.
-          </div>
-
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            <Card className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Pending Owner Payouts</p>
-              <p className="text-2xl font-bold text-orange-500">{ownerPayouts.filter(p => p.status === 'pending').length}</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Total Paid to Owners</p>
-              <p className="text-2xl font-bold text-green-600">
-                ₦{ownerPayouts.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0).toLocaleString('en-NG')}
-              </p>
-            </Card>
-          </div>
-
-          {/* Pending owner payouts */}
-          <h3 className="font-semibold mb-3">Pending — Owed to Property Owners</h3>
-          {ownerPayouts.filter(p => p.status === 'pending').length === 0 ? (
-            <Card className="p-8 text-center text-muted-foreground mb-6">No pending owner payouts</Card>
-          ) : (
-            <div className="space-y-3 mb-6">
-              {ownerPayouts.filter(p => p.status === 'pending').map(payout => (
-                <Card key={payout.id} className="p-4 border-blue-200">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Property</p>
-                      <p className="font-semibold">{payout.properties?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payout.properties?.location}</span></p>
-                      <p className="text-lg font-bold text-green-600">₦{Number(payout.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">owed to owner</span></p>
-                      <div className="mt-2 p-2 rounded bg-muted text-xs space-y-0.5">
-                        <p className="font-medium">Owner: {payout.owner_name || 'Not provided'}{payout.owner_phone ? ` — ${payout.owner_phone}` : ''}</p>
-                        <p>{payout.owner_bank_name} — {payout.owner_account_number}</p>
-                        <p>{payout.owner_account_name}</p>
-                        {payout.owner_account_number && (
-                          <button onClick={() => { navigator.clipboard.writeText(payout.owner_account_number); toast.success('Copied!'); }}
-                            className="text-primary underline text-xs mt-1">Copy account number</button>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Released {new Date(payout.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                    </div>
-                    <div className="flex flex-col gap-2 shrink-0">
-                      <Button size="sm" className="gap-1.5"
-                        onClick={async () => {
-                          if (!window.confirm(`Confirm you have transferred ₦${Number(payout.amount).toLocaleString('en-NG')} to ${payout.owner_account_name || 'the owner'}'s bank account?`)) return;
-                          try {
-                            await ownerPayoutAPI.markPaid(payout.id, user.id);
-                            toast.success('Marked as paid');
-                            fetchData();
-                          } catch (e) { toast.error(e.message || 'Failed to update'); }
-                        }}>
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Mark Paid
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={req.status === 'paid' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">
+                        {req.status}
+                      </Badge>
+                      <Button
+                        size="sm" variant="outline" className="gap-1 h-8 px-2"
+                        onClick={() => downloadReceiptPNG({
+                          title: 'Withdrawal Receipt',
+                          reference: req.id,
+                          date: new Date(req.requested_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+                          status: req.status,
+                          rows: [
+                            { label: 'Amount Requested', value: `₦${Number(req.amount).toLocaleString('en-NG')}` },
+                            { label: 'Withdrawal Fee (3.5%)', value: `-₦${Number(req.fee_amount || 0).toLocaleString('en-NG')}` },
+                          ],
+                          total: { label: 'Paid Out', value: `₦${Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}` },
+                          filename: `rentora-withdrawal-receipt-${req.id}.png`,
+                        })}
+                      >
+                        <Download className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </div>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {/* History */}
-          <h3 className="font-semibold mb-3">History</h3>
-          <Card className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ownerPayouts.filter(p => p.status !== 'pending').length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No history yet</TableCell></TableRow>
-                ) : ownerPayouts.filter(p => p.status !== 'pending').map(payout => (
-                  <TableRow key={payout.id}>
-                    <TableCell className="font-medium">{payout.properties?.title || '—'}</TableCell>
-                    <TableCell>{payout.owner_name || '—'}</TableCell>
-                    <TableCell>₦{Number(payout.amount).toLocaleString('en-NG')}</TableCell>
-                    <TableCell><Badge variant="default" className="capitalize">{payout.status}</Badge></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{payout.paid_at ? new Date(payout.paid_at).toLocaleDateString('en-NG') : '—'}</TableCell>
-                  </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="escrow">
-          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
-            Money currently sitting with Rentora, not yet released. A held payment auto-releases 5 days after payment if the student never confirms move-in.
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            <Card className="p-4 border-amber-300 bg-amber-50">
-              <p className="text-sm text-amber-700 font-medium mb-1">Currently Held</p>
-              <p className="text-2xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p>
-              <p className="text-xs text-amber-600 mt-0.5">{rentPayments.filter(p => p.status === 'held').length} payment(s)</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-sm text-muted-foreground mb-1">Released All-Time</p>
-              <p className="text-2xl font-bold">
-                {formatPrice(rentPayments.filter(p => p.status === 'released').reduce((s, p) => s + Number(p.total_amount || 0), 0))}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">{rentPayments.filter(p => p.status === 'released').length} payment(s)</p>
-            </Card>
-          </div>
-
-          <h3 className="font-semibold mb-3">Currently Held</h3>
-          {rentPayments.filter(p => p.status === 'held').length === 0 ? (
-            <Card className="p-8 text-center text-muted-foreground mb-6">Nothing currently held in escrow</Card>
-          ) : (
-            <div className="space-y-3 mb-6">
-              {rentPayments.filter(p => p.status === 'held').map(payment => {
-                const autoRelease = payment.auto_release_at ? new Date(payment.auto_release_at) : null;
-                const daysLeft = autoRelease ? Math.max(0, Math.ceil((autoRelease - new Date()) / (1000 * 60 * 60 * 24))) : null;
-                return (
-                  <Card key={payment.id} className="p-4 border-amber-200">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div>
-                        <p className="font-semibold">{payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span></p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)} + Service fee {formatPrice(payment.service_fee)}
-                        </p>
-                        {autoRelease && (
-                          <p className="text-xs text-amber-700 mt-1">Auto-releases in {daysLeft} day{daysLeft === 1 ? '' : 's'} ({autoRelease.toLocaleDateString('en-NG')})</p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-lg font-bold text-amber-900">{formatPrice(payment.total_amount)}</p>
-                        <Badge variant="outline" className="border-amber-400 text-amber-700">Held</Badge>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
-          <h3 className="font-semibold mb-3">Recently Released</h3>
-          <Card className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Rent</TableHead>
-                  <TableHead>Agent Fee</TableHead>
-                  <TableHead>Service Fee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Released</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rentPayments.filter(p => p.status === 'released').length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
-                ) : rentPayments.filter(p => p.status === 'released').slice(0, 25).map(payment => (
-                  <TableRow key={payment.id}>
-                    <TableCell className="font-medium">{payment.property?.title || '—'}</TableCell>
-                    <TableCell>{formatPrice(payment.rent_amount)}</TableCell>
-                    <TableCell>{formatPrice(payment.agent_fee)}</TableCell>
-                    <TableCell>{formatPrice(payment.service_fee)}</TableCell>
-                    <TableCell><Badge variant="default" className="capitalize">{payment.status}</Badge></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{payment.released_at ? new Date(payment.released_at).toLocaleDateString('en-NG') : '—'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* ── Agent Detail Dialog ── */}
-      <Dialog open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
-        <DialogContent className="max-w-md">
+      {/* Withdrawal Dialog */}
+      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCog className="w-5 h-5 text-primary" /> Agent Profile
-            </DialogTitle>
+            <DialogTitle>Request Withdrawal</DialogTitle>
+            <DialogDescription>
+              Funds will be sent to your registered bank account, minus a 3.5% withdrawal fee. Admin will process within 1–2 business days.
+            </DialogDescription>
           </DialogHeader>
-          {selectedAgent && (() => {
-            // Always read live verification from state (not stale snapshot)
-            const liveVerification = getAgentVerification(selectedAgent.id || selectedAgent.user_id);
-            const agentWithLiveVerif = { ...selectedAgent, verification: liveVerification };
-            const selectedAgentData = agentWithLiveVerif;
-            // shadow selectedAgent inside dialog with live data
-            return (
-            <>
-            <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-              {/* Basic info */}
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/40">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <User className="w-7 h-7 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-bold text-base">{selectedAgentData.full_name}</p>
-                  <p className="text-sm text-muted-foreground truncate">{selectedAgentData.email}</p>
-                  {selectedAgentData.phone && (
-                    <a href={`tel:${selectedAgentData.phone}`} className="text-xs text-primary font-medium flex items-center gap-1 mt-1 hover:underline">
-                      <Phone className="w-3 h-3" /> {selectedAgentData.phone}
-                    </a>
-                  )}
-                  <Badge className="mt-1.5 bg-green-100 text-green-700 text-xs">✓ Verified Agent</Badge>
-                </div>
+          <div className="space-y-4 py-2">
+            {bankDetails ? (
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
+                <p className="font-medium text-blue-800">{bankDetails.bank_name}</p>
+                <p className="text-blue-600">{bankDetails.account_number} — {bankDetails.account_name}</p>
               </div>
-
-              {/* Verification Documents */}
-              {(selectedAgentData.verification?.id_card_url || selectedAgentData.verification?.selfie_url) && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Verification Documents</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {selectedAgentData.verification.id_card_url && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">ID Card</p>
-                        <a href={selectedAgentData.verification.id_card_url} target="_blank" rel="noreferrer">
-                          <img src={selectedAgentData.verification.id_card_url} alt="ID Card"
-                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
-                        </a>
-                      </div>
-                    )}
-                    {selectedAgentData.verification?.selfie_url && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Selfie with ID</p>
-                        <a href={selectedAgentData.verification.selfie_url} target="_blank" rel="noreferrer">
-                          <img src={selectedAgentData.verification.selfie_url} alt="Selfie"
-                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                  {selectedAgentData.verification?.agreement_url && (
-                    <a href={selectedAgentData.verification.agreement_url} target="_blank" rel="noreferrer"
-                      className="flex items-center gap-2.5 p-2.5 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
-                      <FileText className="w-5 h-5 text-primary shrink-0" />
-                      <p className="text-sm font-medium text-primary">View Signed Agreement</p>
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="p-3 text-center">
-                  <p className="text-2xl font-bold text-primary">{getAgentPropertyCount(selectedAgentData.id)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Properties Listed</p>
-                </Card>
-                <Card className="p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-600">{getAgentInspectionCount(selectedAgentData.id)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Inspections</p>
-                </Card>
+            ) : (
+              <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-sm text-yellow-800">
+                No bank account set up. Go to Bank Details tab to add one.
               </div>
+            )}
+            <div>
+              <Label>Amount (₦)</Label>
+              <Input
+                type="number"
+                max={withdrawalAPI.MAX_WITHDRAWAL_AMOUNT}
+                placeholder={`Max ₦${withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request`}
+                value={withdrawAmount}
+                onChange={e => setWithdrawAmount(e.target.value)}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Max ₦{withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request — available balance: ₦{balance.available.toLocaleString('en-NG')}. Submit multiple requests for larger amounts.
+              </p>
+            </div>
+            {withdrawAmount > 0 && (
+              <div className="p-3 rounded-lg bg-muted text-sm space-y-1">
+                <div className="flex justify-between"><span className="text-muted-foreground">Withdrawal fee (3.5%)</span><span>-₦{withdrawalAPI.previewFee(withdrawAmount).fee.toLocaleString('en-NG')}</span></div>
+                <div className="flex justify-between font-semibold pt-1 border-t"><span>You'll receive</span><span>₦{withdrawalAPI.previewFee(withdrawAmount).net.toLocaleString('en-NG')}</span></div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>Cancel</Button>
+            <Button onClick={handleWithdraw} disabled={submittingWithdrawal || !bankDetails}>
+              {submittingWithdrawal ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : 'Submit Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-              {/* Bank details */}
+      {/* Add/Edit Property Dialog */}
+      <Dialog open={showPropertyDialog} onOpenChange={setShowPropertyDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingProperty ? 'Edit Property' : 'Add New Property'}</DialogTitle>
+            <DialogDescription>Fill in the details below to {editingProperty ? 'update your' : 'list a new'} property.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2"><Label>Title *</Label><Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Cozy Student Hostel" /></div>
+              <div className="space-y-2"><Label>Property Type *</Label>
+                <Select value={formData.property_type} onValueChange={(value) => setFormData({ ...formData, property_type: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hostel"><Home className="w-4 h-4 inline mr-2" />Hostel</SelectItem>
+                    <SelectItem value="apartment"><Building className="w-4 h-4 inline mr-2" />Apartment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
+              <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bank Account</p>
-
-                {/* Pending bank change request */}
-                {(() => {
-                  const agentId = selectedAgentData.id || selectedAgentData.user_id;
-                  const pending = bankRequests.find(r => r.user_id === agentId && r.status === 'pending');
-                  if (!pending) return null;
-
-                  // Fuzzy name match check
-                  const idName = (selectedAgent.full_name || selectedAgentData.verification?.user_name || '').toUpperCase().trim();
-                  const acctName = (pending.account_name || '').toUpperCase().trim();
-                  const idWords = idName.split(' ').filter(Boolean);
-                  const acctWords = acctName.split(' ').filter(Boolean);
-                  const matchCount = idWords.filter(w => acctWords.includes(w)).length;
-                  const nameMatch = matchCount >= 2 || (idWords.length === 1 && acctWords.includes(idWords[0]));
-
+                <Label>Agent Fee</Label>
+                <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
+                  {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.20)) : '₦0'} <span className="ml-1">(20% of rent, auto-calculated)</span>
+                </div>
+              </div>
+              <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
+              <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Near LAUTECH Main Gate" /></div>
+            </div>
+            <div className="space-y-2">
+              <Label>Google Maps Link<span className="text-xs text-muted-foreground font-normal ml-1">so students can get directions</span></Label>
+              <Input
+                value={formData.google_maps_link}
+                onChange={(e) => setFormData({ ...formData, google_maps_link: e.target.value })}
+                placeholder="Paste the share link from Google Maps"
+              />
+              <p className="text-xs text-muted-foreground">
+                Open the location in Google Maps, tap Share, and paste the link here.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Amenities</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {AMENITY_OPTIONS.map((item) => {
+                  const checked = formData.amenities.includes(item);
                   return (
-                    <div className="rounded-lg border border-orange-300 bg-orange-50 overflow-hidden">
-                      {/* Header */}
-                      <div className="flex items-center gap-2 px-4 py-3 bg-orange-100 border-b border-orange-200">
-                        <Clock className="w-4 h-4 text-orange-600 shrink-0" />
-                        <p className="text-xs font-bold text-orange-700 uppercase tracking-wide flex-1">Pending Bank Change — Verify Identity</p>
-                        <span className="text-xs text-orange-500">{new Date(pending.created_at).toLocaleDateString()}</span>
-                      </div>
-
-                      <div className="p-4 space-y-4">
-                        {/* Name match alert */}
-                        <div className={`flex items-start gap-3 p-3 rounded-lg border ${nameMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          {nameMatch
-                            ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                            : <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                          }
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-xs font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>
-                              {nameMatch ? 'Names appear to match' : 'Name mismatch detected — verify carefully'}
-                            </p>
-                            <div className="mt-1.5 grid grid-cols-2 gap-2 text-xs">
-                              <div>
-                                <span className="text-muted-foreground block">Registered Name (ID)</span>
-                                <span className="font-bold">{idName || '—'}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground block">Account Name (Bank)</span>
-                                <span className="font-bold">{acctName || '—'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* ID card image */}
-                        {selectedAgentData.verification?.id_card_url && (
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Agent's ID Card</p>
-                            <a href={selectedAgentData.verification.id_card_url} target="_blank" rel="noreferrer">
-                              <img
-                                src={selectedAgentData.verification.id_card_url}
-                                alt="ID Card"
-                                className="w-full max-h-40 object-contain rounded-lg border bg-muted/20 cursor-pointer hover:opacity-90 transition-opacity"
-                              />
-                              <p className="text-xs text-primary mt-1 text-center">Click to open full size ↗</p>
-                            </a>
-                          </div>
-                        )}
-
-                        {/* Bank details */}
-                        <div className="grid grid-cols-3 gap-3 text-xs bg-white rounded-lg border border-orange-200 p-3">
-                          <div>
-                            <span className="text-muted-foreground block mb-0.5">Bank</span>
-                            <span className="font-semibold">{pending.bank_name}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block mb-0.5">Account No.</span>
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono font-bold">{pending.account_number}</span>
-                              <button onClick={() => copyToClipboard(pending.account_number, 'Account number')} className="text-muted-foreground hover:text-primary">
-                                <Copy className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block mb-0.5">Account Name</span>
-                            <span className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>{pending.account_name}</span>
-                          </div>
-                        </div>
-
-                        {/* Reject reason input — shown when reject is clicked */}
-                        {bankRejectId === pending.id && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold text-red-700">Reason for rejection (shown to agent):</p>
-                            <Input
-                              value={bankRejectNote}
-                              onChange={e => setBankRejectNote(e.target.value)}
-                              placeholder="e.g. Account name does not match your registered name on ID"
-                              className="text-sm border-red-300 focus:ring-red-400"
-                            />
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="destructive" className="flex-1 h-8 gap-1.5"
-                                onClick={() => handleBankRequest(pending.id, 'rejected', bankRejectNote)}>
-                                <XCircle className="w-3.5 h-3.5" /> Confirm Rejection
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-8"
-                                onClick={() => { setBankRejectId(null); setBankRejectNote(''); }}>
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Action buttons */}
-                        {bankRejectId !== pending.id && (
-                          <div className="flex gap-2">
-                            <Button size="sm" className="flex-1 h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => handleBankRequest(pending.id, 'approved')}>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Approve — Names Match
-                            </Button>
-                            <Button size="sm" variant="destructive" className="flex-1 h-9 gap-1.5"
-                              onClick={() => { setBankRejectId(pending.id); setBankRejectNote('Account name does not match the name on your submitted ID. Please resubmit with the correct account.'); }}>
-                              <XCircle className="w-3.5 h-3.5" /> Reject — Mismatch
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <label key={item} className="flex items-center gap-2 text-sm p-2 rounded-md border cursor-pointer hover:bg-muted/50">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setFormData({
+                            ...formData,
+                            amenities: checked
+                              ? formData.amenities.filter((a) => a !== item)
+                              : [...formData.amenities, item],
+                          });
+                        }}
+                      />
+                      {item}
+                    </label>
                   );
-                })()}
-
-                {/* Current approved bank details */}
-                {selectedAgentData.verification?.bank_name ? (
-                  <div className="p-4 rounded-lg border bg-blue-50/50 border-blue-200 space-y-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CreditCard className="w-4 h-4 text-blue-600" />
-                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Current Approved Details</p>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Bank</span>
-                      <span className="text-sm font-semibold">{selectedAgentData.verification.bank_name}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Account Number</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold">{selectedAgentData.verification.account_number}</span>
-                        <button onClick={() => copyToClipboard(selectedAgentData.verification.account_number, 'Account number')} className="text-muted-foreground hover:text-primary transition-colors">
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-blue-200 pt-3">
-                      <span className="text-xs text-muted-foreground">Account Name</span>
-                      <span className="text-sm font-bold text-blue-800">{selectedAgentData.verification.account_name}</span>
-                    </div>
-                  </div>
+                })}
+              </div>
+            </div>
+            <div className="space-y-2"><Label>Description</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the property..." rows={4} /></div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2"><Label>Contact Name *<span className="text-xs text-muted-foreground font-normal ml-1">shown to students who unlock this listing</span></Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
+              <div className="space-y-2"><Label>Contact Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
+            </div>
+            <div className="space-y-1 pt-2">
+              <h4 className="text-sm font-semibold">Property Owner — Payout Details</h4>
+              <p className="text-xs text-muted-foreground">
+                {ownerDetailsLocked
+                  ? "These are locked once set, to protect the owner's payout — contact support@rentora.com.ng if they need to change."
+                  : "Rent is paid directly to the owner's bank account when a tenant moves in — never to your own account. This is separate from the contact info above. Once saved, these can't be edited."}
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2"><Label>Owner Full Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_full_name} onChange={(e) => setFormData({ ...formData, owner_full_name: e.target.value })} placeholder="Landlord's full name" /></div>
+              <div className="space-y-2"><Label>Owner Phone *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_phone} onChange={(e) => setFormData({ ...formData, owner_phone: e.target.value })} placeholder="+234..." /></div>
+              <div className="space-y-2"><Label>Owner Bank Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_bank_name} onChange={(e) => setFormData({ ...formData, owner_bank_name: e.target.value })} placeholder="e.g. GTBank" /></div>
+              <div className="space-y-2"><Label>Owner Account Number *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_number} onChange={(e) => setFormData({ ...formData, owner_account_number: e.target.value })} placeholder="0123456789" /></div>
+              <div className="space-y-2 md:col-span-2"><Label>Owner Account Name *<span className="text-xs text-muted-foreground font-normal ml-1">must match the bank account exactly</span></Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_name} onChange={(e) => setFormData({ ...formData, owner_account_name: e.target.value })} placeholder="Name on the bank account" /></div>
+            </div>
+            <div className="space-y-3">
+              <Label>Property Images <span className="text-muted-foreground text-xs font-normal">(max 5, up to 5MB each)</span></Label>
+              <div onClick={() => !uploadingImage && fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed border-muted' : 'border-muted-foreground/25 hover:border-primary hover:bg-muted/30'}`}>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+                {uploadingImage ? (
+                  <div className="flex flex-col items-center gap-2"><Loader2 className="w-8 h-8 text-primary animate-spin" /><p className="text-sm text-muted-foreground">Uploading...</p></div>
                 ) : (
-                  <div className="p-4 rounded-lg border border-yellow-200 bg-yellow-50">
-                    <p className="text-sm text-yellow-700">No approved bank details on file</p>
-                    <p className="text-xs text-yellow-600 mt-0.5">Approve the pending request above to set bank details</p>
-                  </div>
+                  <div className="flex flex-col items-center gap-2"><Upload className="w-8 h-8 text-muted-foreground" /><p className="text-sm font-medium">Click to upload images</p><p className="text-xs text-muted-foreground">JPG, PNG, WEBP supported</p></div>
                 )}
               </div>
-
-              {/* Address */}
-              {selectedAgentData.verification?.address && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Address</p>
-                  <p className="text-sm p-3 rounded-lg bg-muted/40">{selectedAgentData.verification.address}</p>
-                </div>
-              )}
-
-              {/* Properties */}
-              {getAgentPropertyCount(selectedAgentData.id) > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Listed Properties</p>
-                  <div className="space-y-2">
-                    {properties.filter(p => p.uploaded_by_agent_id === selectedAgentData.id).map(p => (
-                      <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
-                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{p.title}</p>
-                          <p className="text-xs text-muted-foreground">{formatPrice(p.price)}/yr</p>
-                        </div>
-                        <Badge className={`${getStatusBadge(p.status)} text-xs capitalize shrink-0`}>{p.status}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              {selectedAgentData?.phone ? (
-                <a href={`tel:${selectedAgentData.phone}`}>
-                  <Button variant="outline" className="gap-2"><Phone className="w-4 h-4" /> Call Agent</Button>
-                </a>
-              ) : (
-                <a href={`mailto:${selectedAgentData?.email}`} target="_blank" rel="noreferrer">
-                  <Button variant="outline" className="gap-2"><Mail className="w-4 h-4" /> Email Agent</Button>
-                </a>
-              )}
-              <Button onClick={() => setSelectedAgent(null)}>Close</Button>
-            </DialogFooter>
-          </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Verification Review Dialog ── */}
-      <Dialog open={!!selectedVerification} onOpenChange={() => setSelectedVerification(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Verification Request</DialogTitle><DialogDescription>Review the agent verification documents</DialogDescription></DialogHeader>
-          {selectedVerification && (
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-              <div className="p-3 rounded-lg bg-muted/40 space-y-1">
-                <p className="font-semibold">{selectedVerification.user_name}</p>
-                <p className="text-sm text-muted-foreground">{selectedVerification.user_email}</p>
-                <p className="text-sm text-muted-foreground mt-1">{selectedVerification.address}</p>
-                {selectedVerification.bank_name && (() => {
-                  const idName = (selectedVerification.user_name || '').toUpperCase().trim();
-                  const acctName = (selectedVerification.account_name || '').toUpperCase().trim();
-                  const idWords = idName.split(' ').filter(Boolean);
-                  const acctWords = acctName.split(' ').filter(Boolean);
-                  const matches = idWords.filter(w => acctWords.includes(w)).length;
-                  const nameMatch = matches >= 2 || (idWords.length === 1 && acctWords.includes(idWords[0]));
-                  return (
-                    <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bank Account</p>
-                      <div className={`flex items-start gap-2 p-2 rounded-lg border text-xs ${nameMatch ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                        {nameMatch
-                          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
-                          : <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />}
-                        <div>
-                          <p className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>
-                            {nameMatch ? 'Names match' : 'Name mismatch — verify carefully'}
-                          </p>
-                          <p className="text-muted-foreground">ID: <strong>{idName}</strong> · Bank: <strong>{acctName}</strong></p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs bg-white rounded border p-2">
-                        <div><span className="text-muted-foreground block">Bank</span><span className="font-semibold">{selectedVerification.bank_name}</span></div>
-                        <div>
-                          <span className="text-muted-foreground block">Account No.</span>
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono font-bold">{selectedVerification.account_number}</span>
-                            <button onClick={() => copyToClipboard(selectedVerification.account_number, 'Account number')} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                        <div><span className="text-muted-foreground block">Account Name</span><span className={`font-bold ${nameMatch ? 'text-green-700' : 'text-red-700'}`}>{selectedVerification.account_name}</span></div>
-                      </div>
+              {formData.images.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {formData.images.map((img, index) => (
+                    <div key={index} className="relative group aspect-square">
+                      <img src={img} alt={`Property ${index + 1}`} className="w-full h-full rounded-lg object-cover cursor-pointer" onClick={() => openLightbox(formData.images, index)} />
+                      <button type="button" onClick={() => handleRemoveImage(index)}
+                        className="absolute top-1 right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
+                        <XCircle className="w-3.5 h-3.5" />
+                      </button>
+                      {index === 0 && <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded pointer-events-none">Cover</span>}
                     </div>
-                  );
-                })()}
-              </div>
-              <div><p className="text-xs font-medium text-muted-foreground mb-2">ID Card</p><img src={selectedVerification.id_card_url} alt="ID Card" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" /></div>
-              <div><p className="text-xs font-medium text-muted-foreground mb-2">Selfie with ID</p><img src={selectedVerification.selfie_url} alt="Selfie" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" /></div>
-              {selectedVerification.agreement_url ? (
-                <div><p className="text-xs font-medium text-muted-foreground mb-2">Signed Agreement</p>
-                  <a href={selectedVerification.agreement_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
-                    <FileText className="w-8 h-8 text-primary shrink-0" />
-                    <div><p className="text-sm font-medium text-primary">View Signed Agreement PDF</p><p className="text-xs text-muted-foreground">Click to open in new tab</p></div>
-                  </a>
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg border border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">⚠ No signed agreement uploaded</p></div>
-              )}
-            </div>
-          )}
-          {selectedVerification && (
-            <div className="px-1 pb-2">
-              <a href={`mailto:${selectedVerification.user_email}?subject=${encodeURIComponent('Your Rentora Agent Verification')}&body=${encodeURIComponent('Hi ' + selectedVerification.user_name + ',\n\n[Write your message here]\n\nBest regards,\nRentora Admin Team')}`}
-                target="_blank" rel="noreferrer"
-                className="flex items-center gap-2.5 w-full px-4 py-3 rounded-lg border border-border bg-muted/40 hover:bg-muted transition-colors">
-                <Mail className="w-4 h-4 text-primary shrink-0" />
-                <div className="flex-1 min-w-0"><p className="text-sm font-medium">Email {selectedVerification.user_name}</p><p className="text-xs text-muted-foreground truncate">{selectedVerification.user_email}</p></div>
-              </a>
-              <p className="text-xs text-muted-foreground text-center mt-1.5">Opens your email client with a pre-filled message</p>
-            </div>
-          )}
-          <DialogFooter className="gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setSelectedVerification(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-
-      {/* ── Property Preview Dialog ── */}
-      <Dialog open={!!previewProperty} onOpenChange={() => setPreviewProperty(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-primary" /> Property Preview
-            </DialogTitle>
-            <DialogDescription>Review property details before approving</DialogDescription>
-          </DialogHeader>
-          {previewProperty && (
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-              {/* Image gallery */}
-              {previewProperty.images?.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {previewProperty.images.slice(0, 6).map((img, i) => (
-                    <a key={i} href={img} target="_blank" rel="noreferrer">
-                      <img src={img} alt={`Photo ${i + 1}`}
-                        className={`w-full object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer ${i === 0 ? 'col-span-3 max-h-52' : 'max-h-28'}`} />
-                    </a>
                   ))}
+                  {formData.images.length < 5 && (
+                    <div onClick={() => fileInputRef.current?.click()}
+                      className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-muted/30 transition-colors">
+                      <Plus className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
               )}
-              {/* Core info */}
-              <div className="space-y-1">
-                <h2 className="text-lg font-bold">{previewProperty.title}</h2>
-                <p className="text-sm text-muted-foreground">{previewProperty.location}</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge className="bg-primary/10 text-primary capitalize">{previewProperty.property_type}</Badge>
-                  <Badge className="bg-green-100 text-green-800 font-bold">{formatPrice(previewProperty.price)}/yr</Badge>
-                  {previewProperty.bedrooms && <Badge variant="outline">{previewProperty.bedrooms} bed</Badge>}
-                  {previewProperty.bathrooms && <Badge variant="outline">{previewProperty.bathrooms} bath</Badge>}
-                </div>
-              </div>
-              {/* Description */}
-              {previewProperty.description && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Description</p>
-                  <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{previewProperty.description}</p>
-                </div>
-              )}
-              {/* Amenities */}
-              {previewProperty.amenities?.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Amenities</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {previewProperty.amenities.map((a, i) => (
-                      <span key={i} className="text-xs px-2 py-1 rounded-full bg-muted border">{a}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Pricing & Fees — everything the agent entered */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pricing &amp; Fees</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Rent (yearly)</p>
-                    <p className="font-semibold">{formatPrice(previewProperty.price)}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Inspection Fee</p>
-                    <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Caution Fee</p>
-                    <p className="font-semibold">{previewProperty.caution_fee ? formatPrice(previewProperty.caution_fee) : '—'}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Agent Fee (20% of rent)</p>
-                    <p className="font-semibold">{formatPrice(Math.round(Number(previewProperty.price || 0) * 0.20))}</p>
-                  </div>
-                </div>
-              </div>
-              {/* Contact info the agent provided for this listing */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Listing Contact</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Contact Name</p>
-                    <p className="font-semibold">{previewProperty.contact_name || '—'}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Contact Phone</p>
-                    <p className="font-semibold">{previewProperty.contact_phone || '—'}</p>
-                  </div>
-                </div>
-              </div>
-              {/* Status & availability at a glance */}
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="capitalize">Status: {previewProperty.status}</Badge>
-                <Badge variant="outline" className="capitalize">Availability: {previewProperty.availability || 'available'}</Badge>
-                {previewProperty.availability === 'unavailable' && (
-                  <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
-                    onClick={() => handleRelistProperty(previewProperty)}>
-                    <Eye className="w-3 h-3" /> Relist as Available
-                  </Button>
-                )}
-              </div>
-              {/* Agent */}
-              <div className="p-3 rounded-lg bg-muted/40 flex items-center gap-3">
-                <User className="w-8 h-8 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Listed by</p>
-                  <p className="font-semibold text-sm">{previewProperty.uploaded_by_agent_name}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(previewProperty.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
             </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setPreviewProperty(null)}>Close</Button>
-            {previewProperty?.status === 'pending' && (<>
-              <Button variant="destructive" className="gap-1" onClick={() => { handleApproveProperty(previewProperty.id, 'rejected'); setPreviewProperty(null); }}>
-                <XCircle className="w-4 h-4" /> Reject
-              </Button>
-              <Button className="gap-1" onClick={() => { handleApproveProperty(previewProperty.id, 'approved'); setPreviewProperty(null); }}>
-                <CheckCircle2 className="w-4 h-4" /> Approve
-              </Button>
-            </>)}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Delete Confirmation Dialog ── */}
-      <Dialog open={deleteConfirm.open} onOpenChange={(open) => !deleteConfirm.deleting && setDeleteConfirm({ open, property: null, deleting: false })}>
-        <DialogContent>
-          <DialogHeader><DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-5 h-5" /> Delete Property</DialogTitle><DialogDescription>This action cannot be undone.</DialogDescription></DialogHeader>
-          {deleteConfirm.property && (
-            <div className="flex items-center gap-4 py-2">
-              <img src={deleteConfirm.property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-20 h-16 rounded-lg object-cover flex-shrink-0" />
-              <div><p className="font-semibold">{deleteConfirm.property.title}</p><p className="text-sm text-muted-foreground">{deleteConfirm.property.location}</p><p className="text-sm text-muted-foreground">By: {deleteConfirm.property.uploaded_by_agent_name}</p></div>
-            </div>
-          )}
-          <p className="text-sm text-muted-foreground">Are you sure you want to permanently delete this property? All associated unlocks and inspections will also be removed.</p>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, property: null, deleting: false })} disabled={deleteConfirm.deleting}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteProperty} disabled={deleteConfirm.deleting}>{deleteConfirm.deleting ? 'Deleting...' : 'Yes, Delete'}</Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowPropertyDialog(false); resetForm(); }}>Cancel</Button>
+            <Button onClick={handleSubmitProperty} disabled={uploadingImage}>
+              {uploadingImage ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</> : <>{editingProperty ? 'Update' : 'Create'} Property</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1785,4 +1025,4 @@ export function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;``
+export default AgentDashboard;

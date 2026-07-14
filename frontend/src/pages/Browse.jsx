@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { propertyAPI } from '../lib/api';
 import { PropertyCard, PropertyCardSkeleton } from '../components/PropertyCard';
 import { Button } from '../components/ui/button';
@@ -64,7 +64,8 @@ export function Browse() {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [propertyType, setPropertyType] = useState('all');
+  const [searchParams] = useSearchParams();
+  const [propertyType, setPropertyType] = useState(searchParams.get('property_type') || 'all');
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [searchTerm, setSearchTerm] = useState('');
   const [recentlyViewed, setRecentlyViewed] = useState([]);

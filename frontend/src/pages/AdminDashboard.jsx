@@ -1278,11 +1278,12 @@ export function AdminDashboard() {
                   <TableHead>Service Fee</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Released</TableHead>
+                  <TableHead>Move-in Photo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rentPayments.filter(p => p.status === 'released').length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
                 ) : rentPayments.filter(p => p.status === 'released').slice(0, 25).map(payment => (
                   <TableRow key={payment.id}>
                     <TableCell className="font-medium">{payment.property?.title || '—'}</TableCell>
@@ -1291,6 +1292,15 @@ export function AdminDashboard() {
                     <TableCell>{formatPrice(payment.service_fee)}</TableCell>
                     <TableCell><Badge variant="default" className="capitalize">{payment.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{payment.released_at ? new Date(payment.released_at).toLocaleDateString('en-NG') : '—'}</TableCell>
+                    <TableCell>
+                      {payment.move_in_photo_url ? (
+                        <a href={payment.move_in_photo_url} target="_blank" rel="noopener noreferrer">
+                          <img src={payment.move_in_photo_url} alt="Move-in" className="w-10 h-10 rounded object-cover border hover:opacity-80" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">None</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

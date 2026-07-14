@@ -1447,13 +1447,14 @@ export const rentAPI = {
   },
 
   // User confirms move-in / keys received → release funds to agent.
-  confirmMoveIn: async (rentPaymentId, userId) => {
+  confirmMoveIn: async (rentPaymentId, userId, moveInPhotoUrl) => {
     const { error } = await supabase
       .from('property_rent_payments')
       .update({
         status: 'released',
         released_by: 'user',
         released_at: new Date().toISOString(),
+        move_in_photo_url: moveInPhotoUrl || null,
       })
       .eq('id', rentPaymentId)
       .eq('user_id', userId)
