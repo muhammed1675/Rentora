@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI } from '../lib/api';
+import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, maintenanceAPI, userAPI } from '../lib/api';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -67,6 +67,7 @@ export function Profile() {
   const fetchData = async () => {
     if (!user) return;
     setLoading(true);
+    maintenanceAPI.expireStalePending(); // fire-and-forget fallback, not awaited
     try {
       const [walletRes, unlocksRes, inspectionsRes, txRes, rentRes] = await Promise.all([
         walletAPI.get(user.id),
@@ -126,6 +127,24 @@ export function Profile() {
       toast.error(e.message || 'Failed to update password');
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const [phoneDraft, setPhoneDraft] = useState(user?.phone || '');
+  const [savingPhone, setSavingPhone] = useState(false);
+
+  useEffect(() => { setPhoneDraft(user?.phone || ''); }, [user?.phone]);
+
+  const handleSavePhone = async () => {
+    setSavingPhone(true);
+    try {
+      await userAPI.updateProfile(user.id, { phone: phoneDraft });
+      toast.success('Phone number updated');
+      await refreshUser();
+    } catch (e) {
+      toast.error(e.message || 'Failed to update phone number');
+    } finally {
+      setSavingPhone(false);
     }
   };
 
@@ -572,22 +591,31 @@ export function Profile() {
             <h3 className="font-semibold mb-4">Account Settings</h3>
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Full Name</p>
+                <p className="text-sm text-muted-foreground">Full Name <span className="text-xs italic">(contact support to change)</span></p>
                 <p className="font-medium">{user?.full_name}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="text-sm text-muted-foreground">Email <span className="text-xs italic">(contact support to change)</span></p>
                 <p className="font-medium">{user?.email}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Phone Number</p>
-                {user?.phone ? (
-                  <a href={`tel:${user.phone}`} className="font-medium text-primary hover:underline flex items-center gap-1.5">
-                    <Phone className="w-4 h-4" /> {user.phone}
-                  </a>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">Not provided</p>
-                )}
+                <div className="flex items-center gap-2 mt-1 max-w-sm">
+                  <Input
+                    value={phoneDraft}
+                    onChange={(e) => setPhoneDraft(e.target.value)}
+                    placeholder="+234..."
+                    data-testid="profile-phone-input"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={savingPhone || phoneDraft === (user?.phone || '')}
+                    onClick={handleSavePhone}
+                    data-testid="profile-phone-save"
+                  >
+                    {savingPhone ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Role</p>

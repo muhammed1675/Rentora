@@ -650,6 +650,19 @@ export const userAPI = {
     return { data: { message: `Role updated to ${role}` } };
   },
 
+  // Self-service profile update — only ever pass fields a user is allowed
+  // to change themselves (phone, etc). full_name/email/role/suspended are
+  // locked to admin-only at the DB level (trg_restrict_self_profile_edits)
+  // and will be rejected here if included.
+  updateProfile: async (userId, { phone }) => {
+    const { error } = await supabase
+      .from('users')
+      .update({ phone })
+      .eq('id', userId);
+    if (error) throw new Error(error.message || 'Failed to update profile');
+    return { data: { ok: true } };
+  },
+
   suspend: async (userId, suspended) => {
     const { error } = await supabase
       .from('users')
@@ -1278,6 +1291,21 @@ export const ownerPayoutAPI = {
       .eq('status', 'pending'); // guard against double-paying
     if (error) throw error;
     return { data: { ok: true } };
+  },
+};
+
+// Opportunistic fallback for the pending-payment expiry job. Safe to call
+// often — it's a no-op if nothing is actually stale. This exists in case
+// pg_cron isn't enabled on the Supabase plan; call it from any page load
+// that a user is likely to hit periodically (Profile, Admin Dashboard).
+export const maintenanceAPI = {
+  expireStalePending: async () => {
+    try {
+      await supabase.rpc('expire_stale_pending_payments');
+    } catch (e) {
+      // Non-critical — silently ignore (e.g. function not deployed yet).
+      console.warn('expireStalePending:', e.message);
+    }
   },
 };
 

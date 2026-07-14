@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, ownerPayoutAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, ownerPayoutAPI, rentAPI, maintenanceAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp, Coins,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
-  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle
+  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,6 +47,7 @@ export function AdminDashboard() {
   const [previewProperty, setPreviewProperty] = useState(null);
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
   const [ownerPayouts, setOwnerPayouts] = useState([]);
+  const [rentPayments, setRentPayments] = useState([]);
   const [agentBalances, setAgentBalances] = useState([]);
   const [rejectingWithdrawal, setRejectingWithdrawal] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
@@ -61,12 +62,13 @@ export function AdminDashboard() {
 
   const fetchData = async () => {
     setLoading(true);
+    await maintenanceAPI.expireStalePending().catch(() => {});
     try {
-      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, ownerPayoutsRes] = await Promise.all([
+      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, ownerPayoutsRes, rentPaymentsRes] = await Promise.all([
         adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(),
         propertyAPI.getAllAdmin(), inspectionAPI.getAll(), transactionAPI.getAll(),
         contactAPI.getAll(), withdrawalAPI.getAll(), balanceAPI.getAllBalances(),
-        ownerPayoutAPI.getAll(),
+        ownerPayoutAPI.getAll(), rentAPI.getAllForAdmin(),
       ]);
       const allUsers = usersRes.data || [];
       setStats(statsRes.data);
@@ -85,6 +87,7 @@ export function AdminDashboard() {
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
       if (balancesRes?.data) setAgentBalances(balancesRes.data);
       if (ownerPayoutsRes?.data) setOwnerPayouts(ownerPayoutsRes.data);
+      if (rentPaymentsRes?.data) setRentPayments(rentPaymentsRes.data);
       // Load bank change requests (no FK join - enrich from allUsers instead)
       try {
         const { data: bankReqs, error: bankErr } = await supabase
@@ -379,6 +382,12 @@ export function AdminDashboard() {
                 <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{ownerPayouts.filter(p => p.status === 'pending').length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="escrow" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
+              <Lock className="w-4 h-4" /><span>Escrow</span>
+              {rentPayments.filter(p => p.status === 'held').length > 0 && (
+                <Badge className="ml-1 h-5 px-1.5 text-xs bg-amber-500 text-white">{rentPayments.filter(p => p.status === 'held').length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
               <MessageSquare className="w-4 h-4 shrink-0" /> Messages
               {messages.filter(m => m.status === 'unread').length > 0 && (
@@ -398,6 +407,27 @@ export function AdminDashboard() {
             </div>
           ) : (
             <>
+              {/* Escrow — front and center, not buried in the stat grid */}
+              <Card className="p-5 mb-4 border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100/50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-amber-200 flex items-center justify-center shrink-0">
+                      <Lock className="w-6 h-6 text-amber-800" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Total Escrow Held Right Now</p>
+                      <p className="text-2xl sm:text-3xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Across {stats?.held_rent_payments || 0} rent payment{stats?.held_rent_payments === 1 ? '' : 's'} awaiting move-in confirmation or auto-release
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" className="border-amber-400 text-amber-800 hover:bg-amber-100 gap-1.5 shrink-0" onClick={() => setActiveTab('escrow')}>
+                    <Lock className="w-4 h-4" /> View Escrow Details
+                  </Button>
+                </div>
+              </Card>
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Users</p><p className="text-2xl font-bold mt-1">{stats?.total_users || 0}</p></div><Users className="w-6 h-6 text-primary opacity-70" /></div></Card>
                 <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Agents</p><p className="text-2xl font-bold mt-1">{stats?.total_agents || 0}</p></div><UserCheck className="w-6 h-6 text-secondary opacity-70" /></div></Card>
@@ -410,15 +440,23 @@ export function AdminDashboard() {
                 <Card className="p-4 border-green-200 bg-green-50"><p className="text-xs text-green-700 font-medium">Approved Properties</p><p className="text-2xl font-bold mt-1 text-green-900">{stats?.approved_properties || 0}</p></Card>
                 <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Completed Inspections</p><p className="text-2xl font-bold mt-1 text-blue-900">{stats?.completed_inspections || 0}</p></Card>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Coins className="w-5 h-5 text-primary" /></div><div><p className="text-xs text-muted-foreground">Token Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.token_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Inspection Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.inspection_revenue || 0)}</p></div></div></Card>
+                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><Wallet className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Rent Service Fee</p><p className="text-xl font-bold">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p></div></div></Card>
+                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><ArrowDownCircle className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Withdrawal Fee</p><p className="text-xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p></div></div></Card>
                 <Card className="p-4 bg-primary text-white"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><TrendingUp className="w-5 h-5" /></div><div><p className="text-xs opacity-80">Total Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p></div></div></Card>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Rentora revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
+                <Card className="p-4 border-amber-300 bg-amber-50"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Lock className="w-5 h-5 text-amber-700" /></div><div><p className="text-xs text-amber-700 font-medium">Total Escrow Held <span className="italic font-normal">(awaiting move-in / release)</span></p><p className="text-xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p></div></div></Card>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
                 <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Token Transactions</p><p className="text-2xl font-bold mt-1">{transactions.token_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.token_transactions.filter(t => t.status === 'completed').length} completed</p></div><Coins className="w-6 h-6 text-primary opacity-60" /></div></Card>
                 <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.inspection_transactions.filter(t => t.status === 'completed').length} completed</p></div><Receipt className="w-6 h-6 text-secondary opacity-60" /></div></Card>
+                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Rent Transactions</p><p className="text-2xl font-bold mt-1">{stats?.total_rent_payments || 0}</p><p className="text-xs text-muted-foreground mt-0.5">{stats?.held_rent_payments || 0} held · {stats?.released_rent_payments || 0} released</p></div><Home className="w-6 h-6 text-primary opacity-60" /></div></Card>
                 <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Inspections</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_inspections || 0}</p><p className="text-xs text-yellow-600 mt-0.5">awaiting completion</p></Card>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
                 <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Unread Messages</p><p className="text-2xl font-bold mt-1 text-blue-900">{messages.filter(m => m.status === 'unread').length}</p><p className="text-xs text-blue-600 mt-0.5">need response</p></Card>
               </div>
             </>
@@ -1171,6 +1209,88 @@ export function AdminDashboard() {
                     <TableCell>₦{Number(payout.amount).toLocaleString('en-NG')}</TableCell>
                     <TableCell><Badge variant="default" className="capitalize">{payout.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{payout.paid_at ? new Date(payout.paid_at).toLocaleDateString('en-NG') : '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="escrow">
+          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+            Money currently sitting with Rentora, not yet released. A held payment auto-releases 5 days after payment if the student never confirms move-in.
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <Card className="p-4 border-amber-300 bg-amber-50">
+              <p className="text-sm text-amber-700 font-medium mb-1">Currently Held</p>
+              <p className="text-2xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p>
+              <p className="text-xs text-amber-600 mt-0.5">{rentPayments.filter(p => p.status === 'held').length} payment(s)</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-sm text-muted-foreground mb-1">Released All-Time</p>
+              <p className="text-2xl font-bold">
+                {formatPrice(rentPayments.filter(p => p.status === 'released').reduce((s, p) => s + Number(p.total_amount || 0), 0))}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{rentPayments.filter(p => p.status === 'released').length} payment(s)</p>
+            </Card>
+          </div>
+
+          <h3 className="font-semibold mb-3">Currently Held</h3>
+          {rentPayments.filter(p => p.status === 'held').length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground mb-6">Nothing currently held in escrow</Card>
+          ) : (
+            <div className="space-y-3 mb-6">
+              {rentPayments.filter(p => p.status === 'held').map(payment => {
+                const autoRelease = payment.auto_release_at ? new Date(payment.auto_release_at) : null;
+                const daysLeft = autoRelease ? Math.max(0, Math.ceil((autoRelease - new Date()) / (1000 * 60 * 60 * 24))) : null;
+                return (
+                  <Card key={payment.id} className="p-4 border-amber-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span></p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)} + Service fee {formatPrice(payment.service_fee)}
+                        </p>
+                        {autoRelease && (
+                          <p className="text-xs text-amber-700 mt-1">Auto-releases in {daysLeft} day{daysLeft === 1 ? '' : 's'} ({autoRelease.toLocaleDateString('en-NG')})</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-bold text-amber-900">{formatPrice(payment.total_amount)}</p>
+                        <Badge variant="outline" className="border-amber-400 text-amber-700">Held</Badge>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          <h3 className="font-semibold mb-3">Recently Released</h3>
+          <Card className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Rent</TableHead>
+                  <TableHead>Agent Fee</TableHead>
+                  <TableHead>Service Fee</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Released</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rentPayments.filter(p => p.status === 'released').length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
+                ) : rentPayments.filter(p => p.status === 'released').slice(0, 25).map(payment => (
+                  <TableRow key={payment.id}>
+                    <TableCell className="font-medium">{payment.property?.title || '—'}</TableCell>
+                    <TableCell>{formatPrice(payment.rent_amount)}</TableCell>
+                    <TableCell>{formatPrice(payment.agent_fee)}</TableCell>
+                    <TableCell>{formatPrice(payment.service_fee)}</TableCell>
+                    <TableCell><Badge variant="default" className="capitalize">{payment.status}</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{payment.released_at ? new Date(payment.released_at).toLocaleDateString('en-NG') : '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
