@@ -1157,7 +1157,7 @@ export const balanceAPI = {
 
 export const withdrawalAPI = {
   WITHDRAWAL_FEE_PCT: 3.5,
-  MAX_WITHDRAWAL_AMOUNT: 3000, // per request — larger balances need multiple requests
+  MIN_WITHDRAWAL_AMOUNT: 3000, // minimum per request
 
   // Preview the fee/net split for a given withdrawal amount (used by the UI
   // to show "you'll receive ₦X" before the agent submits).
@@ -1167,8 +1167,8 @@ export const withdrawalAPI = {
   },
 
   request: async ({ agentId, agentName, agentEmail, amount, bankName, accountNumber, accountName }) => {
-    if (amount > withdrawalAPI.MAX_WITHDRAWAL_AMOUNT) {
-      throw new Error(`Maximum withdrawal is ₦${withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request. Submit another request for the rest.`);
+    if (amount < withdrawalAPI.MIN_WITHDRAWAL_AMOUNT) {
+      throw new Error(`Minimum withdrawal is ₦${withdrawalAPI.MIN_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request.`);
     }
     // Check available balance — use array select to avoid maybeSingle body-lock bug
     const balRes = await supabase
@@ -1434,7 +1434,7 @@ export const rentAPI = {
   },
 
   markHeld: async (reference, koralpayRef) => {
-    const { error } = await supabase
+    const { data: row, error } = await supabase
       .from('property_rent_payments')
       .update({
         status: 'held',
@@ -1442,8 +1442,39 @@ export const rentAPI = {
         koralpay_reference: koralpayRef || null,
       })
       .eq('reference', reference)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .select('*, property:properties(title)')
+      .single();
     if (error) throw error;
+
+    // Notify the agent that rent has been paid and is held with Rentora —
+    // not released to them yet. Mirrors the inspection_agent_notify pattern
+    // already used for inspection bookings.
+    try {
+      if (row?.agent_id) {
+        const agentRes = await supabase.from('users').select('email, full_name').eq('id', row.agent_id).limit(1);
+        const agent = agentRes.data?.[0];
+        if (agent?.email) {
+          const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+          const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+          await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+            body: JSON.stringify({
+              type: 'rent_payment_held',
+              to: agent.email,
+              data: {
+                agent_name: agent.full_name || 'there',
+                property_title: row.property?.title || 'your property',
+                amount: row.total_amount,
+                agent_fee: row.agent_fee,
+                reference: row.reference,
+              },
+            }),
+          });
+        }
+      }
+    } catch (e) { console.warn('rent_payment_held email failed:', e); }
   },
 
   // User confirms move-in / keys received → release funds to agent.

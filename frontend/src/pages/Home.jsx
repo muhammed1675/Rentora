@@ -144,41 +144,59 @@ export function Home() {
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Browse by Property Type</h2>
             <p className="text-muted-foreground mt-2">Pick what you're looking for to jump straight to it</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
             <button
               onClick={() => navigate('/browse?property_type=hostel')}
-              className="group flex items-center gap-4 p-5 rounded-xl border border-border/60 bg-card hover:border-primary hover:shadow-md transition-all text-left"
+              className="group relative h-48 rounded-xl overflow-hidden border border-border/60 hover:shadow-lg transition-all text-left"
             >
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                <HomeIcon className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold">Hostels</p>
-                <p className="text-xs text-muted-foreground">Shared student housing</p>
+              <img
+                src="https://images.pexels.com/photos/5137980/pexels-photo-5137980.jpeg?auto=compress&cs=tinysrgb&w=600"
+                alt="Hostel rooms"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-2">
+                <HomeIcon className="w-5 h-5 text-white" />
+                <div>
+                  <p className="font-semibold text-white">Hostels</p>
+                  <p className="text-xs text-white/80">Shared student housing</p>
+                </div>
               </div>
             </button>
             <button
               onClick={() => navigate('/browse?property_type=apartment')}
-              className="group flex items-center gap-4 p-5 rounded-xl border border-border/60 bg-card hover:border-primary hover:shadow-md transition-all text-left"
+              className="group relative h-48 rounded-xl overflow-hidden border border-border/60 hover:shadow-lg transition-all text-left"
             >
-              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center shrink-0 group-hover:bg-secondary/20 transition-colors">
-                <Building className="w-6 h-6 text-secondary" />
-              </div>
-              <div>
-                <p className="font-semibold">Apartments</p>
-                <p className="text-xs text-muted-foreground">Self-contained units</p>
+              <img
+                src="https://images.pexels.com/photos/6588599/pexels-photo-6588599.jpeg?auto=compress&cs=tinysrgb&w=600"
+                alt="Apartments"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-2">
+                <Building className="w-5 h-5 text-white" />
+                <div>
+                  <p className="font-semibold text-white">Apartments</p>
+                  <p className="text-xs text-white/80">Self-contained units</p>
+                </div>
               </div>
             </button>
             <button
               onClick={() => navigate('/browse')}
-              className="group flex items-center gap-4 p-5 rounded-xl border border-border/60 bg-card hover:border-primary hover:shadow-md transition-all text-left"
+              className="group relative h-48 rounded-xl overflow-hidden border border-border/60 hover:shadow-lg transition-all text-left"
             >
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-muted/70 transition-colors">
-                <Search className="w-6 h-6 text-foreground/70" />
-              </div>
-              <div>
-                <p className="font-semibold">All Listings</p>
-                <p className="text-xs text-muted-foreground">See everything available</p>
+              <img
+                src="https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=600"
+                alt="All listings"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-2">
+                <Search className="w-5 h-5 text-white" />
+                <div>
+                  <p className="font-semibold text-white">All Listings</p>
+                  <p className="text-xs text-white/80">See everything available</p>
+                </div>
               </div>
             </button>
           </div>

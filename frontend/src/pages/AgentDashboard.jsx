@@ -387,7 +387,7 @@ export function AgentDashboard() {
     const amt = parseFloat(withdrawAmount);
     if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
     if (amt > balance.available) { toast.error('Amount exceeds available balance'); return; }
-    if (amt > withdrawalAPI.MAX_WITHDRAWAL_AMOUNT) { toast.error(`Maximum withdrawal is ₦${withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request`); return; }
+    if (amt < withdrawalAPI.MIN_WITHDRAWAL_AMOUNT) { toast.error(`Minimum withdrawal is ₦${withdrawalAPI.MIN_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request`); return; }
     if (!bankDetails?.account_number) { toast.error('Add your bank account first (Bank Details tab)'); return; }
     setSubmittingWithdrawal(true);
     try {
@@ -522,8 +522,12 @@ export function AgentDashboard() {
                         <p className="text-primary font-bold text-sm truncate">{formatPrice(property.price)}<span className="text-xs font-normal text-muted-foreground">/yr</span></p>
                         <div className="flex gap-1.5 shrink-0 items-center">
                           <Button variant="outline" size="sm"
-                            onClick={() => { if (user?.suspended) { toast.error('Your account is suspended.'); return; } handleOpenDialog(property); }}
-                            disabled={user?.suspended} className="h-7 px-2.5 text-xs gap-1">
+                            onClick={() => {
+                              if (user?.suspended) { toast.error('Your account is suspended.'); return; }
+                              if (paidRecord) { toast.error('This property has been taken and can no longer be edited. Contact support@rentora.com.ng if a change is genuinely needed.'); return; }
+                              handleOpenDialog(property);
+                            }}
+                            disabled={user?.suspended || !!paidRecord} className="h-7 px-2.5 text-xs gap-1">
                             <Edit className="w-3 h-3" /> Edit
                           </Button>
                           {paidRecord ? (
@@ -531,8 +535,8 @@ export function AgentDashboard() {
                               variant="secondary"
                               className="h-7 px-2.5 text-xs gap-1 bg-green-100 text-green-700 hover:bg-green-100 cursor-help"
                               title={paidRecord.status === 'held'
-                                ? "Payment held in escrow — awaiting the renter's move-in confirmation. This listing is locked and can't be reopened until then."
-                                : "Rent has been paid and released — this property is occupied. Contact support@rentora.com.ng if it needs to be relisted."}
+                                ? "Payment held in escrow — awaiting the renter's move-in confirmation. This listing is locked, can't be edited or reopened until then."
+                                : "Rent has been paid and released — this property is taken and permanently locked from editing. Contact support@rentora.com.ng if it needs to be relisted."}
                             >
                               <Lock className="w-3 h-3" />
                               {paidRecord.status === 'held' ? 'Payment Held' : 'Taken (Paid)'}
@@ -866,14 +870,14 @@ export function AgentDashboard() {
               <Label>Amount (₦)</Label>
               <Input
                 type="number"
-                max={withdrawalAPI.MAX_WITHDRAWAL_AMOUNT}
-                placeholder={`Max ₦${withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request`}
+                min={withdrawalAPI.MIN_WITHDRAWAL_AMOUNT}
+                placeholder={`Min ₦${withdrawalAPI.MIN_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')}`}
                 value={withdrawAmount}
                 onChange={e => setWithdrawAmount(e.target.value)}
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Max ₦{withdrawalAPI.MAX_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request — available balance: ₦{balance.available.toLocaleString('en-NG')}. Submit multiple requests for larger amounts.
+                Minimum ₦{withdrawalAPI.MIN_WITHDRAWAL_AMOUNT.toLocaleString('en-NG')} per request — available balance: ₦{balance.available.toLocaleString('en-NG')}.
               </p>
             </div>
             {withdrawAmount > 0 && (
