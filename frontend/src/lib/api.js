@@ -1434,7 +1434,12 @@ export const rentAPI = {
   },
 
   markHeld: async (reference, koralpayRef) => {
-    const { data: row, error } = await supabase
+    // This is the critical write — payment confirmation must succeed even
+    // if everything below it (agent notification) fails for any reason.
+    // No chained .select().single() here on purpose: that can throw on
+    // an unrelated hiccup and would silently break a payment that Korapay
+    // already actually charged.
+    const { error } = await supabase
       .from('property_rent_payments')
       .update({
         status: 'held',
@@ -1442,18 +1447,25 @@ export const rentAPI = {
         koralpay_reference: koralpayRef || null,
       })
       .eq('reference', reference)
-      .eq('status', 'pending')
-      .select('*, property:properties(title)')
-      .single();
+      .eq('status', 'pending');
     if (error) throw error;
 
-    // Notify the agent that rent has been paid and is held with Rentora —
-    // not released to them yet. Mirrors the inspection_agent_notify pattern
-    // already used for inspection bookings.
+    // Notify the agent (and student) — best-effort only, wrapped so a
+    // failure here can never undo or block the payment confirmation above.
     try {
+      const { data: rows } = await supabase
+        .from('property_rent_payments')
+        .select('*, property:properties(title)')
+        .eq('reference', reference)
+        .limit(1);
+      const row = rows?.[0];
       if (row?.agent_id) {
         const agentRes = await supabase.from('users').select('email, full_name').eq('id', row.agent_id).limit(1);
         const agent = agentRes.data?.[0];
+        const studentRes = row.user_id
+          ? await supabase.from('users').select('email, full_name, phone').eq('id', row.user_id).limit(1)
+          : { data: [] };
+        const student = studentRes.data?.[0];
         if (agent?.email) {
           const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
           const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
@@ -1469,9 +1481,28 @@ export const rentAPI = {
                 amount: row.total_amount,
                 agent_fee: row.agent_fee,
                 reference: row.reference,
+                student_name: student?.full_name || 'A student',
+                student_email: student?.email || '',
+                student_phone: student?.phone || '',
               },
             }),
           });
+          if (student?.email) {
+            await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+              body: JSON.stringify({
+                type: 'rent_payment_receipt',
+                to: student.email,
+                data: {
+                  student_name: student.full_name || 'there',
+                  property_title: row.property?.title || 'the property',
+                  amount: row.total_amount,
+                  reference: row.reference,
+                },
+              }),
+            });
+          }
         }
       }
     } catch (e) { console.warn('rent_payment_held email failed:', e); }
@@ -1491,6 +1522,55 @@ export const rentAPI = {
       .eq('user_id', userId)
       .eq('status', 'held');
     if (error) throw error;
+
+    // Notify agent + student that funds have been released — best-effort,
+    // never allowed to affect the confirmation above (already succeeded).
+    try {
+      const { data: rows } = await supabase
+        .from('property_rent_payments')
+        .select('*, property:properties(title)')
+        .eq('id', rentPaymentId)
+        .limit(1);
+      const row = rows?.[0];
+      if (row) {
+        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+        const [agentRes, studentRes] = await Promise.all([
+          row.agent_id ? supabase.from('users').select('email, full_name').eq('id', row.agent_id).limit(1) : Promise.resolve({ data: [] }),
+          supabase.from('users').select('email, full_name').eq('id', userId).limit(1),
+        ]);
+        const agent = agentRes.data?.[0];
+        const student = studentRes.data?.[0];
+        const sendMail = (body) => fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify(body),
+        });
+        if (agent?.email) {
+          await sendMail({
+            type: 'rent_payment_released',
+            to: agent.email,
+            data: {
+              agent_name: agent.full_name || 'there',
+              property_title: row.property?.title || 'your property',
+              agent_fee: row.agent_fee,
+              reference: row.reference,
+            },
+          });
+        }
+        if (student?.email) {
+          await sendMail({
+            type: 'rent_payment_released_student',
+            to: student.email,
+            data: {
+              student_name: student.full_name || 'there',
+              property_title: row.property?.title || 'the property',
+              reference: row.reference,
+            },
+          });
+        }
+      }
+    } catch (e) { console.warn('rent_payment_released email failed:', e); }
   },
 
   // Rent payments for the logged-in user (their held/released receipts).

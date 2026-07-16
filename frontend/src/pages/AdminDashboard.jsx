@@ -867,7 +867,7 @@ export function AdminDashboard() {
                     <TableCell className="text-sm whitespace-nowrap">{formatPrice(p.price)}</TableCell>
                     <TableCell className="text-sm">{p.uploaded_by_agent_name}</TableCell>
                     <TableCell><Badge className={`${getStatusBadge(p.status)} capitalize`}>{p.status}</Badge></TableCell>
-                    <TableCell><div className="flex gap-1.5">{p.status === 'pending' && (<><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setPreviewProperty(p)}><Eye className="w-3.5 h-3.5" /></Button><Button size="sm" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3.5 h-3.5" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3.5 h-3.5" /></Button></>)}<Button variant="destructive" size="sm" className="h-7 px-2" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3.5 h-3.5" /></Button></div></TableCell>
+                    <TableCell><div className="flex gap-1.5"><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setPreviewProperty(p)}><Eye className="w-3.5 h-3.5" /></Button>{p.status === 'pending' && (<><Button size="sm" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'approved')}><CheckCircle2 className="w-3.5 h-3.5" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleApproveProperty(p.id, 'rejected')}><XCircle className="w-3.5 h-3.5" /></Button></>)}<Button variant="destructive" size="sm" className="h-7 px-2" onClick={() => confirmDeleteProperty(p)}><Trash2 className="w-3.5 h-3.5" /></Button></div></TableCell>
                   </TableRow>
                 ))}</TableBody>
               </Table>
@@ -1759,6 +1759,36 @@ export function AdminDashboard() {
                     <p className="font-semibold">{previewProperty.contact_phone || '—'}</p>
                   </div>
                 </div>
+              </div>
+              {/* Property Owner — visible to admin at every stage, including before approval */}
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Property Owner (Payout Details)</p>
+                {previewProperty.owner_full_name ? (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Full Name</p>
+                      <p className="font-semibold">{previewProperty.owner_full_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Phone</p>
+                      <p className="font-semibold">{previewProperty.owner_phone || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Bank</p>
+                      <p className="font-semibold">{previewProperty.owner_bank_name || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Account Number</p>
+                      <p className="font-semibold">{previewProperty.owner_account_number || '—'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Account Name</p>
+                      <p className="font-semibold">{previewProperty.owner_account_name || '—'}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-red-600 font-medium">Missing — this listing cannot accept a rent payment until the agent adds owner details.</p>
+                )}
               </div>
               {/* Status & availability at a glance */}
               <div className="flex flex-wrap items-center gap-2">

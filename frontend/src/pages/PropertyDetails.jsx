@@ -359,17 +359,17 @@ export function PropertyDetails() {
             <h1 className="text-3xl font-bold tracking-tight">{property.title}</h1>
             <div className="flex items-center gap-2 mt-2 text-muted-foreground flex-wrap">
               <MapPin className="w-5 h-5" /><span>{property.location}</span>
-              {property.google_maps_link && (
-                <a
-                  href={property.google_maps_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline text-sm font-medium ml-2"
-                >
-                  <MapPin className="w-4 h-4" />Get Directions
-                </a>
-              )}
             </div>
+            {property.google_maps_link && (
+              <a
+                href={property.google_maps_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-semibold shadow-sm"
+              >
+                <MapPin className="w-4 h-4" />Get Directions on Google Maps
+              </a>
+            )}
           </div>
 
           <Card className="p-6">

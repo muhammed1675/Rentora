@@ -49,6 +49,16 @@ export function PropertyCard({ property }) {
           <div className="flex items-center gap-1 mt-1.5 text-foreground/55">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
             <span className="text-sm line-clamp-1">{property.location}</span>
+            {property.google_maps_link && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(property.google_maps_link, '_blank', 'noopener,noreferrer'); }}
+                className="ml-1 text-xs text-primary hover:underline shrink-0 whitespace-nowrap cursor-pointer"
+              >
+                View map
+              </span>
+            )}
           </div>
           {property.description && (
             <p className="text-sm text-foreground/55 mt-2 line-clamp-2 leading-relaxed">
