@@ -216,6 +216,14 @@ export function PropertyDetails() {
         onSuccess: async () => {
           toast.success('Inspection booked! Our agent will contact you shortly.');
           setRequestingInspection(false);
+          inspectionAPI.notifyAgent({
+            agentId: response.data.agent_id,
+            agentName: response.data.agent_name,
+            propertyTitle: response.data.property_title,
+            inspectionDate,
+            reference: response.data.reference,
+            user,
+          });
         },
         onFailed: () => {
           toast.error('Payment was not successful. Please try again.');

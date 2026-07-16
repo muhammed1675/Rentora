@@ -117,6 +117,7 @@ export function AgentDashboard() {
   const [savingBank, setSavingBank] = useState(false);
   const [balance, setBalance] = useState({ total_earned: 0, total_withdrawn: 0, available: 0 });
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
+  const [earningsHistory, setEarningsHistory] = useState([]);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
@@ -139,17 +140,19 @@ export function AgentDashboard() {
     if (!user) return;
     setLoading(true);
     try {
-      const [propertiesRes, inspectionsRes, balanceRes, withdrawalsRes, rentPaymentsRes] = await Promise.all([
+      const [propertiesRes, inspectionsRes, balanceRes, withdrawalsRes, rentPaymentsRes, earningsRes] = await Promise.all([
         propertyAPI.getMyListings(user.id),
         inspectionAPI.getAssigned(user.id),
         balanceAPI.getMyBalance(user.id),
         withdrawalAPI.getMyRequests(user.id),
         rentAPI.getPaymentsForAgent(user.id).catch(() => ({ data: [] })),
+        balanceAPI.getEarningsHistory(user.id).catch(() => ({ data: [] })),
       ]);
       setProperties(propertiesRes.data);
       setInspections(inspectionsRes.data);
       if (balanceRes?.data) setBalance(balanceRes.data);
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
+      setEarningsHistory(earningsRes?.data || []);
       // If a property has both a held and a released record (shouldn't
       // normally happen), prefer 'released' since it's the more final state.
       const paymentMap = {};
@@ -802,6 +805,33 @@ export function AgentDashboard() {
               <ArrowDownCircle className="w-4 h-4" /> Request Withdrawal
             </Button>
           </div>
+
+          {/* Earnings history */}
+          <Card className="p-4 sm:p-6 mb-6">
+            <h3 className="font-semibold mb-4">Earnings History</h3>
+            {earningsHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No earnings yet — completed inspections and released rent agent fees will show up here</p>
+            ) : (
+              <div className="space-y-3">
+                {earningsHistory.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={e.type === 'inspection' ? 'text-blue-600 border-blue-300' : 'text-green-600 border-green-300'}>
+                          {e.label}
+                        </Badge>
+                        <p className="font-medium text-sm truncate">{e.property_title}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {e.date ? new Date(e.date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      </p>
+                    </div>
+                    <p className="font-bold text-green-600 shrink-0">+₦{e.amount.toLocaleString('en-NG')}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
 
           {/* Withdrawal history */}
           <Card className="p-4 sm:p-6">

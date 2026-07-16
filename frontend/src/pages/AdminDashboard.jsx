@@ -206,6 +206,18 @@ export function AdminDashboard() {
   // once any rent payment for it has been held or released (prevents an
   // agent double-renting an already-occupied room). Use this once a
   // tenancy has genuinely ended and the listing should go live again.
+  // Opens the same property preview modal used in the Properties tab, from
+  // anywhere else in the dashboard (Escrow, Owner Payouts) that only has a
+  // property_id — looks it up from the already-fetched properties list.
+  const openPropertyPreviewById = (propertyId) => {
+    const full = properties.find((p) => p.id === propertyId);
+    if (full) {
+      setPreviewProperty(full);
+    } else {
+      toast.error('Property details not found — it may have been deleted.');
+    }
+  };
+
   const handleRelistProperty = async (property) => {
     if (!window.confirm(`Relist "${property.title}" as available? Only do this if you've confirmed the previous tenancy has actually ended.`)) return;
     try {
@@ -388,6 +400,9 @@ export function AdminDashboard() {
                 <Badge className="ml-1 h-5 px-1.5 text-xs bg-amber-500 text-white">{rentPayments.filter(p => p.status === 'held').length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="rentora-revenue" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
+              <TrendingUp className="w-4 h-4" /><span>Rentora Revenue</span>
+            </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
               <MessageSquare className="w-4 h-4 shrink-0" /> Messages
               {messages.filter(m => m.status === 'unread').length > 0 && (
@@ -441,10 +456,26 @@ export function AdminDashboard() {
                 <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Completed Inspections</p><p className="text-2xl font-bold mt-1 text-blue-900">{stats?.completed_inspections || 0}</p></Card>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Coins className="w-5 h-5 text-primary" /></div><div><p className="text-xs text-muted-foreground">Token Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.token_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><Wallet className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Rent Service Fee</p><p className="text-xl font-bold">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0"><ArrowDownCircle className="w-5 h-5 text-secondary" /></div><div><p className="text-xs text-muted-foreground">Withdrawal Fee</p><p className="text-xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p></div></div></Card>
-                <Card className="p-4 bg-primary text-white"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><TrendingUp className="w-5 h-5" /></div><div><p className="text-xs opacity-80">Total Revenue</p><p className="text-xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p></div></div></Card>
+                <Card className="p-5 border-2 border-primary/20">
+                  <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center mb-2"><Coins className="w-6 h-6 text-primary" /></div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Token Revenue</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.token_revenue || 0)}</p>
+                </Card>
+                <Card className="p-5 border-2 border-secondary/20">
+                  <div className="w-11 h-11 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><Wallet className="w-6 h-6 text-secondary" /></div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Rent Service Fee</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p>
+                </Card>
+                <Card className="p-5 border-2 border-secondary/20">
+                  <div className="w-11 h-11 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><ArrowDownCircle className="w-6 h-6 text-secondary" /></div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Withdrawal Fee</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
+                </Card>
+                <Card className="p-5 bg-gradient-to-br from-primary to-primary/80 text-white">
+                  <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center mb-2"><TrendingUp className="w-6 h-6" /></div>
+                  <p className="text-xs sm:text-sm opacity-90">Total Revenue</p>
+                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.total_revenue || 0)}</p>
+                </Card>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Rentora revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
@@ -1154,7 +1185,13 @@ export function AdminDashboard() {
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">Property</p>
-                      <p className="font-semibold">{payout.properties?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payout.properties?.location}</span></p>
+                      <button
+                        onClick={() => openPropertyPreviewById(payout.property_id)}
+                        className="font-semibold text-primary hover:underline text-left"
+                      >
+                        {payout.properties?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payout.properties?.location}</span>
+                      </button>
+                      <p className="text-xs text-muted-foreground">Listed by agent: <span className="font-medium text-foreground">{payout.agent?.full_name || 'Unknown agent'}</span>{payout.agent?.email ? ` (${payout.agent.email})` : ''}</p>
                       <p className="text-lg font-bold text-green-600">₦{Number(payout.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">owed to owner</span></p>
                       <div className="mt-2 p-2 rounded bg-muted text-xs space-y-0.5">
                         <p className="font-medium">Owner: {payout.owner_name || 'Not provided'}{payout.owner_phone ? ` — ${payout.owner_phone}` : ''}</p>
@@ -1193,6 +1230,7 @@ export function AdminDashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Property</TableHead>
+                  <TableHead>Agent</TableHead>
                   <TableHead>Owner</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
@@ -1201,10 +1239,15 @@ export function AdminDashboard() {
               </TableHeader>
               <TableBody>
                 {ownerPayouts.filter(p => p.status !== 'pending').length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No history yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No history yet</TableCell></TableRow>
                 ) : ownerPayouts.filter(p => p.status !== 'pending').map(payout => (
                   <TableRow key={payout.id}>
-                    <TableCell className="font-medium">{payout.properties?.title || '—'}</TableCell>
+                    <TableCell className="font-medium">
+                      <button onClick={() => openPropertyPreviewById(payout.property_id)} className="text-primary hover:underline text-left">
+                        {payout.properties?.title || '—'}
+                      </button>
+                    </TableCell>
+                    <TableCell>{payout.agent?.full_name || '—'}</TableCell>
                     <TableCell>{payout.owner_name || '—'}</TableCell>
                     <TableCell>₦{Number(payout.amount).toLocaleString('en-NG')}</TableCell>
                     <TableCell><Badge variant="default" className="capitalize">{payout.status}</Badge></TableCell>
@@ -1248,7 +1291,9 @@ export function AdminDashboard() {
                   <Card key={payment.id} className="p-4 border-amber-200">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
-                        <p className="font-semibold">{payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span></p>
+                        <button onClick={() => openPropertyPreviewById(payment.property_id)} className="font-semibold text-primary hover:underline text-left">
+                          {payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span>
+                        </button>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)} + Service fee {formatPrice(payment.service_fee)}
                         </p>
@@ -1286,7 +1331,11 @@ export function AdminDashboard() {
                   <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
                 ) : rentPayments.filter(p => p.status === 'released').slice(0, 25).map(payment => (
                   <TableRow key={payment.id}>
-                    <TableCell className="font-medium">{payment.property?.title || '—'}</TableCell>
+                    <TableCell className="font-medium">
+                      <button onClick={() => openPropertyPreviewById(payment.property_id)} className="text-primary hover:underline text-left">
+                        {payment.property?.title || '—'}
+                      </button>
+                    </TableCell>
                     <TableCell>{formatPrice(payment.rent_amount)}</TableCell>
                     <TableCell>{formatPrice(payment.agent_fee)}</TableCell>
                     <TableCell>{formatPrice(payment.service_fee)}</TableCell>
@@ -1305,6 +1354,59 @@ export function AdminDashboard() {
                 ))}
               </TableBody>
             </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rentora-revenue">
+          <div className="mb-4 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-800">
+            This is Rentora's own money — what the platform actually earns, separate from anything owed to agents or property owners. Inspection fees are excluded since agents keep 100% of those.
+          </div>
+
+          <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
+            <p className="text-sm opacity-90 mb-1">Total Revenue (All-Time)</p>
+            <p className="text-4xl sm:text-5xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p>
+            <p className="text-xs opacity-80 mt-2">Token purchases + rent service fee + withdrawal fee</p>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="p-6 border-2 border-primary/20">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                <Coins className="w-6 h-6 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">Token Revenue</p>
+              <p className="text-3xl font-bold">{formatPrice(stats?.token_revenue || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-2">100% of every token purchase</p>
+            </Card>
+            <Card className="p-6 border-2 border-secondary/20">
+              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
+                <Wallet className="w-6 h-6 text-secondary" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">Rent Service Fee</p>
+              <p className="text-3xl font-bold">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-2">Added on top of rent, never a cut of it</p>
+            </Card>
+            <Card className="p-6 border-2 border-secondary/20">
+              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
+                <ArrowDownCircle className="w-6 h-6 text-secondary" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">Withdrawal Fee</p>
+              <p className="text-3xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-2">3.5% of every agent withdrawal, once paid</p>
+            </Card>
+          </div>
+
+          <Card className="p-4 mt-6">
+            <p className="text-sm font-medium mb-2">For reference — money that is NOT Rentora revenue</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex justify-between p-2 rounded bg-muted/50">
+                <span className="text-muted-foreground">Inspection fees processed (100% to agents)</span>
+                <span className="font-medium">{formatPrice(stats?.inspection_fees_processed || 0)}</span>
+              </div>
+              <div className="flex justify-between p-2 rounded bg-muted/50">
+                <span className="text-muted-foreground">Currently held in escrow (not yet Rentora's or anyone's)</span>
+                <span className="font-medium">{formatPrice(stats?.total_escrow_held || 0)}</span>
+              </div>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>

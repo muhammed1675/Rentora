@@ -393,9 +393,42 @@ export const inspectionAPI = {
         inspection_id: inspectionId,
         reference,
         amount: inspectionAmount,
-        payment_type: 'inspection'
+        payment_type: 'inspection',
+        agent_id: property.uploaded_by_agent_id,
+        agent_name: property.uploaded_by_agent_name,
+        property_title: property.title,
       }
     };
+  },
+
+  // Best-effort agent notification once payment succeeds — never allowed to
+  // affect the booking itself, which has already completed by this point.
+  notifyAgent: async ({ agentId, agentName, propertyTitle, inspectionDate, reference, user }) => {
+    try {
+      if (!agentId) return;
+      const agentRes = await supabase.from('users').select('email').eq('id', agentId).limit(1);
+      const agentEmail = agentRes.data?.[0]?.email;
+      if (!agentEmail) return;
+      const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+      const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+      await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({
+          type: 'inspection_agent_notify',
+          to: agentEmail,
+          data: {
+            agent_name: agentName || 'there',
+            user_name: user?.full_name || 'A student',
+            user_email: user?.email || '',
+            user_phone: user?.phone || '',
+            property_title: propertyTitle,
+            inspection_date: inspectionDate,
+            reference,
+          },
+        }),
+      });
+    } catch (e) { console.warn('inspection_agent_notify email failed:', e); }
   },
 
   getMyInspections: async (userId) => {
@@ -1151,6 +1184,48 @@ export const balanceAPI = {
     if (res.error) { console.warn('agent_balances:', res.error.message); return { data: [] }; }
     return { data: res.data || [] };
   },
+
+  // A real, itemized earnings history for the agent — combines completed
+  // inspection fees (100% to agent) and released rent agent fees into one
+  // sorted list, since agent_balances only stores a running total, not a
+  // per-transaction ledger.
+  getEarningsHistory: async (agentId) => {
+    const [inspectionRes, rentRes] = await Promise.all([
+      supabase
+        .from('inspection_transactions')
+        .select('id, amount, created_at, inspection:inspections!inner(agent_id, property:properties(title))')
+        .eq('status', 'completed')
+        .eq('inspection.agent_id', agentId),
+      supabase
+        .from('property_rent_payments')
+        .select('id, agent_fee, released_at, property:properties(title)')
+        .eq('agent_id', agentId)
+        .eq('status', 'released'),
+    ]);
+
+    const inspectionRows = (inspectionRes.data || []).map((tx) => ({
+      id: `insp_${tx.id}`,
+      type: 'inspection',
+      label: 'Inspection Fee',
+      property_title: tx.inspection?.property?.title || 'Property',
+      amount: Number(tx.amount || 0),
+      date: tx.created_at,
+    }));
+
+    const rentRows = (rentRes.data || []).map((rp) => ({
+      id: `rent_${rp.id}`,
+      type: 'rent_agent_fee',
+      label: 'Agent Fee (Rent)',
+      property_title: rp.property?.title || 'Property',
+      amount: Number(rp.agent_fee || 0),
+      date: rp.released_at,
+    }));
+
+    const combined = [...inspectionRows, ...rentRows].sort(
+      (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
+    );
+    return { data: combined };
+  },
 };
 
 // ============== WITHDRAWAL APIs ==============
@@ -1280,7 +1355,19 @@ export const ownerPayoutAPI = {
       .select('*, properties(title, location)')
       .order('created_at', { ascending: false });
     if (res.error) { console.warn('owner_payouts:', res.error.message); return { data: [] }; }
-    return { data: res.data || [] };
+    const rows = res.data || [];
+
+    // Attach the listing agent's name/email — fetched separately rather
+    // than guessing a foreign-key constraint name for an embedded join.
+    const agentIds = [...new Set(rows.map((r) => r.agent_id).filter(Boolean))];
+    if (agentIds.length > 0) {
+      const agentsRes = await supabase.from('users').select('id, full_name, email').in('id', agentIds);
+      const agentsById = {};
+      for (const a of (agentsRes.data || [])) agentsById[a.id] = a;
+      for (const r of rows) r.agent = agentsById[r.agent_id] || null;
+    }
+
+    return { data: rows };
   },
 
   markPaid: async (payoutId, adminId, notes) => {
