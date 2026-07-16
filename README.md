@@ -2,7 +2,7 @@
 
 Rentora is a student housing rental platform built for LAUTECH (Ladoke Akintola University of Technology), connecting students with verified agents and available properties around campus.
 
-**Live app:** [lautech-rentals.vercel.app](https://lautech-rentals.vercel.app)
+**Live app:** [https://www.rentora.com.ng/)
 
 ## Features
 
