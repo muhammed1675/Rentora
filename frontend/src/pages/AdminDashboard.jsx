@@ -218,17 +218,6 @@ export function AdminDashboard() {
     }
   };
 
-  const handleRelistProperty = async (property) => {
-    if (!window.confirm(`Relist "${property.title}" as available? Only do this if you've confirmed the previous tenancy has actually ended.`)) return;
-    try {
-      await propertyAPI.update(property.id, { availability: 'available' });
-      toast.success('Property relisted as available');
-      fetchData();
-    } catch (err) {
-      toast.error(err.message || 'Failed to relist property');
-    }
-  };
-
   const confirmDeleteProperty = (property) => setDeleteConfirm({ open: true, property, deleting: false });
 
   const handleDeleteProperty = async () => {
@@ -1897,10 +1886,9 @@ export function AdminDashboard() {
                 <Badge variant="outline" className="capitalize">Status: {previewProperty.status}</Badge>
                 <Badge variant="outline" className="capitalize">Availability: {previewProperty.availability || 'available'}</Badge>
                 {previewProperty.availability === 'unavailable' && (
-                  <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1 text-green-600 border-green-300 hover:bg-green-50"
-                    onClick={() => handleRelistProperty(previewProperty)}>
-                    <Eye className="w-3 h-3" /> Relist as Available
-                  </Button>
+                  <span className="text-xs text-muted-foreground italic">
+                    Permanently taken once rent is held or released — cannot be relisted from the dashboard.
+                  </span>
                 )}
               </div>
               {/* Agent */}

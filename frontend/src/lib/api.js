@@ -148,12 +148,43 @@ export const propertyAPI = {
   },
 
   approve: async (id, status, adminId) => {
-    const { error } = await supabase
+    const { data: rows, error } = await supabase
       .from('properties')
       .update({ status, approved_by_admin_id: adminId })
-      .eq('id', id);
-    
+      .eq('id', id)
+      .select('title, uploaded_by_agent_id')
+      .limit(1);
+
     if (error) throw error;
+
+    // Notify the agent — best-effort, never allowed to affect the
+    // approval itself, which has already succeeded above.
+    if (status === 'approved') {
+      try {
+        const property = rows?.[0];
+        if (property?.uploaded_by_agent_id) {
+          const agentRes = await supabase.from('users').select('email, full_name').eq('id', property.uploaded_by_agent_id).limit(1);
+          const agent = agentRes.data?.[0];
+          if (agent?.email) {
+            const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+            const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+            await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+              body: JSON.stringify({
+                type: 'property_approved',
+                to: agent.email,
+                data: {
+                  agent_name: agent.full_name || 'there',
+                  property_title: property.title,
+                },
+              }),
+            });
+          }
+        }
+      } catch (e) { console.warn('property_approved email failed:', e); }
+    }
+
     return { data: { message: `Property ${status}` } };
   },
 
@@ -349,6 +380,9 @@ export const inspectionAPI = {
     if (propError || !property) {
       throw new Error('Property not found');
     }
+    if (property.availability === 'unavailable') {
+      throw new Error('This property has already been taken and is no longer accepting inspection bookings.');
+    }
     
     const reference = generateReference('INSP');
     const inspectionId = uuidv4();
@@ -399,36 +433,6 @@ export const inspectionAPI = {
         property_title: property.title,
       }
     };
-  },
-
-  // Best-effort agent notification once payment succeeds — never allowed to
-  // affect the booking itself, which has already completed by this point.
-  notifyAgent: async ({ agentId, agentName, propertyTitle, inspectionDate, reference, user }) => {
-    try {
-      if (!agentId) return;
-      const agentRes = await supabase.from('users').select('email').eq('id', agentId).limit(1);
-      const agentEmail = agentRes.data?.[0]?.email;
-      if (!agentEmail) return;
-      const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-      const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-      await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({
-          type: 'inspection_agent_notify',
-          to: agentEmail,
-          data: {
-            agent_name: agentName || 'there',
-            user_name: user?.full_name || 'A student',
-            user_email: user?.email || '',
-            user_phone: user?.phone || '',
-            property_title: propertyTitle,
-            inspection_date: inspectionDate,
-            reference,
-          },
-        }),
-      });
-    } catch (e) { console.warn('inspection_agent_notify email failed:', e); }
   },
 
   getMyInspections: async (userId) => {
@@ -1526,7 +1530,7 @@ export const rentAPI = {
     // No chained .select().single() here on purpose: that can throw on
     // an unrelated hiccup and would silently break a payment that Korapay
     // already actually charged.
-    const { error } = await supabase
+    const { data: updatedRows, error } = await supabase
       .from('property_rent_payments')
       .update({
         status: 'held',
@@ -1534,8 +1538,15 @@ export const rentAPI = {
         koralpay_reference: koralpayRef || null,
       })
       .eq('reference', reference)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .select('id');
     if (error) throw error;
+
+    // If no row matched, this payment was already marked held by an
+    // earlier call (e.g. Korapay's onSuccess firing twice) — skip the
+    // notification entirely so the agent/student don't get duplicate
+    // emails for the same payment.
+    if (!updatedRows || updatedRows.length === 0) return;
 
     // Notify the agent (and student) — best-effort only, wrapped so a
     // failure here can never undo or block the payment confirmation above.
@@ -1597,7 +1608,7 @@ export const rentAPI = {
 
   // User confirms move-in / keys received → release funds to agent.
   confirmMoveIn: async (rentPaymentId, userId, moveInPhotoUrl) => {
-    const { error } = await supabase
+    const { data: updatedRows, error } = await supabase
       .from('property_rent_payments')
       .update({
         status: 'released',
@@ -1607,8 +1618,15 @@ export const rentAPI = {
       })
       .eq('id', rentPaymentId)
       .eq('user_id', userId)
-      .eq('status', 'held');
+      .eq('status', 'held')
+      .select('id');
     if (error) throw error;
+
+    // No row matched — either this was already confirmed (a second click
+    // after a slow first request, or a retry after a network hiccup on
+    // the response) or it's not actually held. Either way, don't send a
+    // second round of release emails.
+    if (!updatedRows || updatedRows.length === 0) return;
 
     // Notify agent + student that funds have been released — best-effort,
     // never allowed to affect the confirmation above (already succeeded).

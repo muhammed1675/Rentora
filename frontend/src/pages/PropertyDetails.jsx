@@ -216,14 +216,10 @@ export function PropertyDetails() {
         onSuccess: async () => {
           toast.success('Inspection booked! Our agent will contact you shortly.');
           setRequestingInspection(false);
-          inspectionAPI.notifyAgent({
-            agentId: response.data.agent_id,
-            agentName: response.data.agent_name,
-            propertyTitle: response.data.property_title,
-            inspectionDate,
-            reference: response.data.reference,
-            user,
-          });
+          // Note: the agent + student inspection emails are already sent by
+          // paymentAPI.confirmPayment() (called automatically inside
+          // openKorapayCheckout's onSuccess in korapay.js) — do not send a
+          // second notification here, that was causing duplicate emails.
         },
         onFailed: () => {
           toast.error('Payment was not successful. Please try again.');
@@ -590,14 +586,20 @@ export function PropertyDetails() {
               </Button>
             </div>
             <h3 className="font-semibold mb-2">Request Inspection</h3>
-            <p className="text-sm text-muted-foreground mb-4">Schedule a physical visit with our verified agent for {formatPrice(Number(property?.inspection_fee) || 3000)}</p>
-            <Button variant="outline" onClick={() => {
-              if (!isAuthenticated) { toast.error('Please login to request inspection'); navigate('/login'); return; }
-              setInspectionEmail(user?.email || '');
-              setShowInspectionDialog(true);
-            }} className="w-full gap-2" data-testid="request-inspection-btn">
-              <CalendarIcon className="w-4 h-4" />Schedule Inspection
-            </Button>
+            {property?.availability === 'unavailable' ? (
+              <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting inspection bookings.</p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">Schedule a physical visit with our verified agent for {formatPrice(Number(property?.inspection_fee) || 3000)}</p>
+                <Button variant="outline" onClick={() => {
+                  if (!isAuthenticated) { toast.error('Please login to request inspection'); navigate('/login'); return; }
+                  setInspectionEmail(user?.email || '');
+                  setShowInspectionDialog(true);
+                }} className="w-full gap-2" data-testid="request-inspection-btn">
+                  <CalendarIcon className="w-4 h-4" />Schedule Inspection
+                </Button>
+              </>
+            )}
           </Card>
 
           {property.uploaded_by_agent_name && (

@@ -114,6 +114,14 @@ export function Profile() {
   const handleMoveInPhotoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Mobile camera photos can be 10-20MB+, which is slow or can time out
+    // on a weak connection — catch it here with a clear message instead of
+    // a confusing failure partway through upload.
+    const MAX_SIZE_MB = 8;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast.error(`That photo is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Please choose one under ${MAX_SIZE_MB}MB — most phones let you pick a smaller size in the camera/gallery app.`);
+      return;
+    }
     setMoveInPhotoFile(file);
     setMoveInPhotoPreview(URL.createObjectURL(file));
   };
@@ -122,14 +130,22 @@ export function Profile() {
     if (!moveInDialogPayment) return;
     if (!moveInPhotoFile) { toast.error('Please upload a photo of yourself at the property to confirm move-in'); return; }
     setConfirmingMoveIn(true);
+    let uploadedUrl;
     try {
       const uploadRes = await storageAPI.uploadImage(moveInPhotoFile, 'move-in-photos');
-      await rentAPI.confirmMoveIn(moveInDialogPayment.id, user.id, uploadRes.data.url);
+      uploadedUrl = uploadRes.data.url;
+    } catch (e) {
+      toast.error('Could not upload your photo: ' + (e.message || 'unknown error') + '. Please check your connection and try again.');
+      setConfirmingMoveIn(false);
+      return;
+    }
+    try {
+      await rentAPI.confirmMoveIn(moveInDialogPayment.id, user.id, uploadedUrl);
       toast.success('Move-in confirmed. Your rent has been released to the property owner.');
       setMoveInDialogPayment(null);
       fetchData();
     } catch (e) {
-      toast.error(e.message || 'Failed to confirm move-in');
+      toast.error('Photo uploaded, but confirming move-in failed: ' + (e.message || 'unknown error') + '. Please try again — your photo will not need to be re-uploaded if you retry immediately.');
     } finally {
       setConfirmingMoveIn(false);
     }
