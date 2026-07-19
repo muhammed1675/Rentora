@@ -35,6 +35,7 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { useState } from 'react';
 import { ConsentBanner } from './ConsentBanner';
+import { SkylineLogo } from './SkylineLogo';
 
 export function Layout({ children }) {
   const { user, logout, isAuthenticated, isAdmin, isAgent } = useAuth();
@@ -65,7 +66,7 @@ export function Layout({ children }) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
-              <img src="/rentora-logo.png" alt="Rentora" className="h-9 w-auto" />
+              <SkylineLogo size="md" />
             </Link>
 
             {/* Desktop Nav */}
@@ -79,7 +80,7 @@ export function Layout({ children }) {
                   data-testid="nav-home"
                 >
                   <Home className="w-4 h-4" />
-                  Home
+                  Solutions
                 </Button>
               </Link>
               
@@ -91,7 +92,7 @@ export function Layout({ children }) {
                   data-testid="nav-browse"
                 >
                   <Search className="w-4 h-4" />
-                  Browse
+                  Projects
                 </Button>
               </Link>
 
@@ -276,7 +277,7 @@ export function Layout({ children }) {
       <header className="md:hidden sticky top-0 z-50 glass border-b">
         <div className="flex items-center justify-between h-14 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/rentora-logo.png" alt="Rentora" className="h-8 w-auto" />
+            <SkylineLogo size="sm" />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -548,10 +549,10 @@ export function Layout({ children }) {
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <img src="/rentora-logo.png" alt="Rentora" className="h-8 w-auto" />
+              <SkylineLogo size="sm" />
               <div>
-                <p className="font-bold text-sm">Rentora</p>
-                <p className="text-xs text-muted-foreground">Student Housing Platform, Ogbomosho</p>
+                <p className="font-bold text-sm">Skyline Modular</p>
+                <p className="text-xs text-muted-foreground">Modular Housing Platform, nationwide</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
@@ -572,10 +573,10 @@ export function Layout({ children }) {
         <div className="px-6 py-5">
           {/* Brand */}
           <div className="flex items-center gap-2 mb-4">
-            <img src="/rentora-logo.png" alt="Rentora" className="h-7 w-auto" />
+            <img src="/rentora-logo.png" alt="Skyline Modular" className="h-7 w-auto" />
             <div>
-              <p className="font-bold text-xs">Rentora</p>
-              <p className="text-[10px] text-muted-foreground">Student Housing, Ogbomosho</p>
+              <p className="font-bold text-xs">Skyline Modular</p>
+              <p className="text-[10px] text-muted-foreground">Modular Housing, nationwide</p>
             </div>
           </div>
 

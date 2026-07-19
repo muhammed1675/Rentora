@@ -1,392 +1,321 @@
-import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { Dialog, DialogContent } from '../components/ui/dialog';
 import {
-  Search, Shield, Coins, Calendar, ArrowRight, Lock,
-  Building2, Users, CheckCircle2, MessageSquare, Home as HomeIcon, Building,
-  ChevronRight as ChevronRightIcon, ShoppingBag, Sparkles
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from '../components/ui/accordion';
+import {
+  Factory, Clock, ShieldCheck, Leaf, ArrowRight, Home as HomeIcon,
+  Building2, Briefcase, GraduationCap, ClipboardList, Hammer, Truck,
+  Wrench, Sparkles, MapPin, MessageSquareText, Phone
 } from 'lucide-react';
 
-import { AppBanner } from '../components/AppBanner';
-
 export function Home() {
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState(0);
 
-  useEffect(() => {
-    const seen = localStorage.getItem('rentora_onboarding_seen');
-    if (!seen) {
-      const t = setTimeout(() => setShowOnboarding(true), 800);
-      return () => clearTimeout(t);
-    }
-  }, []);
-
-  const dismissOnboarding = () => {
-    localStorage.setItem('rentora_onboarding_seen', 'true');
-    localStorage.setItem('rentora_onboarding_done', 'true');
-    setShowOnboarding(false);
-    setOnboardingStep(0);
-  };
-
-  const onboardingSteps = [
-    {
-      icon: Search,
-      title: 'Browse Verified Properties',
-      desc: 'All listings on Rentora are reviewed and approved. Filter by price, type, and location to find your perfect match.',
-      color: 'bg-blue-500',
-    },
-    {
-      icon: Coins,
-      title: 'Unlock Owner Contacts',
-      desc: 'Buy tokens (₦1,000 each) to unlock the phone number of any property owner. One token, one contact — no hidden fees.',
-      color: 'bg-yellow-500',
-    },
-    {
-      icon: Calendar,
-      title: 'Book an Inspection',
-      desc: 'Pay a small inspection fee (from ₦1,000, set by the agent) to schedule a physical visit. Our verified agent will accompany you to inspect the property in person.',
-      color: 'bg-green-500',
-    },
-    {
-      icon: Shield,
-      title: "You're Protected",
-      desc: "Every agent on Rentora is ID-verified, and your rent stays held in escrow until you confirm you've moved in — never paid to the agent upfront. Support is available if anything goes wrong.",
-      color: 'bg-primary',
-    },
+  const highlights = [
+    { icon: Factory, title: 'Built in Controlled', sub: 'Factory Settings' },
+    { icon: Clock, title: '50% Faster', sub: 'Project Delivery' },
+    { icon: ShieldCheck, title: 'Superior Quality', sub: '& Durability' },
+    { icon: Leaf, title: 'Sustainable', sub: 'by Design' },
   ];
 
-  const features = [
-    { icon: Shield, title: 'Verified Properties', description: 'All listings are reviewed and approved by our admin team for quality assurance.' },
-    { icon: Lock, title: 'Rent Held in Escrow', description: 'Your rent stays safely held with Rentora until you confirm you\'ve moved in — never paid to the agent upfront.' },
-    { icon: Calendar, title: 'Request Inspections', description: 'Schedule property visits with our verified agents from just ₦1,000, set per listing.' },
-    { icon: Users, title: 'Trusted Agents', description: 'Our agents are ID-verified and accountable for the properties they list.' },
+  const solutions = [
+    { icon: HomeIcon, tag: 'Modular Homes', desc: 'Beautiful, energy-efficient homes built for modern living.',
+      img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=70' },
+    { icon: Building2, tag: 'Multi-Family', desc: 'Scalable housing solutions built faster, for more people.',
+      img: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=900&q=70' },
+    { icon: Briefcase, tag: 'Commercial', desc: 'Offices, retail, and mixed-use spaces — built with precision.',
+      img: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&q=70' },
+    { icon: GraduationCap, tag: 'Institutions', desc: 'Schools and facilities that support communities.',
+      img: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=900&q=70' },
+  ];
+
+  const steps = [
+    { n: 1, icon: ClipboardList, title: 'Plan',    desc: 'We collaborate and design to bring your vision to life.' },
+    { n: 2, icon: Hammer,        title: 'Build',   desc: 'Modules are built in our factory with precision and quality control.' },
+    { n: 3, icon: Truck,         title: 'Deliver', desc: 'Modules are transported to your site, ready for quick installation.' },
+    { n: 4, icon: Wrench,        title: 'Install', desc: 'Our team assembles modules quickly and efficiently on-site.' },
+    { n: 5, icon: Sparkles,      title: 'Enjoy',   desc: 'Move in sooner and enjoy a better building experience.' },
   ];
 
   const stats = [
-    { value: '500+', label: 'Properties Listed' },
-    { value: '1,000+', label: 'Happy Students' },
-    { value: '50+', label: 'Verified Agents' },
-    { value: '24/7', label: 'Support Available' },
+    { icon: Clock, value: '50%', label: 'Faster Delivery' },
+    { icon: Briefcase, value: '20%', label: 'Cost Savings' },
+    { icon: ShieldCheck, value: 'High', label: 'Quality Control' },
+    { icon: Leaf, value: 'Low', label: 'Environmental Impact' },
+  ];
+
+  const projects = [
+    { name: 'Lakeside Retreat', location: 'Lake Arrowhead, CA', tag: 'Modular Home',
+      desc: 'A custom modular home designed for comfort, views, and year-round living.',
+      img: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=900&q=70' },
+    { name: 'The Summit', location: 'Denver, CO', tag: 'Multi-Family',
+      desc: 'A 48-unit complex delivered in half the time of traditional construction.',
+      img: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=900&q=70' },
+    { name: 'Elevate Office', location: 'Austin, TX', tag: 'Commercial',
+      desc: 'A sleek, sustainable office space built for productivity and growth.',
+      img: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=70' },
+  ];
+
+  const faqs = [
+    { q: 'How is modular construction different?',
+      a: 'Modules are built in a climate-controlled factory in parallel with site preparation, cutting timelines and improving quality control.' },
+    { q: 'How much time and cost can I save?',
+      a: 'Most projects are delivered up to 50% faster with roughly 20% cost savings compared to traditional site-built construction.' },
+    { q: 'Is modular construction as durable as traditional?',
+      a: 'Yes — Skyline modules are engineered to meet or exceed local building codes and are transport-tested for structural integrity.' },
+    { q: 'Can modular buildings be customized?',
+      a: 'Absolutely. From layout and finishes to façade materials, every Skyline project starts with your vision.' },
+    { q: 'Do you handle permitting and site work?',
+      a: 'We coordinate permits, foundation, utilities, and installation as part of a single turn-key process.' },
   ];
 
   return (
-    <div className="min-h-screen" data-testid="home-page">
-
-      {/* ── Hero ─────────────────────────────────────── */}
-      <section className="relative h-[580px] md:h-[640px] flex items-center overflow-hidden" aria-label="Find student hostels and accommodation near LAUTECH Ogbomosho">
-        <img
-          src="https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg"
-          alt="Student accommodation near LAUTECH Ogbomosho"
-          className="absolute inset-0 w-full h-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-slate-900/70" />
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-900/70" />
-
-        <div className="relative z-10 container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-sm font-medium backdrop-blur-sm">
-              <Building2 className="w-4 h-4 text-primary" />
-              <span className="text-white/90">Student Housing Made Easy</span>
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white drop-shadow-lg">
-              Verified Hostels &amp; Rooms
-              <span className="text-primary block mt-2">Near LAUTECH, Ogbomosho</span>
-            </h1>
-
-            <p className="text-lg md:text-xl text-white/75 max-w-2xl mx-auto">
-              Ogbomosho's #1 student housing platform. Find cheap hostels, self-contains, bedsitters and mini flats near LAUTECH — unlock agent contacts &amp; book inspections online.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-              <Link to="/browse">
-                <Button size="lg" className="gap-2 px-8 shadow-lg active:scale-95 transition-transform" data-testid="browse-btn">
-                  <Search className="w-5 h-5" />
-                  Browse Properties
+    <div className="min-h-screen bg-background" data-testid="home-page">
+      {/* Hero */}
+      <section className="relative bg-background">
+        <div className="container mx-auto px-6 pt-10 md:pt-16 pb-6">
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div className="max-w-xl">
+              <h1 className="font-display font-extrabold tracking-tight text-4xl md:text-5xl lg:text-6xl leading-[1.05] text-foreground">
+                Built Smarter.
+                <span className="block text-primary">Delivered Faster.</span>
+              </h1>
+              <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed">
+                Premium modular and prefab buildings engineered for quality, efficiency, and a better way to build.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button size="lg" className="gap-2 px-6 shadow-sm" onClick={() => navigate('/browse')}>
+                  Explore Solutions <ArrowRight className="w-4 h-4" />
                 </Button>
-              </Link>
-              {!isAuthenticated && (
-                <Link to="/register">
-                  <Button size="lg" variant="outline" className="gap-2 px-8 bg-white/10 border-white/30 text-white hover:bg-white/20 active:scale-95 transition-transform backdrop-blur-sm" data-testid="get-started-btn">
-                    Get Started
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </Link>
-              )}
+                <Button size="lg" variant="outline" className="gap-2 px-6 border-primary text-primary hover:bg-primary/5"
+                  onClick={() => navigate('/contact')}>
+                  Get a Free Quote
+                </Button>
+              </div>
+            </div>
+            <div className="relative rounded-2xl overflow-hidden shadow-xl aspect-[4/3] md:aspect-[5/4]">
+              <img
+                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80"
+                alt="Modern modular home at dusk"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
         </div>
-      </section>
 
-      {/* ── Stats ────────────────────────────────────── */}
-      <section className="py-14 bg-white border-b border-border/60 shadow-sm">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {stats.map((stat, index) => (
-              <div key={stat.label} className="text-center" style={{ animationDelay: `${index * 100}ms` }}>
-                <p className="text-3xl md:text-4xl font-bold text-primary">{stat.value}</p>
-                <p className="text-sm font-medium text-foreground/60 mt-1">{stat.label}</p>
+        <div className="container mx-auto px-6 pb-14">
+          <div className="rounded-2xl border border-border bg-white shadow-sm px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {highlights.map(h => (
+              <div key={h.title} className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-brand-soft flex items-center justify-center shrink-0">
+                  <h.icon className="w-5 h-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm text-foreground leading-tight">{h.title}</p>
+                  <p className="text-xs text-muted-foreground leading-tight">{h.sub}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Browse by Property Type ──────────────────── */}
-      <section className="py-14 bg-background border-b border-border/40" aria-label="Browse student housing by property type">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Browse by Property Type</h2>
-            <p className="text-muted-foreground mt-2">Pick what you're looking for to jump straight to it</p>
+      {/* Solutions */}
+      <section className="py-16 md:py-20 bg-muted/40">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-10">
+            <p className="text-primary text-xs font-bold tracking-[0.25em] uppercase">Modular Solutions</p>
+            <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-foreground">Built for Every Need</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
-            <button
-              onClick={() => navigate('/browse?property_type=hostel')}
-              className="group relative h-48 rounded-xl overflow-hidden border border-border/60 hover:shadow-lg transition-all text-left"
-            >
-              <img
-                src="https://images.pexels.com/photos/5137980/pexels-photo-5137980.jpeg?auto=compress&cs=tinysrgb&w=600"
-                alt="Hostel rooms"
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-2">
-                <HomeIcon className="w-5 h-5 text-white" />
-                <div>
-                  <p className="font-semibold text-white">Hostels</p>
-                  <p className="text-xs text-white/80">Shared student housing</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {solutions.map(s => (
+              <Card key={s.tag} className="overflow-hidden border-border/70 bg-white hover:shadow-lg transition-shadow">
+                <div className="relative aspect-[4/3]">
+                  <img src={s.img} alt={s.tag} className="w-full h-full object-cover" />
+                  <div className="absolute -bottom-6 left-4 w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center">
+                    <s.icon className="w-6 h-6 text-primary" />
+                  </div>
                 </div>
-              </div>
-            </button>
-            <button
-              onClick={() => navigate('/browse?property_type=apartment')}
-              className="group relative h-48 rounded-xl overflow-hidden border border-border/60 hover:shadow-lg transition-all text-left"
-            >
-              <img
-                src="https://images.pexels.com/photos/6588599/pexels-photo-6588599.jpeg?auto=compress&cs=tinysrgb&w=600"
-                alt="Apartments"
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-2">
-                <Building className="w-5 h-5 text-white" />
-                <div>
-                  <p className="font-semibold text-white">Apartments</p>
-                  <p className="text-xs text-white/80">Self-contained units</p>
+                <div className="p-5 pt-8">
+                  <h3 className="font-semibold text-lg text-foreground">{s.tag}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+                  <Link to="/browse" className="mt-3 inline-flex items-center gap-1 text-primary text-sm font-semibold">
+                    Learn More <ArrowRight className="w-4 h-4" />
+                  </Link>
                 </div>
-              </div>
-            </button>
-            <button
-              onClick={() => navigate('/browse')}
-              className="group relative h-48 rounded-xl overflow-hidden border border-border/60 hover:shadow-lg transition-all text-left"
-            >
-              <img
-                src="https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=600"
-                alt="All listings"
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-2">
-                <Search className="w-5 h-5 text-white" />
-                <div>
-                  <p className="font-semibold text-white">All Listings</p>
-                  <p className="text-xs text-white/80">See everything available</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ─────────────────────────────────── */}
-      <section className="py-16 md:py-24 bg-background" aria-label="Why choose Rentora for student accommodation Ogbomosho">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-              Why LAUTECH Students Choose Rentora
-            </h2>
-            <p className="text-foreground/60 mt-3 max-w-2xl mx-auto text-base">
-              Built for students in Ogbomosho — find affordable, verified student accommodation near LAUTECH quickly and safely.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature, index) => (
-              <Card
-                key={feature.title}
-                className="p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border border-border/60 bg-white"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2 text-foreground">{feature.title}</h3>
-                <p className="text-sm text-foreground/60 leading-relaxed">{feature.description}</p>
               </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── How It Works ─────────────────────────────── */}
-      <section className="py-16 md:py-24 bg-slate-50 border-y border-border/40" aria-label="How to rent student accommodation near LAUTECH">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-              How to Rent a Hostel Near LAUTECH
-            </h2>
-            <p className="text-foreground/60 mt-3 text-base">
-              Find student housing in Ogbomosho in 3 simple steps
-            </p>
+      {/* How It Works */}
+      <section className="py-16 md:py-20 bg-background">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-14">
+            <p className="text-primary text-xs font-bold tracking-[0.25em] uppercase">How It Works</p>
+            <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-foreground">A Smarter Way to Build</h2>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {[
-              { step: '01', title: 'Browse', desc: 'Explore verified hostels and apartments near LAUTECH with filters for price and type' },
-              { step: '02', title: 'Unlock', desc: 'Buy tokens and unlock the agent\'s contact for any hostel or room you like' },
-              { step: '03', title: 'Inspect', desc: 'Schedule a physical inspection with our verified Ogbomosho agents' },
-            ].map((item, index) => (
-              <div key={item.step} className="relative text-center group">
-                <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-5 shadow-md group-hover:scale-105 transition-transform">
-                  <span className="text-2xl font-bold text-white">{item.step}</span>
+          <div className="relative max-w-5xl mx-auto">
+            <div className="hidden md:block absolute top-10 left-[10%] right-[10%] border-t-2 border-dashed border-primary/30" />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-8 relative">
+              {steps.map(s => (
+                <div key={s.n} className="flex flex-col items-center text-center">
+                  <div className="relative w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                    <s.icon className="w-8 h-8 text-white" />
+                    <div className="absolute -bottom-2 w-6 h-6 rounded-full bg-white border-2 border-primary flex items-center justify-center text-[11px] font-bold text-primary">
+                      {s.n}
+                    </div>
+                  </div>
+                  <h3 className="mt-5 font-semibold text-foreground">{s.title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-[180px]">{s.desc}</p>
                 </div>
-                <h3 className="text-xl font-semibold mb-2 text-foreground">{item.title}</h3>
-                <p className="text-sm text-foreground/60 leading-relaxed">{item.desc}</p>
-                {index < 2 && (
-                  <div className="hidden md:block absolute top-10 -right-4 text-primary/40 text-2xl">→</div>
-                )}
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats banner */}
+      <section className="py-10">
+        <div className="container mx-auto px-6">
+          <div className="rounded-2xl overflow-hidden bg-primary text-white grid md:grid-cols-2">
+            <div className="relative min-h-[220px]">
+              <img
+                src="https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=70"
+                alt="Modular construction in progress"
+                className="absolute inset-0 w-full h-full object-cover mix-blend-luminosity opacity-70"
+              />
+              <div className="absolute inset-0 bg-primary/40" />
+            </div>
+            <div className="p-8 md:p-10">
+              <p className="text-xs font-bold tracking-[0.25em] uppercase text-white/70">Speed & Efficiency</p>
+              <h3 className="mt-2 text-2xl md:text-3xl font-extrabold">Better Buildings. Better Outcomes.</h3>
+              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+                {stats.map(s => (
+                  <div key={s.label}>
+                    <s.icon className="w-6 h-6 text-white/80" />
+                    <p className="mt-2 text-2xl font-extrabold">{s.value}</p>
+                    <p className="text-xs text-white/80">{s.label}</p>
+                  </div>
+                ))}
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured projects */}
+      <section className="py-16 md:py-20 bg-background">
+        <div className="container mx-auto px-6">
+          <div className="flex items-end justify-between mb-8 gap-4 flex-wrap">
+            <div>
+              <p className="text-primary text-xs font-bold tracking-[0.25em] uppercase">Featured Projects</p>
+              <h2 className="mt-2 text-3xl md:text-4xl font-extrabold text-foreground">Real Projects. Real Results.</h2>
+            </div>
+            <Link to="/browse" className="inline-flex items-center gap-1 text-primary text-sm font-semibold">
+              View All Projects <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {projects.map(p => (
+              <Card key={p.name} className="overflow-hidden border-border/70 bg-white hover:shadow-lg transition-shadow">
+                <div className="aspect-[4/3]">
+                  <img src={p.img} alt={p.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-semibold text-lg text-foreground">{p.name}</h3>
+                    <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-brand-soft text-primary whitespace-nowrap">{p.tag}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground inline-flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {p.location}
+                  </p>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{p.desc}</p>
+                </div>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Onboarding Modal ─────────────────────────── */}
-      <Dialog open={showOnboarding} onOpenChange={() => {}}>
-        <DialogContent className="w-[calc(100vw-32px)] max-w-sm mx-auto rounded-2xl p-0 overflow-hidden gap-0 [&>button]:hidden z-[99999]">
-          <div className="flex gap-1.5 justify-center pt-5 pb-1">
-            {onboardingSteps.map((_, i) => (
-              <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${i === onboardingStep ? 'w-6 bg-primary' : 'w-1.5 bg-muted-foreground/20'}`} />
-            ))}
-          </div>
-
-          <div className="px-6 py-5 text-center min-h-[200px] flex flex-col items-center justify-center">
-            {(() => {
-              const step = onboardingSteps[onboardingStep];
-              const Icon = step.icon;
-              return (
-                <>
-                  <div className={`w-16 h-16 rounded-2xl ${step.color} flex items-center justify-center mb-4 shadow-lg`}>
-                    <Icon className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-                </>
-              );
-            })()}
-          </div>
-
-          <div className="flex gap-2 px-6 pb-6">
-            <button
-              onClick={dismissOnboarding}
-              className="flex-1 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-            >
-              {onboardingStep === onboardingSteps.length - 1 ? 'Done' : 'Skip'}
-            </button>
-            {onboardingStep < onboardingSteps.length - 1 ? (
-              <Button className="flex-1 gap-1" onClick={() => setOnboardingStep(s => s + 1)}>
-                Next <ChevronRightIcon className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button className="flex-1" onClick={dismissOnboarding}>
-                Get Started 🎉
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Become an Agent CTA ──────────────────────── */}
-      <section className="py-16 md:py-24 bg-background">
-        <div className="container mx-auto px-4">
-          <Card className="relative overflow-hidden bg-primary text-white p-8 md:p-12 border-0 shadow-xl">
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="max-w-xl">
-                <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
-                  Want to Become a Rentora Agent?
-                </h2>
-                <p className="mt-4 text-white/80 text-base leading-relaxed">
-                  Keep <strong>100% of every inspection fee</strong> you set, plus your full rent commission when a tenant moves in. Work flexible hours and grow your income.
-                </p>
-                <ul className="mt-4 space-y-1.5">
-                  {['Keep 100% of your inspection fee', 'Earn your full rent + agent fee via secure escrow', 'Flexible hours', 'ID-verified badge', 'Direct bank withdrawals'].map(item => (
-                    <li key={item} className="flex items-center gap-2 text-sm text-white/80">
-                      <CheckCircle2 className="w-4 h-4 text-white shrink-0" />{item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="shrink-0">
-                <Link to="/become-agent">
-                  <Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold shadow active:scale-95 transition-transform">
-                    Apply Now <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </Link>
-              </div>
+      {/* CTA + FAQ */}
+      <section className="py-10 md:py-16 bg-background">
+        <div className="container mx-auto px-6 grid md:grid-cols-[1fr_1.4fr] gap-6">
+          <Card className="bg-primary text-white p-8 border-0 shadow-xl">
+            <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center">
+              <MessageSquareText className="w-6 h-6 text-white" />
             </div>
+            <h3 className="mt-5 text-2xl md:text-3xl font-extrabold leading-tight">Ready to Build Something Better?</h3>
+            <p className="mt-3 text-sm text-white/85 leading-relaxed">
+              Let's discuss your project and show you how modular can save you time and money.
+            </p>
+            <Button size="lg" variant="secondary" className="mt-6 bg-white text-primary hover:bg-white/90 gap-2"
+              onClick={() => navigate('/contact')}>
+              Get a Free Quote <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Card>
+
+          <Card className="p-8 border-border/70 bg-white">
+            <p className="text-primary text-xs font-bold tracking-[0.25em] uppercase">FAQ</p>
+            <h3 className="mt-2 text-2xl md:text-3xl font-extrabold text-foreground">Frequently Asked Questions</h3>
+            <Accordion type="single" collapsible className="mt-4">
+              {faqs.map((f, i) => (
+                <AccordionItem key={i} value={`f-${i}`} className="border-border/70">
+                  <AccordionTrigger className="text-left text-sm font-semibold hover:no-underline">{f.q}</AccordionTrigger>
+                  <AccordionContent className="text-sm text-muted-foreground">{f.a}</AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </Card>
         </div>
       </section>
 
-            {/* ── Updated: Ogbomosho Marketplace Promo Banner ──── */}
-      <section className="py-12 bg-background">
-        <div className="container mx-auto px-4">
-          <div 
-            className="relative overflow-hidden rounded-[2.5rem] p-8 md:p-16 shadow-2xl group border border-white/10"
-            style={{
-              backgroundImage: `linear-gradient(135deg, rgba(26, 32, 25, 0.85) 0%, rgba(45, 90, 39, 0.7) 50%, rgba(26, 32, 25, 0.6) 100%), url('https://images.unsplash.com/photo-1585540083814-ea6ee8af9e4f?w=1600&h=900&fit=crop')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          >
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-              <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl transition-transform group-hover:scale-110 duration-500">
-                  <ShoppingBag className="h-10 w-10 text-white" />
-                </div>
-                <div>
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-yellow-400 text-black text-[11px] font-black uppercase tracking-[0.1em] mb-4 shadow-lg animate-bounce">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Coming Soon
-                  </div>
-                  <h2 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight">
-                    The Ogbomosho Student <br className="hidden md:block" /> Marketplace
-                  </h2>
-                  <p className="mt-4 text-white/90 text-lg md:text-xl max-w-2xl font-medium leading-relaxed">
-                    Buy and sell anything within the LAUTECH community. From used textbooks to electronics—safe, local, and student-only.
-                  </p>
-                </div>
-              </div>
-
-              <div className="shrink-0 w-full md:w-auto">
-                <Link   to="https://ogbomoshomarket.vercel.app/" target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="w-full md:w-auto bg-white text-emerald-900 hover:bg-slate-50 font-black px-12 h-16 rounded-2xl shadow-2xl hover:scale-105 transition-all group border-0 text-lg">
-                    Explore Marketplace
-                    <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-2 transition-transform" />
-                  </Button>
-                </Link>
-              </div>
+      {/* Footer */}
+      <footer className="mt-8 bg-[#0b1220] text-white/80">
+        <div className="container mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-5 gap-8">
+          <div className="col-span-2">
+            <div className="text-white">
+              <div className="font-display font-extrabold tracking-tight text-lg">SKYLINE</div>
+              <div className="text-[10px] tracking-[0.35em] text-white/60 mt-1">MODULAR</div>
             </div>
+            <p className="mt-4 text-sm text-white/70 max-w-xs leading-relaxed">
+              Modern buildings. Smarter process. Better results. That's the Skyline Modular promise.
+            </p>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm mb-3">Solutions</p>
+            <ul className="space-y-2 text-sm text-white/70">
+              <li><Link to="/browse">Modular Homes</Link></li>
+              <li><Link to="/browse">Multi-Family</Link></li>
+              <li><Link to="/browse">Commercial</Link></li>
+              <li><Link to="/browse">Institutions</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm mb-3">Company</p>
+            <ul className="space-y-2 text-sm text-white/70">
+              <li><Link to="/contact">About Us</Link></li>
+              <li><Link to="/contact">Our Process</Link></li>
+              <li><Link to="/become-agent">Partners</Link></li>
+              <li><Link to="/contact">Contact</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm mb-3">Get in Touch</p>
+            <ul className="space-y-2 text-sm text-white/70">
+              <li className="inline-flex items-center gap-2"><Phone className="w-4 h-4" /> (888) SKY-8230</li>
+              <li>hello@skylinemodular.com</li>
+              <li>123 Skyline Way, San Diego, CA</li>
+            </ul>
           </div>
         </div>
-      </section>
-
-      <AppBanner />
+        <div className="border-t border-white/10 py-4 text-center text-xs text-white/50">
+          © {new Date().getFullYear()} Skyline Modular. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }

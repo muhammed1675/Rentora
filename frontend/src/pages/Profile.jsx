@@ -327,7 +327,7 @@ export function Profile() {
         <TabsContent value="rent">
           <h3 className="font-semibold mb-3">Escrow Payment History</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Every rent payment you've made through Rentora, and where it stands — held safely with us, released to the agent, or refunded.
+            Every rent payment you've made through Skyline Modular, and where it stands — held safely with us, released to the agent, or refunded.
           </p>
           {rentPayments.length > 0 ? (
             <div className="space-y-4">
@@ -343,7 +343,7 @@ export function Profile() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold">{rp.property?.title || 'Property'}</h3>
                         {rp.status === 'held' && (
-                          <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" />Held by Rentora</Badge>
+                          <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" />Held by Skyline Modular</Badge>
                         )}
                         {rp.status === 'released' && (
                           <Badge className="gap-1 bg-green-600"><CheckCircle2 className="w-3 h-3" />Released</Badge>
@@ -413,7 +413,7 @@ export function Profile() {
               <HomeIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold">No rent payments yet</h3>
               <p className="text-sm text-muted-foreground mt-2">
-                When you pay rent on Rentora, we hold it safely until you confirm you've moved in.
+                When you pay rent on Skyline Modular, we hold it safely until you confirm you've moved in.
               </p>
             </Card>
           )}

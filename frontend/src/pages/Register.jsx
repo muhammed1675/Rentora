@@ -74,7 +74,7 @@ export function Register() {
           <p className="text-muted-foreground text-sm mb-1">We sent a verification link to</p>
           <p className="font-semibold text-foreground mb-4">{email}</p>
           <p className="text-muted-foreground text-sm mb-6">
-            Click the link in the email to activate your Rentora account. Check your spam folder if you don't see it.
+            Click the link in the email to activate your Skyline Modular account. Check your spam folder if you don't see it.
           </p>
           <Link to="/login">
             <Button className="w-full">Go to Sign In</Button>
@@ -103,7 +103,7 @@ export function Register() {
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight">Create Account</h1>
-          <p className="text-muted-foreground mt-2">Join LAUTECH Rentals today</p>
+          <p className="text-muted-foreground mt-2">Join Skyline Rentals today</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
