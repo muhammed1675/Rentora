@@ -35,7 +35,6 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { useState } from 'react';
 import { ConsentBanner } from './ConsentBanner';
-import { SkylineLogo } from './SkylineLogo';
 
 export function Layout({ children }) {
   const { user, logout, isAuthenticated, isAdmin, isAgent } = useAuth();
@@ -61,12 +60,12 @@ export function Layout({ children }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Header */}
-      <header className="hidden md:block sticky top-0 z-50 glass border-b">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
+      <header className="hidden md:block sticky top-4 z-50 px-6">
+        <div className="container mx-auto">
+          <div className="pill-nav flex items-center justify-between h-16 px-6">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
-              <SkylineLogo size="md" />
+              <img src="/rentora-logo.png" alt="Rentora" className="h-9 w-auto" />
             </Link>
 
             {/* Desktop Nav */}
@@ -80,7 +79,7 @@ export function Layout({ children }) {
                   data-testid="nav-home"
                 >
                   <Home className="w-4 h-4" />
-                  Solutions
+                  Home
                 </Button>
               </Link>
               
@@ -92,7 +91,7 @@ export function Layout({ children }) {
                   data-testid="nav-browse"
                 >
                   <Search className="w-4 h-4" />
-                  Projects
+                  Browse
                 </Button>
               </Link>
 
@@ -277,7 +276,7 @@ export function Layout({ children }) {
       <header className="md:hidden sticky top-0 z-50 glass border-b">
         <div className="flex items-center justify-between h-14 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <SkylineLogo size="sm" />
+            <img src="/rentora-logo.png" alt="Rentora" className="h-8 w-auto" />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -545,23 +544,23 @@ export function Layout({ children }) {
       </nav>
 
       {/* Desktop footer */}
-      <footer className="hidden md:block border-t bg-muted/30 mt-auto">
+      <footer className="hidden md:block curved-top bg-foreground text-white mt-16">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <SkylineLogo size="sm" />
+              <img src="/rentora-logo.png" alt="Rentora" className="h-8 w-auto" />
               <div>
-                <p className="font-bold text-sm">Skyline Modular</p>
-                <p className="text-xs text-muted-foreground">Modular Housing Platform, nationwide</p>
+                <p className="font-bold text-sm text-white">Rentora</p>
+                <p className="text-xs text-white/60">Student Housing Platform, Ogbomosho</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-white/70">
               <Link to="/terms" className="hover:text-primary transition-colors">Terms & Conditions</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Refund Policy</Link>
               <Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/60">
               © {new Date().getFullYear()} Rentora. All rights reserved.
             </p>
           </div>
@@ -573,10 +572,10 @@ export function Layout({ children }) {
         <div className="px-6 py-5">
           {/* Brand */}
           <div className="flex items-center gap-2 mb-4">
-            <img src="/rentora-logo.png" alt="Skyline Modular" className="h-7 w-auto" />
+            <img src="/rentora-logo.png" alt="Rentora" className="h-7 w-auto" />
             <div>
-              <p className="font-bold text-xs">Skyline Modular</p>
-              <p className="text-[10px] text-muted-foreground">Modular Housing, nationwide</p>
+              <p className="font-bold text-xs">Rentora</p>
+              <p className="text-[10px] text-muted-foreground">Student Housing, Ogbomosho</p>
             </div>
           </div>
 

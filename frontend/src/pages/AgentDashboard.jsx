@@ -956,7 +956,7 @@ export function AgentDashboard() {
                 </div>
               </div>
               <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
-              <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Nationwide Main Gate" /></div>
+              <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Near LAUTECH Main Gate" /></div>
             </div>
             <div className="space-y-2">
               <Label>Google Maps Link<span className="text-xs text-muted-foreground font-normal ml-1">so students can get directions</span></Label>

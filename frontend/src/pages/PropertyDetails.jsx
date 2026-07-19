@@ -520,7 +520,7 @@ export function PropertyDetails() {
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground pt-1">
-                  Rent + agent fee are held by Skyline Modular and released to the agent after you confirm move-in. Caution fee is settled directly with the agent.
+                  Rent + agent fee are held by Rentora and released to the agent after you confirm move-in. Caution fee is settled directly with the agent.
                 </p>
               </div>
             )}
@@ -574,7 +574,7 @@ export function PropertyDetails() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Skyline Modular holds your rent safely until you confirm you've moved in. A small service fee (5%) applies.
+                Rentora holds your rent safely until you confirm you've moved in. A small service fee (5%) applies.
               </p>
               <Button
                 onClick={handlePayRent}

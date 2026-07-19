@@ -68,13 +68,13 @@ export function AppBanner() {
         {/* App icon */}
         <img
           src="/launchericon-72x72.png"
-          alt="Skyline Modular"
+          alt="Rentora"
           className="w-12 h-12 rounded-xl shrink-0 shadow-sm"
         />
 
         {/* Text */}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm">Get the Skyline Modular App</p>
+          <p className="font-semibold text-sm">Get the Rentora App</p>
           {isIOS ? (
             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
               Tap <strong>Share</strong> then <strong>"Add to Home Screen"</strong>

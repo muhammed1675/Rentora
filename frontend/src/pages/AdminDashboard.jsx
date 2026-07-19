@@ -390,7 +390,7 @@ export function AdminDashboard() {
               )}
             </TabsTrigger>
             <TabsTrigger value="rentora-revenue" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <TrendingUp className="w-4 h-4" /><span>Skyline Modular Revenue</span>
+              <TrendingUp className="w-4 h-4" /><span>Rentora Revenue</span>
             </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
               <MessageSquare className="w-4 h-4 shrink-0" /> Messages
@@ -467,7 +467,7 @@ export function AdminDashboard() {
                 </Card>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Skyline Modular revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
+                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Rentora revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
                 <Card className="p-4 border-amber-300 bg-amber-50"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Lock className="w-5 h-5 text-amber-700" /></div><div><p className="text-xs text-amber-700 font-medium">Total Escrow Held <span className="italic font-normal">(awaiting move-in / release)</span></p><p className="text-xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p></div></div></Card>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
@@ -1250,7 +1250,7 @@ export function AdminDashboard() {
 
         <TabsContent value="escrow">
           <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
-            Money currently sitting with Skyline Modular, not yet released. A held payment auto-releases 5 days after payment if the student never confirms move-in.
+            Money currently sitting with Rentora, not yet released. A held payment auto-releases 5 days after payment if the student never confirms move-in.
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -1348,7 +1348,7 @@ export function AdminDashboard() {
 
         <TabsContent value="rentora-revenue">
           <div className="mb-4 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-800">
-            This is Skyline Modular's own money — what the platform actually earns, separate from anything owed to agents or property owners. Inspection fees are excluded since agents keep 100% of those.
+            This is Rentora's own money — what the platform actually earns, separate from anything owed to agents or property owners. Inspection fees are excluded since agents keep 100% of those.
           </div>
 
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
@@ -1385,14 +1385,14 @@ export function AdminDashboard() {
           </div>
 
           <Card className="p-4 mt-6">
-            <p className="text-sm font-medium mb-2">For reference — money that is NOT Skyline Modular revenue</p>
+            <p className="text-sm font-medium mb-2">For reference — money that is NOT Rentora revenue</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="flex justify-between p-2 rounded bg-muted/50">
                 <span className="text-muted-foreground">Inspection fees processed (100% to agents)</span>
                 <span className="font-medium">{formatPrice(stats?.inspection_fees_processed || 0)}</span>
               </div>
               <div className="flex justify-between p-2 rounded bg-muted/50">
-                <span className="text-muted-foreground">Currently held in escrow (not yet Skyline Modular's or anyone's)</span>
+                <span className="text-muted-foreground">Currently held in escrow (not yet Rentora's or anyone's)</span>
                 <span className="font-medium">{formatPrice(stats?.total_escrow_held || 0)}</span>
               </div>
             </div>
