@@ -16,7 +16,8 @@ import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp, Coins,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
-  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home
+  MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
+  Menu, X, ChevronRight, CalendarCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,6 +34,7 @@ export function AdminDashboard() {
   const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [selectedVerification, setSelectedVerification] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -335,79 +337,131 @@ export function AdminDashboard() {
 
   if (!isAuthenticated || !isAdmin) return null;
 
+  // Sidebar navigation groups — these map onto the SAME activeTab values
+  // the existing TabsContent blocks already key off. No change to the
+  // underlying tab logic, only how it's navigated to.
+  const navGroups = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    {
+      label: 'People', icon: Users, detail: 'Users · Agents · Verification',
+      items: [
+        { id: 'users', label: 'Users', count: users.length },
+        { id: 'agents', label: 'Agents', count: agents.length },
+        { id: 'verification', label: 'Verification', count: stats?.pending_verifications, urgent: true },
+      ],
+    },
+    { id: 'properties', label: 'Listings', icon: Building2, count: stats?.pending_properties, urgent: true },
+    { id: 'inspections', label: 'Bookings', icon: CalendarCheck },
+    {
+      label: 'Money', icon: Wallet, detail: 'Transactions · Payouts · Escrow',
+      items: [
+        { id: 'transactions', label: 'Transactions' },
+        { id: 'payouts', label: 'Agent Payouts', count: withdrawalRequests.filter(r => r.status === 'pending').length, urgent: true },
+        { id: 'owner-payouts', label: 'Owner Payouts', count: ownerPayouts.filter(p => p.status === 'pending').length, urgent: true },
+        { id: 'escrow', label: 'Escrow', count: rentPayments.filter(p => p.status === 'held').length },
+        { id: 'rentora-revenue', label: 'Rentora Revenue' },
+      ],
+    },
+    { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
+  ];
+
+  const goTo = (id) => { setActiveTab(id); setMobileNavOpen(false); };
+  const activeGroupLabel = navGroups.find(g => g.id === activeTab)?.label
+    || navGroups.find(g => g.items?.some(i => i.id === activeTab))?.items.find(i => i.id === activeTab)?.label
+    || 'Overview';
+
+  const NavCountBadge = ({ count, urgent }) => {
+    if (!count) return null;
+    return <Badge className={`ml-auto h-5 px-1.5 text-xs shrink-0 ${urgent ? 'bg-red-500 text-white' : 'bg-muted-foreground/20 text-foreground'}`}>{count}</Badge>;
+  };
+
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="admin-dashboard">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage users, properties, and operations</p>
-        </div>
-        <Button onClick={fetchData} variant="outline" size="sm" className="gap-2">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
-      </div>
+    <div className="min-h-screen bg-muted/30 lg:grid lg:grid-cols-[260px_1fr]" data-testid="admin-dashboard">
+      {/* Mobile nav backdrop */}
+      {mobileNavOpen && (
+        <button
+          onClick={() => setMobileNavOpen(false)}
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          aria-label="Close admin navigation"
+        />
+      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="overflow-x-auto mb-6 -mx-4 px-4">
-          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 gap-1 h-auto p-1">
-            <TabsTrigger value="overview" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <LayoutDashboard className="w-4 h-4 shrink-0" /> Overview
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Users className="w-4 h-4 shrink-0" /> Users
-              {users.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{users.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="agents" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <UserCog className="w-4 h-4 shrink-0" /> Agents
-              {agents.length > 0 && <Badge variant="secondary" className="ml-1 text-xs px-1.5">{agents.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="verification" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Shield className="w-4 h-4 shrink-0" /> Verify
-              {stats?.pending_verifications > 0 && <Badge variant="destructive" className="ml-1 text-xs px-1.5">{stats.pending_verifications}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="properties" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Building2 className="w-4 h-4 shrink-0" /> Properties
-              {stats?.pending_properties > 0 && <Badge variant="destructive" className="ml-1 text-xs px-1.5">{stats.pending_properties}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="inspections" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Calendar className="w-4 h-4 shrink-0" /> Inspections
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Receipt className="w-4 h-4 shrink-0" /> Transactions
-            </TabsTrigger>
-            <TabsTrigger value="payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Wallet className="w-4 h-4" /><span>Agent Payouts</span>
-              {withdrawalRequests.filter(r => r.status === 'pending').length > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{withdrawalRequests.filter(r => r.status === 'pending').length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="owner-payouts" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <CreditCard className="w-4 h-4" /><span>Owner Payouts</span>
-              {ownerPayouts.filter(p => p.status === 'pending').length > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs bg-red-500 text-white">{ownerPayouts.filter(p => p.status === 'pending').length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="escrow" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <Lock className="w-4 h-4" /><span>Escrow</span>
-              {rentPayments.filter(p => p.status === 'held').length > 0 && (
-                <Badge className="ml-1 h-5 px-1.5 text-xs bg-amber-500 text-white">{rentPayments.filter(p => p.status === 'held').length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="rentora-revenue" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <TrendingUp className="w-4 h-4" /><span>Rentora Revenue</span>
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm whitespace-nowrap">
-              <MessageSquare className="w-4 h-4 shrink-0" /> Messages
-              {messages.filter(m => m.status === 'unread').length > 0 && (
-                <Badge variant="destructive" className="ml-1 text-xs px-1.5">
-                  {messages.filter(m => m.status === 'unread').length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white p-5 overflow-y-auto transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-lg font-bold">Rentora Admin</h1>
+            <p className="text-xs text-white/50 mt-0.5">Manage users, properties &amp; operations</p>
+          </div>
+          <button onClick={() => setMobileNavOpen(false)} className="lg:hidden text-white/70 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
         </div>
+        <nav className="space-y-1" aria-label="Admin navigation">
+          {navGroups.map((group) => {
+            if (!group.items) {
+              const Icon = group.icon;
+              const isActive = activeTab === group.id;
+              return (
+                <button
+                  key={group.id}
+                  onClick={() => goTo(group.id)}
+                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${isActive ? 'bg-white text-slate-900 font-semibold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">{group.label}</span>
+                  <NavCountBadge count={group.count} urgent={group.urgent} />
+                </button>
+              );
+            }
+            const GroupIcon = group.icon;
+            const groupHasActive = group.items.some(i => i.id === activeTab);
+            return (
+              <div key={group.label} className="pt-1">
+                <div className="px-3 pt-2 pb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/40">
+                  <GroupIcon className="w-3.5 h-3.5" />{group.label}
+                </div>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => goTo(item.id)}
+                        className={`w-full flex items-center gap-2 rounded-lg pl-8 pr-3 py-2 text-sm text-left transition-colors ${isActive ? 'bg-white text-slate-900 font-semibold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                      >
+                        <span className="flex-1">{item.label}</span>
+                        <NavCountBadge count={item.count} urgent={item.urgent} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </nav>
+      </aside>
 
+      {/* Main content */}
+      <main className="min-w-0">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b bg-background/95 backdrop-blur px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setMobileNavOpen(true)} className="lg:hidden shrink-0">
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Admin console</p>
+              <h2 className="font-semibold truncate">{activeGroupLabel}</h2>
+            </div>
+          </div>
+          <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shrink-0">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+        </header>
+
+        <div className="p-4 sm:p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
         {/* ── Overview ── */}
         <TabsContent value="overview">
           {loading ? (
@@ -1410,7 +1464,9 @@ export function AdminDashboard() {
             </div>
           </Card>
         </TabsContent>
-      </Tabs>
+          </Tabs>
+        </div>
+      </main>
 
       {/* ── Agent Detail Dialog ── */}
       <Dialog open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
@@ -1949,4 +2005,4 @@ export function AdminDashboard() {
   );
 }
 
-export default AdminDashboard;``
+export default AdminDashboard;
