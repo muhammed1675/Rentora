@@ -1195,7 +1195,7 @@ export const rentAPI = {
   // Initiate a rent payment. Rentora holds (rent + agent_fee) until move-in,
   // then releases the FULL amount to the agent — Rentora's only cut is the
   // service_fee, added on top, never a percentage of the rent itself.
-  // Agent fee is always 20% of rent, computed here — it is not a value
+  // Agent fee is always 10% of rent, computed here — it is not a value
   // agents type into the listing form.
   initiate: async (propertyId, user) => {
     const { data: property, error: propErr } = await supabase
@@ -1216,7 +1216,7 @@ export const rentAPI = {
 
     const feePct = await rentAPI.getServiceFeePct();
     const rentAmount    = Number(property.price);
-    const agentFee      = Math.round(rentAmount * 0.20);      // 20% of rent, always
+    const agentFee      = Math.round(rentAmount * 0.10);      // 10% of rent, always
     const cautionFee    = Number(property.caution_fee) || 0;  // pass-through, no service fee applied
     const baseAmount    = rentAmount + agentFee;               // rent portion goes to the owner, agent fee to the agent
     const serviceFee    = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut — never applied to the caution fee

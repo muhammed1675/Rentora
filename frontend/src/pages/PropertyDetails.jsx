@@ -506,8 +506,8 @@ export function PropertyDetails() {
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground">Agent Fee <span className="text-xs">(20% of rent)</span></p>
-                  <p className="text-sm font-semibold">{formatPrice(Math.round(Number(property.price || 0) * 0.20))}</p>
+                  <p className="text-sm text-muted-foreground">Agent Fee <span className="text-xs">(10% of rent)</span></p>
+                  <p className="text-sm font-semibold">{formatPrice(Math.round(Number(property.price || 0) * 0.10))}</p>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-border/40">
                   <p className="text-sm font-semibold">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground">(+ small service fee at checkout)</span></p>
@@ -515,7 +515,7 @@ export function PropertyDetails() {
                     {formatPrice(
                       Number(property.price || 0) +
                       Number(property.caution_fee || 0) +
-                      Math.round(Number(property.price || 0) * 0.20)
+                      Math.round(Number(property.price || 0) * 0.10)
                     )}
                   </p>
                 </div>

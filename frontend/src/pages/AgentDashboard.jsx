@@ -957,7 +957,7 @@ export function AgentDashboard() {
               <div className="space-y-2">
                 <Label>Agent Fee</Label>
                 <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
-                  {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.20)) : '₦0'} <span className="ml-1">(20% of rent, auto-calculated)</span>
+                  {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.10)) : '₦0'} <span className="ml-1">(10% of rent, auto-calculated)</span>
                 </div>
               </div>
               <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>

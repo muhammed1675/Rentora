@@ -1844,8 +1844,8 @@ export function AdminDashboard() {
                     <p className="font-semibold">{previewProperty.caution_fee ? formatPrice(previewProperty.caution_fee) : '—'}</p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted/40">
-                    <p className="text-xs text-muted-foreground">Agent Fee (20% of rent)</p>
-                    <p className="font-semibold">{formatPrice(Math.round(Number(previewProperty.price || 0) * 0.20))}</p>
+                    <p className="text-xs text-muted-foreground">Agent Fee (10% of rent)</p>
+                    <p className="font-semibold">{formatPrice(Math.round(Number(previewProperty.price || 0) * 0.10))}</p>
                   </div>
                 </div>
               </div>
