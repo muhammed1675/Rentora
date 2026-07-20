@@ -938,44 +938,56 @@ export function AgentDashboard() {
             <DialogTitle>{editingProperty ? 'Edit Property' : 'Add New Property'}</DialogTitle>
             <DialogDescription>Fill in the details below to {editingProperty ? 'update your' : 'list a new'} property.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Title *</Label><Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Cozy Student Hostel" /></div>
-              <div className="space-y-2"><Label>Property Type *</Label>
-                <Select value={formData.property_type} onValueChange={(value) => setFormData({ ...formData, property_type: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hostel"><Home className="w-4 h-4 inline mr-2" />Hostel</SelectItem>
-                    <SelectItem value="apartment"><Building className="w-4 h-4 inline mr-2" />Apartment</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
-              <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
-              <div className="space-y-2">
-                <Label>Agent Fee</Label>
-                <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
-                  {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.10)) : '₦0'} <span className="ml-1">(10% of rent, auto-calculated)</span>
+          <div className="space-y-6 py-4">
+            {/* ── Basic Information ── */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Basic Information</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Title *</Label><Input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Cozy Student Hostel" /></div>
+                <div className="space-y-2"><Label>Property Type *</Label>
+                  <Select value={formData.property_type} onValueChange={(value) => setFormData({ ...formData, property_type: value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hostel"><Home className="w-4 h-4 inline mr-2" />Hostel</SelectItem>
+                      <SelectItem value="apartment"><Building className="w-4 h-4 inline mr-2" />Apartment</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
               <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Near LAUTECH Main Gate" /></div>
+              <div className="space-y-2">
+                <Label>Google Maps Link<span className="text-xs text-muted-foreground font-normal ml-1">so students can get directions</span></Label>
+                <Input
+                  value={formData.google_maps_link}
+                  onChange={(e) => setFormData({ ...formData, google_maps_link: e.target.value })}
+                  placeholder="Paste the share link from Google Maps"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Open the location in Google Maps, tap Share, and paste the link here.
+                </p>
+              </div>
+              <div className="space-y-2"><Label>Description</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the property..." rows={4} /></div>
             </div>
-            <div className="space-y-2">
-              <Label>Google Maps Link<span className="text-xs text-muted-foreground font-normal ml-1">so students can get directions</span></Label>
-              <Input
-                value={formData.google_maps_link}
-                onChange={(e) => setFormData({ ...formData, google_maps_link: e.target.value })}
-                placeholder="Paste the share link from Google Maps"
-              />
-              <p className="text-xs text-muted-foreground">
-                Open the location in Google Maps, tap Share, and paste the link here.
-              </p>
+
+            {/* ── Pricing & Fees ── */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Pricing &amp; Fees</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
+                <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
+                <div className="space-y-2">
+                  <Label>Agent Fee</Label>
+                  <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
+                    {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.10)) : '₦0'} <span className="ml-1">(10% of rent, auto-calculated)</span>
+                  </div>
+                </div>
+                <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Amenities</Label>
+
+            {/* ── Amenities ── */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Amenities</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {AMENITY_OPTIONS.map((item) => {
                   const checked = formData.amenities.includes(item);
@@ -999,28 +1011,39 @@ export function AgentDashboard() {
                 })}
               </div>
             </div>
-            <div className="space-y-2"><Label>Description</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the property..." rows={4} /></div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Contact Name *<span className="text-xs text-muted-foreground font-normal ml-1">shown to students who unlock this listing</span></Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
-              <div className="space-y-2"><Label>Contact Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
+
+            {/* ── Contact Information ── */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Contact Information</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Contact Name *<span className="text-xs text-muted-foreground font-normal ml-1">shown to students who unlock this listing</span></Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
+                <div className="space-y-2"><Label>Contact Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
+              </div>
             </div>
-            <div className="space-y-1 pt-2">
-              <h4 className="text-sm font-semibold">Property Owner — Payout Details</h4>
-              <p className="text-xs text-muted-foreground">
-                {ownerDetailsLocked
-                  ? "These are locked once set, to protect the owner's payout — contact support@rentora.com.ng if they need to change."
-                  : "Rent is paid directly to the owner's bank account when a tenant moves in — never to your own account. This is separate from the contact info above. Once saved, these can't be edited."}
-              </p>
+
+            {/* ── Property Owner — Payout Details ── */}
+            <div className="space-y-4">
+              <div className="border-b pb-2">
+                <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">Property Owner — Payout Details</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {ownerDetailsLocked
+                    ? "These are locked once set, to protect the owner's payout — contact support@rentora.com.ng if they need to change."
+                    : "Rent is paid directly to the owner's bank account when a tenant moves in — never to your own account. Once saved, these can't be edited."}
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Owner Full Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_full_name} onChange={(e) => setFormData({ ...formData, owner_full_name: e.target.value })} placeholder="Landlord's full name" /></div>
+                <div className="space-y-2"><Label>Owner Phone *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_phone} onChange={(e) => setFormData({ ...formData, owner_phone: e.target.value })} placeholder="+234..." /></div>
+                <div className="space-y-2"><Label>Owner Bank Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_bank_name} onChange={(e) => setFormData({ ...formData, owner_bank_name: e.target.value })} placeholder="e.g. GTBank" /></div>
+                <div className="space-y-2"><Label>Owner Account Number *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_number} onChange={(e) => setFormData({ ...formData, owner_account_number: e.target.value })} placeholder="0123456789" /></div>
+                <div className="space-y-2 md:col-span-2"><Label>Owner Account Name *<span className="text-xs text-muted-foreground font-normal ml-1">must match the bank account exactly</span></Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_name} onChange={(e) => setFormData({ ...formData, owner_account_name: e.target.value })} placeholder="Name on the bank account" /></div>
+              </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Owner Full Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_full_name} onChange={(e) => setFormData({ ...formData, owner_full_name: e.target.value })} placeholder="Landlord's full name" /></div>
-              <div className="space-y-2"><Label>Owner Phone *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_phone} onChange={(e) => setFormData({ ...formData, owner_phone: e.target.value })} placeholder="+234..." /></div>
-              <div className="space-y-2"><Label>Owner Bank Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_bank_name} onChange={(e) => setFormData({ ...formData, owner_bank_name: e.target.value })} placeholder="e.g. GTBank" /></div>
-              <div className="space-y-2"><Label>Owner Account Number *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_number} onChange={(e) => setFormData({ ...formData, owner_account_number: e.target.value })} placeholder="0123456789" /></div>
-              <div className="space-y-2 md:col-span-2"><Label>Owner Account Name *<span className="text-xs text-muted-foreground font-normal ml-1">must match the bank account exactly</span></Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_name} onChange={(e) => setFormData({ ...formData, owner_account_name: e.target.value })} placeholder="Name on the bank account" /></div>
-            </div>
+
+            {/* ── Property Images ── */}
             <div className="space-y-3">
-              <Label>Property Images <span className="text-muted-foreground text-xs font-normal">(max 5, up to 5MB each)</span></Label>
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Property Images</h3>
+              <Label className="text-muted-foreground text-xs font-normal">Max 5, up to 5MB each</Label>
               <div onClick={() => !uploadingImage && fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed border-muted' : 'border-muted-foreground/25 hover:border-primary hover:bg-muted/30'}`}>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />

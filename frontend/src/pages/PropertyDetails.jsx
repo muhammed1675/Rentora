@@ -237,6 +237,11 @@ export function PropertyDetails() {
   };
 
   const [payingRent, setPayingRent] = useState(false);
+  const [serviceFeePct, setServiceFeePct] = useState(5);
+
+  useEffect(() => {
+    rentAPI.getServiceFeePct().then(setServiceFeePct).catch(() => {});
+  }, []);
   const handlePayRent = async () => {
     if (!user) { toast.error('Please log in first'); return; }
     if (property?.availability === 'unavailable') { toast.error('This property is no longer available'); return; }
@@ -573,8 +578,26 @@ export function PropertyDetails() {
                   <span className="text-xs px-2 py-0.5 rounded bg-secondary">Taken</span>
                 )}
               </div>
+              {property?.price > 0 && (() => {
+                const rent = Number(property.price);
+                const agentFee = Math.round(rent * 0.10);
+                const cautionFee = Number(property.caution_fee) || 0;
+                const serviceFee = Math.round((rent + agentFee) * (serviceFeePct / 100));
+                const total = rent + agentFee + cautionFee + serviceFee;
+                return (
+                  <div className="text-sm space-y-1 mb-3">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Rent</span><span>{formatPrice(rent)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Agent fee (10%)</span><span>{formatPrice(agentFee)}</span></div>
+                    {cautionFee > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">Caution fee</span><span>{formatPrice(cautionFee)}</span></div>
+                    )}
+                    <div className="flex justify-between"><span className="text-muted-foreground">Service fee ({serviceFeePct}%)</span><span>{formatPrice(serviceFee)}</span></div>
+                    <div className="flex justify-between font-semibold pt-1.5 mt-1 border-t"><span>Total to pay</span><span className="text-primary">{formatPrice(total)}</span></div>
+                  </div>
+                );
+              })()}
               <p className="text-xs text-muted-foreground mb-3">
-                Rentora holds your rent, agent fee, and caution fee safely until you confirm you've moved in — a small service fee applies at checkout.
+                Rentora holds your rent, agent fee, and caution fee safely until you confirm you've moved in.
               </p>
               <Button
                 onClick={handlePayRent}
