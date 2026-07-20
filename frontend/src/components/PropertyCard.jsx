@@ -1,86 +1,75 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Home, Building } from 'lucide-react';
-import { Badge } from './ui/badge';
-import { Card } from './ui/card';
+import { MapPin } from 'lucide-react';
 
 export function PropertyCard({ property }) {
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-NG', {
+  const formatPrice = (price) =>
+    new Intl.NumberFormat('en-NG', {
       style: 'currency', currency: 'NGN',
       minimumFractionDigits: 0, maximumFractionDigits: 0,
-    }).format(price);
-  };
+    }).format(price || 0);
 
-  const TypeIcon = property.property_type === 'hostel' ? Home : Building;
+  const typeLabel = property.property_type
+    ? property.property_type.charAt(0).toUpperCase() + property.property_type.slice(1)
+    : 'Home';
+
+  const isUnavailable = property.status === 'unavailable' || property.availability === 'unavailable';
 
   return (
-    <Link to={`/property/${property.id}`} data-testid={`property-card-${property.id}`}>
-      <Card className="group overflow-hidden border border-border/60 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white">
-        {/* Image */}
-        <div className="relative aspect-[4/3] overflow-hidden">
+    <article className="group min-w-0" data-testid={`property-card-${property.id}`}>
+      <div className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-[hsl(60_8%_90%)]">
+        <Link to={`/property/${property.id}`} aria-label={`View ${property.title}`}>
           <img
             src={property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
             alt={property.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
             loading="lazy"
           />
-          {/* Type Badge */}
-          <Badge
-            variant="secondary"
-            className="absolute top-3 left-3 gap-1 bg-white/95 text-foreground border border-border/40 shadow-sm font-medium"
-          >
-            <TypeIcon className="w-3 h-3" />
-            {property.property_type}
-          </Badge>
-          {/* Price Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/75 to-transparent p-4 pt-10">
-            <p className="text-xl font-bold text-white tracking-tight drop-shadow">
-              {formatPrice(property.price)}
-              <span className="text-sm font-normal text-white/80">/year</span>
+        </Link>
+        <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm">
+          {typeLabel}
+        </span>
+        {isUnavailable && (
+          <div className="absolute inset-x-3 bottom-3 rounded-xl bg-[hsl(210_53%_13%)]/90 px-3 py-2 text-center text-xs font-semibold text-white">
+            Taken
+          </div>
+        )}
+      </div>
+      <div className="px-1 pb-2 pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Link to={`/property/${property.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-primary line-clamp-1">
+              {property.title}
+            </Link>
+            <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground line-clamp-1">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              {property.location}
             </p>
           </div>
+          <p className="whitespace-nowrap text-sm font-semibold text-foreground">
+            {formatPrice(property.price)}
+            <span className="font-normal text-muted-foreground">/yr</span>
+          </p>
         </div>
-
-        {/* Content */}
-        <div className="p-4">
-          <h3 className="font-semibold text-base line-clamp-1 text-foreground group-hover:text-primary transition-colors">
-            {property.title}
-          </h3>
-          <div className="flex items-center gap-1 mt-1.5 text-foreground/55">
-            <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-sm line-clamp-1">{property.location}</span>
-            {property.google_maps_link && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(property.google_maps_link, '_blank', 'noopener,noreferrer'); }}
-                className="ml-1 text-xs text-primary hover:underline shrink-0 whitespace-nowrap cursor-pointer"
-              >
-                View map
-              </span>
-            )}
+        {property.google_maps_link && (
+          <div className="mt-4 flex items-center justify-end border-t border-black/5 pt-3">
+            <a href={property.google_maps_link} target="_blank" rel="noreferrer"
+               className="text-xs font-semibold text-primary hover:underline">View map</a>
           </div>
-          {property.description && (
-            <p className="text-sm text-foreground/55 mt-2 line-clamp-2 leading-relaxed">
-              {property.description}
-            </p>
-          )}
-        </div>
-      </Card>
-    </Link>
+        )}
+      </div>
+    </article>
   );
 }
 
 export function PropertyCardSkeleton() {
   return (
-    <Card className="overflow-hidden border border-border/50">
-      <div className="aspect-[4/3] bg-muted animate-pulse" />
-      <div className="p-4 space-y-3">
+    <div className="min-w-0">
+      <div className="aspect-[5/4] rounded-2xl bg-[hsl(60_8%_90%)] animate-pulse" />
+      <div className="px-1 pb-2 pt-4 space-y-3">
         <div className="h-5 bg-muted rounded animate-pulse" />
         <div className="h-4 bg-muted rounded w-2/3 animate-pulse" />
-        <div className="h-4 bg-muted rounded animate-pulse" />
       </div>
-    </Card>
+    </div>
   );
 }
 
