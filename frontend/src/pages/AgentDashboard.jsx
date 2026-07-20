@@ -381,7 +381,12 @@ export function AgentDashboard() {
     approved: 'bg-green-100 text-green-800',
     rejected: 'bg-red-100 text-red-800',
     assigned: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800'
+    completed: 'bg-green-100 text-green-800',
+    failed: 'bg-red-100 text-red-800',
+    held: 'bg-yellow-100 text-yellow-800',
+    released: 'bg-green-100 text-green-800',
+    paid: 'bg-green-100 text-green-800',
+    refunded: 'bg-red-100 text-red-800',
   }[status] || 'bg-gray-100 text-gray-800');
 
   if (!isAuthenticated || (!isAgent && !isAdmin)) return null;
@@ -847,7 +852,7 @@ export function AgentDashboard() {
                       <p className="text-xs text-muted-foreground">{new Date(req.requested_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant={req.status === 'paid' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">
+                      <Badge className={`capitalize ${req.status === 'paid' ? 'bg-green-100 text-green-800' : req.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
                         {req.status}
                       </Badge>
                       <Button

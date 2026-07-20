@@ -520,7 +520,7 @@ export const transactionAPI = {
     
     const { data: inspTxs } = await supabase
       .from('inspection_transactions')
-      .select('*')
+      .select('*, inspection:inspections(property_id)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -794,250 +794,22 @@ export const adminAPI = {
 // ============== PAYMENT APIs ==============
 
 export const paymentAPI = {
-  verify: async (reference) => {
-    // Check token transaction
-    const { data: tokenTx } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-    
-    if (tokenTx) {
-      return {
-        data: {
-          type: 'token_purchase',
-          status: tokenTx.status,
-          amount: tokenTx.amount,
-          tokens: tokenTx.tokens_added
-        }
-      };
-    }
-    
-    // Check inspection transaction
-    const { data: inspTx } = await supabase
-      .from('inspection_transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-    
-    if (inspTx) {
-      // Get inspection details to return agent info
-      const { data: inspection } = await supabase
-        .from('inspections')
-        .select('agent_name, agent_id, property_title')
-        .eq('id', inspTx.inspection_id)
-        .single();
-      // Agent phone comes from users.phone — the number they registered with
-      let agentPhone = null;
-      if (inspection?.agent_id) {
-        const { data: agentUser } = await supabase
-          .from('users')
-          .select('phone')
-          .eq('id', inspection.agent_id)
-          .single();
-        agentPhone = agentUser?.phone || null;
-      }
-      return {
-        data: {
-          type: 'inspection',
-          status: inspTx.status,
-          amount: inspTx.amount,
-          inspection_id: inspTx.inspection_id,
-          agent_name: inspection?.agent_name || null,
-          agent_phone: agentPhone,
-          property_title: inspection?.property_title || null,
-        }
-      };
-    }
-    
-    // Rent escrow payment
-    const { data: rentTx } = await supabase
-      .from('property_rent_payments')
-      .select('*')
-      .eq('reference', reference)
-      .maybeSingle();
-
-    if (rentTx) {
-      if (rentTx.status === 'pending') {
-        await supabase
-          .from('property_rent_payments')
-          .update({ status: 'held', held_at: new Date().toISOString() })
-          .eq('reference', reference);
-      }
-      return { data: { type: 'rent_held', status: 'held', amount: rentTx.total_amount, rent_amount: rentTx.rent_amount, service_fee: rentTx.service_fee } };
-    }
-
-    throw new Error('Transaction not found');
-  },
-
-  // Simulate payment for testing
+  // Calls the server-side verified confirmation endpoint (/api/confirm-payment)
+  // instead of writing to the database directly. That endpoint independently
+  // verifies the charge with Korapay using the secret key before marking
+  // anything paid — this function no longer trusts the browser's own word
+  // that a payment succeeded. Works for token purchases, inspections, and
+  // rent (the endpoint auto-detects which one based on the reference).
   confirmPayment: async (reference) => {
-    // Called by korapay.js onSuccess — marks payment completed in DB
-    const { data: tokenTx } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-
-    if (tokenTx) {
-      if (tokenTx.status !== 'completed') {
-        await supabase
-          .from('transactions')
-          .update({ status: 'completed' })
-          .eq('reference', reference);
-
-        const { data: wallet } = await supabase
-          .from('wallets')
-          .select('token_balance')
-          .eq('user_id', tokenTx.user_id)
-          .single();
-
-        const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
-        await supabase
-          .from('wallets')
-          .update({ token_balance: newBalance })
-          .eq('user_id', tokenTx.user_id);
-      }
-      // Send token receipt email
-      try {
-        const userRes = await supabase.from('users').select('email, full_name').eq('id', tokenTx.user_id).limit(1);
-        const u = userRes.data?.[0] || null;
-        if (u?.email) {
-          await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'token_receipt',
-              userEmail: u.email,
-              userName: u.full_name || 'User',
-              amount: tokenTx.amount,
-              tokens: tokenTx.tokens_added,
-              reference: reference,
-            }),
-          });
-        }
-      } catch (e) { console.warn('Token receipt email failed:', e); }
-      return { data: { type: 'token_purchase', status: 'completed', amount: tokenTx.amount, tokens: tokenTx.tokens_added } };
-    }
-
-    const { data: inspTx } = await supabase
-      .from('inspection_transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-
-    if (inspTx) {
-      if (inspTx.status !== 'completed') {
-        await supabase
-          .from('inspection_transactions')
-          .update({ status: 'completed' })
-          .eq('reference', reference);
-
-        await supabase
-          .from('inspections')
-          .update({ payment_status: 'completed', status: 'assigned' })
-          .eq('id', inspTx.inspection_id);
-      }
-      // Send inspection receipt emails to client and agent
-      try {
-        const inspFullRes = await supabase
-          .from('inspections')
-          .select('user_id, user_name, user_email, agent_id, agent_name, property_title, inspection_date')
-          .eq('id', inspTx.inspection_id)
-          .limit(1);
-        const insp = inspFullRes.data?.[0] || null;
-        if (insp) {
-          let agentPhone = null;
-          let agentEmail = null;
-          if (insp.agent_id) {
-            const agentRes = await supabase.from('users').select('phone, email').eq('id', insp.agent_id).limit(1);
-            const agentUser = agentRes.data?.[0] || null;
-            agentPhone = agentUser?.phone || null;
-            agentEmail = agentUser?.email || null;
-          }
-          let userPhone = null;
-          if (insp.user_id) {
-            const userRes = await supabase.from('users').select('phone').eq('id', insp.user_id).limit(1);
-            userPhone = userRes.data?.[0]?.phone || null;
-          }
-          await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'inspection_receipt',
-              userEmail: insp.user_email,
-              userName: insp.user_name,
-              userPhone: userPhone || 'Not provided',
-              agentName: insp.agent_name || 'Your Agent',
-              agentEmail: agentEmail,
-              agentPhone: agentPhone,
-              propertyTitle: insp.property_title,
-              inspectionDate: insp.inspection_date,
-              reference: reference,
-              amount: inspTx.amount,
-            }),
-          });
-        }
-      } catch (e) { console.warn('Inspection receipt email failed:', e); }
-      return { data: { type: 'inspection', status: 'completed', amount: inspTx.amount } };
-    }
-
-    throw new Error('Transaction not found');
+    const res = await fetch('/api/confirm-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reference }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body?.error || 'Failed to confirm payment');
+    return { data: body };
   },
-
-  simulate: async (reference) => {
-    // Check token transaction
-    const { data: tokenTx } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-    
-    if (tokenTx) {
-      await supabase
-        .from('transactions')
-        .update({ status: 'completed' })
-        .eq('reference', reference);
-      
-      // Add tokens to wallet
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('token_balance')
-        .eq('user_id', tokenTx.user_id)
-        .single();
-      
-      const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
-      await supabase
-        .from('wallets')
-        .update({ token_balance: newBalance })
-        .eq('user_id', tokenTx.user_id);
-      
-      return { data: { message: 'Token payment simulated', tokens_added: tokenTx.tokens_added } };
-    }
-    
-    // Check inspection transaction
-    const { data: inspTx } = await supabase
-      .from('inspection_transactions')
-      .select('*')
-      .eq('reference', reference)
-      .single();
-    
-    if (inspTx) {
-      await supabase
-        .from('inspection_transactions')
-        .update({ status: 'completed' })
-        .eq('reference', reference);
-      
-      await supabase
-        .from('inspections')
-        .update({ payment_status: 'completed', status: 'assigned' })
-        .eq('id', inspTx.inspection_id);
-      
-      return { data: { message: 'Inspection payment simulated' } };
-    }
-    
-    throw new Error('Transaction not found');
-  }
 };
 
 // ============== STORAGE APIs ==============
@@ -1304,35 +1076,20 @@ export const withdrawalAPI = {
     return { data: res.data || [] };
   },
 
+  // The DB trigger trg_settle_withdrawal_on_paid (migration v17) now
+  // atomically re-validates this amount against the agent's CURRENT
+  // available balance and increments total_withdrawn itself — this no
+  // longer needs to fetch/compute/update balance from the client, which
+  // was vulnerable to a race condition (two withdrawals paid at once
+  // could both pass a stale balance check). If the trigger rejects this
+  // (balance changed since the request was made), the update throws and
+  // status stays unpaid — surfaced to the admin as an error.
   markPaid: async (requestId, adminId) => {
-    // Get the request first
-    const { data: req, error: reqErr } = await supabase
-      .from('withdrawal_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single();
-    if (reqErr) throw reqErr;
-
-    // Update status
-    const { error: updErr } = await supabase
+    const { error } = await supabase
       .from('withdrawal_requests')
       .update({ status: 'paid', resolved_at: new Date().toISOString(), resolved_by: adminId })
       .eq('id', requestId);
-    if (updErr) throw updErr;
-
-    // Add to total_withdrawn in agent_balances
-    const balRes2 = await supabase
-      .from('agent_balances')
-      .select('total_withdrawn')
-      .eq('agent_id', req.agent_id)
-      .limit(1);
-    const bal = balRes2.data?.[0] || null;
-    const newWithdrawn = Number(bal?.total_withdrawn || 0) + Number(req.amount);
-    await supabase
-      .from('agent_balances')
-      .update({ total_withdrawn: newWithdrawn, updated_at: new Date().toISOString() })
-      .eq('agent_id', req.agent_id);
-
+    if (error) throw new Error(error.message || 'Failed to mark withdrawal as paid');
     return { data: { ok: true } };
   },
 
@@ -1458,12 +1215,13 @@ export const rentAPI = {
     }
 
     const feePct = await rentAPI.getServiceFeePct();
-    const rentAmount  = Number(property.price);
-    const agentFee    = Math.round(rentAmount * 0.20);      // 20% of rent, always
-    const baseAmount  = rentAmount + agentFee;               // rent portion goes to the owner, agent fee to the agent
-    const serviceFee  = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut, on top
-    const totalAmount = baseAmount + serviceFee;
-    const reference   = generateReference('RENT');
+    const rentAmount    = Number(property.price);
+    const agentFee      = Math.round(rentAmount * 0.20);      // 20% of rent, always
+    const cautionFee    = Number(property.caution_fee) || 0;  // pass-through, no service fee applied
+    const baseAmount    = rentAmount + agentFee;               // rent portion goes to the owner, agent fee to the agent
+    const serviceFee    = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut — never applied to the caution fee
+    const totalAmount   = baseAmount + serviceFee + cautionFee;
+    const reference     = generateReference('RENT');
 
     // 5-day auto-release window from now
     const autoRelease = new Date();
@@ -1477,6 +1235,7 @@ export const rentAPI = {
         agent_id: property.uploaded_by_agent_id,
         rent_amount: rentAmount,
         agent_fee: agentFee,
+        caution_fee: cautionFee,
         service_fee: serviceFee,
         total_amount: totalAmount,
         reference,
@@ -1501,6 +1260,7 @@ export const rentAPI = {
         reference,
         rent_amount: rentAmount,
         agent_fee: agentFee,
+        caution_fee: cautionFee,
         service_fee: serviceFee,
         amount: totalAmount,
         service_fee_pct: feePct,
@@ -1524,86 +1284,21 @@ export const rentAPI = {
     return { data: data || [] };
   },
 
+  // Calls the server-side verified confirmation endpoint — no longer
+  // writes directly to the database or trusts the browser's own claim
+  // that Korapay succeeded. See /api/confirm-payment.js. The endpoint
+  // handles the agent/student notification emails itself, only on the
+  // actual first transition (never on a repeat call), which also closes
+  // the duplicate-email risk from a double-fired success callback.
   markHeld: async (reference, koralpayRef) => {
-    // This is the critical write — payment confirmation must succeed even
-    // if everything below it (agent notification) fails for any reason.
-    // No chained .select().single() here on purpose: that can throw on
-    // an unrelated hiccup and would silently break a payment that Korapay
-    // already actually charged.
-    const { data: updatedRows, error } = await supabase
-      .from('property_rent_payments')
-      .update({
-        status: 'held',
-        held_at: new Date().toISOString(),
-        koralpay_reference: koralpayRef || null,
-      })
-      .eq('reference', reference)
-      .eq('status', 'pending')
-      .select('id');
-    if (error) throw error;
-
-    // If no row matched, this payment was already marked held by an
-    // earlier call (e.g. Korapay's onSuccess firing twice) — skip the
-    // notification entirely so the agent/student don't get duplicate
-    // emails for the same payment.
-    if (!updatedRows || updatedRows.length === 0) return;
-
-    // Notify the agent (and student) — best-effort only, wrapped so a
-    // failure here can never undo or block the payment confirmation above.
-    try {
-      const { data: rows } = await supabase
-        .from('property_rent_payments')
-        .select('*, property:properties(title)')
-        .eq('reference', reference)
-        .limit(1);
-      const row = rows?.[0];
-      if (row?.agent_id) {
-        const agentRes = await supabase.from('users').select('email, full_name').eq('id', row.agent_id).limit(1);
-        const agent = agentRes.data?.[0];
-        const studentRes = row.user_id
-          ? await supabase.from('users').select('email, full_name, phone').eq('id', row.user_id).limit(1)
-          : { data: [] };
-        const student = studentRes.data?.[0];
-        if (agent?.email) {
-          const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-          const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-          await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-            body: JSON.stringify({
-              type: 'rent_payment_held',
-              to: agent.email,
-              data: {
-                agent_name: agent.full_name || 'there',
-                property_title: row.property?.title || 'your property',
-                amount: row.total_amount,
-                agent_fee: row.agent_fee,
-                reference: row.reference,
-                student_name: student?.full_name || 'A student',
-                student_email: student?.email || '',
-                student_phone: student?.phone || '',
-              },
-            }),
-          });
-          if (student?.email) {
-            await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-              body: JSON.stringify({
-                type: 'rent_payment_receipt',
-                to: student.email,
-                data: {
-                  student_name: student.full_name || 'there',
-                  property_title: row.property?.title || 'the property',
-                  amount: row.total_amount,
-                  reference: row.reference,
-                },
-              }),
-            });
-          }
-        }
-      }
-    } catch (e) { console.warn('rent_payment_held email failed:', e); }
+    const res = await fetch('/api/confirm-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reference }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body?.error || 'Failed to confirm rent payment');
+    return { data: body };
   },
 
   // User confirms move-in / keys received → release funds to agent.

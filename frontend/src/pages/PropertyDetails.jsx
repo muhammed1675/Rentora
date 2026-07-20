@@ -499,9 +499,9 @@ export function PropertyDetails() {
             <p className="text-sm text-muted-foreground">/year</p>
             {(property.caution_fee || property.price) && (
               <div className="mt-4 pt-4 border-t border-border/60 space-y-2">
-                {property.caution_fee && (
+                {property.caution_fee > 0 && (
                   <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">Caution Fee <span className="text-xs">(paid to agent directly)</span></p>
+                    <p className="text-sm text-muted-foreground">Caution Fee</p>
                     <p className="text-sm font-semibold">{formatPrice(property.caution_fee)}</p>
                   </div>
                 )}
@@ -510,7 +510,7 @@ export function PropertyDetails() {
                   <p className="text-sm font-semibold">{formatPrice(Math.round(Number(property.price || 0) * 0.20))}</p>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-border/40">
-                  <p className="text-sm font-semibold">Total Move-in Cost</p>
+                  <p className="text-sm font-semibold">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground">(+ small service fee at checkout)</span></p>
                   <p className="text-sm font-bold text-primary">
                     {formatPrice(
                       Number(property.price || 0) +
@@ -520,7 +520,7 @@ export function PropertyDetails() {
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground pt-1">
-                  Rent + agent fee are held by Rentora and released to the agent after you confirm move-in. Caution fee is settled directly with the agent.
+                  Rent, agent fee, and caution fee are all held safely by Rentora and released to the property owner once you confirm move-in.
                 </p>
               </div>
             )}
@@ -574,7 +574,7 @@ export function PropertyDetails() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Rentora holds your rent safely until you confirm you've moved in. A small service fee (5%) applies.
+                Rentora holds your rent, agent fee, and caution fee safely until you confirm you've moved in — a small service fee applies at checkout.
               </p>
               <Button
                 onClick={handlePayRent}

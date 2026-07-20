@@ -314,6 +314,11 @@ export function AdminDashboard() {
     rejected: 'bg-red-100 text-red-800',
     completed: 'bg-green-100 text-green-800',
     assigned: 'bg-blue-100 text-blue-800',
+    failed: 'bg-red-100 text-red-800',
+    held: 'bg-yellow-100 text-yellow-800',
+    released: 'bg-green-100 text-green-800',
+    paid: 'bg-green-100 text-green-800',
+    refunded: 'bg-red-100 text-red-800',
   }[status] || 'bg-gray-100 text-gray-800');
 
   const filteredUsers = users.filter(u =>
@@ -1134,7 +1139,7 @@ export function AdminDashboard() {
                   <TableRow key={req.id}>
                     <TableCell className="font-medium">{req.agent_name}</TableCell>
                     <TableCell>₦{Number(req.amount).toLocaleString('en-NG')}</TableCell>
-                    <TableCell><Badge variant={req.status === 'paid' ? 'default' : 'destructive'} className="capitalize">{req.status}</Badge></TableCell>
+                    <TableCell><Badge className={`capitalize ${req.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{req.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(req.requested_at).toLocaleDateString('en-NG')}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{req.notes || '—'}</TableCell>
                   </TableRow>
@@ -1182,6 +1187,11 @@ export function AdminDashboard() {
                       </button>
                       <p className="text-xs text-muted-foreground">Listed by agent: <span className="font-medium text-foreground">{payout.agent?.full_name || 'Unknown agent'}</span>{payout.agent?.email ? ` (${payout.agent.email})` : ''}</p>
                       <p className="text-lg font-bold text-green-600">₦{Number(payout.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">owed to owner</span></p>
+                      {payout.caution_fee_portion > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Rent {formatPrice(payout.rent_portion)} + Caution fee {formatPrice(payout.caution_fee_portion)}
+                        </p>
+                      )}
                       <div className="mt-2 p-2 rounded bg-muted text-xs space-y-0.5">
                         <p className="font-medium">Owner: {payout.owner_name || 'Not provided'}{payout.owner_phone ? ` — ${payout.owner_phone}` : ''}</p>
                         <p>{payout.owner_bank_name} — {payout.owner_account_number}</p>
@@ -1239,7 +1249,7 @@ export function AdminDashboard() {
                     <TableCell>{payout.agent?.full_name || '—'}</TableCell>
                     <TableCell>{payout.owner_name || '—'}</TableCell>
                     <TableCell>₦{Number(payout.amount).toLocaleString('en-NG')}</TableCell>
-                    <TableCell><Badge variant="default" className="capitalize">{payout.status}</Badge></TableCell>
+                    <TableCell><Badge className={`capitalize ${payout.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{payout.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{payout.paid_at ? new Date(payout.paid_at).toLocaleDateString('en-NG') : '—'}</TableCell>
                   </TableRow>
                 ))}
@@ -1284,7 +1294,7 @@ export function AdminDashboard() {
                           {payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span>
                         </button>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)} + Service fee {formatPrice(payment.service_fee)}
+                          Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)}{payment.caution_fee > 0 ? ` + Caution fee ${formatPrice(payment.caution_fee)}` : ''} + Service fee {formatPrice(payment.service_fee)}
                         </p>
                         {autoRelease && (
                           <p className="text-xs text-amber-700 mt-1">Auto-releases in {daysLeft} day{daysLeft === 1 ? '' : 's'} ({autoRelease.toLocaleDateString('en-NG')})</p>
@@ -1309,6 +1319,7 @@ export function AdminDashboard() {
                   <TableHead>Property</TableHead>
                   <TableHead>Rent</TableHead>
                   <TableHead>Agent Fee</TableHead>
+                  <TableHead>Caution Fee</TableHead>
                   <TableHead>Service Fee</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Released</TableHead>
@@ -1317,7 +1328,7 @@ export function AdminDashboard() {
               </TableHeader>
               <TableBody>
                 {rentPayments.filter(p => p.status === 'released').length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
                 ) : rentPayments.filter(p => p.status === 'released').slice(0, 25).map(payment => (
                   <TableRow key={payment.id}>
                     <TableCell className="font-medium">
@@ -1327,8 +1338,9 @@ export function AdminDashboard() {
                     </TableCell>
                     <TableCell>{formatPrice(payment.rent_amount)}</TableCell>
                     <TableCell>{formatPrice(payment.agent_fee)}</TableCell>
+                    <TableCell>{payment.caution_fee > 0 ? formatPrice(payment.caution_fee) : '—'}</TableCell>
                     <TableCell>{formatPrice(payment.service_fee)}</TableCell>
-                    <TableCell><Badge variant="default" className="capitalize">{payment.status}</Badge></TableCell>
+                    <TableCell><Badge className="capitalize bg-green-100 text-green-800">{payment.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{payment.released_at ? new Date(payment.released_at).toLocaleDateString('en-NG') : '—'}</TableCell>
                     <TableCell>
                       {payment.move_in_photo_url ? (

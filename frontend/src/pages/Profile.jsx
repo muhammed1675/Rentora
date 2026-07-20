@@ -23,6 +23,7 @@ import {
   Phone,
   Home as HomeIcon,
   CheckCircle2,
+  RefreshCw,
   Clock,
   Download
 } from 'lucide-react';
@@ -205,6 +206,11 @@ export function Profile() {
       cancelled: 'bg-red-100 text-red-800',
       approved: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
+      failed: 'bg-red-100 text-red-800',
+      held: 'bg-yellow-100 text-yellow-800',
+      released: 'bg-green-100 text-green-800',
+      paid: 'bg-green-100 text-green-800',
+      refunded: 'bg-red-100 text-red-800',
     };
     return variants[status] || 'bg-gray-100 text-gray-800';
   };
@@ -343,16 +349,19 @@ export function Profile() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold">{rp.property?.title || 'Property'}</h3>
                         {rp.status === 'held' && (
-                          <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" />Held by Rentora</Badge>
+                          <Badge className="gap-1 bg-yellow-100 text-yellow-800 hover:bg-yellow-100"><Clock className="w-3 h-3" />Held by Rentora</Badge>
                         )}
                         {rp.status === 'released' && (
-                          <Badge className="gap-1 bg-green-600"><CheckCircle2 className="w-3 h-3" />Released</Badge>
+                          <Badge className="gap-1 bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle2 className="w-3 h-3" />Released</Badge>
                         )}
                         {rp.status === 'pending' && (
-                          <Badge variant="outline">Payment pending</Badge>
+                          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Payment pending</Badge>
+                        )}
+                        {rp.status === 'failed' && (
+                          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Payment failed</Badge>
                         )}
                         {rp.status === 'refunded' && (
-                          <Badge variant="destructive">Refunded</Badge>
+                          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Refunded</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{rp.property?.location}</p>
@@ -360,6 +369,9 @@ export function Profile() {
                         <div>Rent: <span className="font-medium">{formatPrice(rp.rent_amount)}</span></div>
                         {rp.agent_fee > 0 && (
                           <div>Agent fee: <span className="font-medium">{formatPrice(rp.agent_fee)}</span></div>
+                        )}
+                        {rp.caution_fee > 0 && (
+                          <div>Caution fee: <span className="font-medium">{formatPrice(rp.caution_fee)}</span></div>
                         )}
                         <div>Service fee: <span className="font-medium">{formatPrice(rp.service_fee)}</span></div>
                         <div>Total paid: <span className="font-semibold">{formatPrice(rp.total_amount)}</span></div>
@@ -381,6 +393,15 @@ export function Profile() {
                           <CheckCircle2 className="w-4 h-4" />I've moved in
                         </Button>
                       )}
+                      {(rp.status === 'pending' || rp.status === 'failed') && rp.property_id && (
+                        <Button
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => navigate(`/property/${rp.property_id}`)}
+                        >
+                          <RefreshCw className="w-4 h-4" />Retry Payment
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -395,6 +416,7 @@ export function Profile() {
                             { label: 'Location', value: rp.property?.location || '—' },
                             { label: 'Rent', value: formatPrice(rp.rent_amount) },
                             { label: 'Agent Fee', value: formatPrice(rp.agent_fee) },
+                            ...(rp.caution_fee > 0 ? [{ label: 'Caution Fee', value: formatPrice(rp.caution_fee) }] : []),
                             { label: 'Service Fee', value: formatPrice(rp.service_fee) },
                           ],
                           total: { label: 'Total Paid', value: formatPrice(rp.total_amount) },
@@ -556,6 +578,14 @@ export function Profile() {
                             <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
                             <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
                           </div>
+                          {(tx.status === 'pending' || tx.status === 'failed') && (
+                            <Button
+                              size="sm" variant="outline" className="gap-1 shrink-0 text-primary border-primary/40"
+                              onClick={() => navigate('/tokens')}
+                            >
+                              <RefreshCw className="w-4 h-4" />Retry
+                            </Button>
+                          )}
                           <Button
                             size="sm" variant="outline" className="gap-1 shrink-0"
                             onClick={() => downloadReceiptPNG({
@@ -598,6 +628,14 @@ export function Profile() {
                             <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
                             <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
                           </div>
+                          {(tx.status === 'pending' || tx.status === 'failed') && tx.inspection?.property_id && (
+                            <Button
+                              size="sm" variant="outline" className="gap-1 shrink-0 text-primary border-primary/40"
+                              onClick={() => navigate(`/property/${tx.inspection.property_id}`)}
+                            >
+                              <RefreshCw className="w-4 h-4" />Retry
+                            </Button>
+                          )}
                           <Button
                             size="sm" variant="outline" className="gap-1 shrink-0"
                             onClick={() => downloadReceiptPNG({
@@ -711,7 +749,7 @@ export function Profile() {
           <DialogHeader>
             <DialogTitle>Confirm Move-In</DialogTitle>
             <DialogDescription>
-              Upload a photo of yourself at the property to confirm you've moved in. This releases your rent to the property owner and your agent fee to the agent — it can't be undone, so please only confirm once you've actually moved in.
+              Upload a photo of yourself at the property to confirm you've moved in. This releases your rent, agent fee, and caution fee to the property owner — it can't be undone, so please only confirm once you've actually moved in. Note: Rentora does not yet have an automated refund process for the caution fee when you eventually move out — that's handled directly with your agent/landlord.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

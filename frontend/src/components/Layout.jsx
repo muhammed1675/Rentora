@@ -60,9 +60,9 @@ export function Layout({ children }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Header */}
-      <header className="hidden md:block sticky top-4 z-50 px-6">
-        <div className="container mx-auto">
-          <div className="pill-nav flex items-center justify-between h-16 px-6">
+      <header className="hidden md:block sticky top-0 z-50 glass border-b">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
               <img src="/rentora-logo.png" alt="Rentora" className="h-9 w-auto" />
@@ -544,23 +544,23 @@ export function Layout({ children }) {
       </nav>
 
       {/* Desktop footer */}
-      <footer className="hidden md:block curved-top bg-foreground text-white mt-16">
+      <footer className="hidden md:block border-t bg-muted/30 mt-auto">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <img src="/rentora-logo.png" alt="Rentora" className="h-8 w-auto" />
               <div>
-                <p className="font-bold text-sm text-white">Rentora</p>
-                <p className="text-xs text-white/60">Student Housing Platform, Ogbomosho</p>
+                <p className="font-bold text-sm">Rentora</p>
+                <p className="text-xs text-muted-foreground">Student Housing Platform, Ogbomosho</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-white/70">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
               <Link to="/terms" className="hover:text-primary transition-colors">Terms & Conditions</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Refund Policy</Link>
               <Link to="/contact" className="hover:text-primary transition-colors">Contact Us</Link>
             </div>
-            <p className="text-xs text-white/60">
+            <p className="text-xs text-muted-foreground">
               © {new Date().getFullYear()} Rentora. All rights reserved.
             </p>
           </div>
