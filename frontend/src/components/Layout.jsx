@@ -11,7 +11,6 @@ import { ConsentBanner } from './ConsentBanner';
 const publicNav = [
   { label: 'Browse', to: '/browse' },
   { label: 'Compare', to: '/compare' },
-  { label: 'For agents', to: '/become-agent' },
   { label: 'Contact', to: '/contact' },
 ];
 
