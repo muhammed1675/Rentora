@@ -337,17 +337,16 @@ export function AdminDashboard() {
 
   if (!isAuthenticated || !isAdmin) return null;
 
-  // Sidebar navigation groups — these map onto the SAME activeTab values
-  // the existing TabsContent blocks already key off. No change to the
-  // underlying tab logic, only how it's navigated to.
+  // Sidebar navigation groups — same activeTab values used by the existing
+  // TabsContent blocks below. Only the visual shell changes.
   const navGroups = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     {
       label: 'People', icon: Users, detail: 'Users · Agents · Verification',
       items: [
-        { id: 'users', label: 'Users', count: users.length },
-        { id: 'agents', label: 'Agents', count: agents.length },
-        { id: 'verification', label: 'Verification', count: stats?.pending_verifications, urgent: true },
+        { id: 'users', label: 'Users', icon: Users, count: users.length },
+        { id: 'agents', label: 'Agents', icon: UserCog, count: agents.length },
+        { id: 'verification', label: 'Verification', icon: Shield, count: stats?.pending_verifications, urgent: true },
       ],
     },
     { id: 'properties', label: 'Listings', icon: Building2, count: stats?.pending_properties, urgent: true },
@@ -355,11 +354,11 @@ export function AdminDashboard() {
     {
       label: 'Money', icon: Wallet, detail: 'Transactions · Payouts · Escrow',
       items: [
-        { id: 'transactions', label: 'Transactions' },
-        { id: 'payouts', label: 'Agent Payouts', count: withdrawalRequests.filter(r => r.status === 'pending').length, urgent: true },
-        { id: 'owner-payouts', label: 'Owner Payouts', count: ownerPayouts.filter(p => p.status === 'pending').length, urgent: true },
-        { id: 'escrow', label: 'Escrow', count: rentPayments.filter(p => p.status === 'held').length },
-        { id: 'rentora-revenue', label: 'Rentora Revenue' },
+        { id: 'transactions', label: 'Transactions', icon: Receipt },
+        { id: 'payouts', label: 'Agent Payouts', icon: ArrowDownCircle, count: withdrawalRequests.filter(r => r.status === 'pending').length, urgent: true },
+        { id: 'owner-payouts', label: 'Owner Payouts', icon: Home, count: ownerPayouts.filter(p => p.status === 'pending').length, urgent: true },
+        { id: 'escrow', label: 'Escrow', icon: Lock, count: rentPayments.filter(p => p.status === 'held').length },
+        { id: 'rentora-revenue', label: 'Revenue', icon: TrendingUp },
       ],
     },
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
@@ -370,34 +369,57 @@ export function AdminDashboard() {
     || navGroups.find(g => g.items?.some(i => i.id === activeTab))?.items.find(i => i.id === activeTab)?.label
     || 'Overview';
 
-  const NavCountBadge = ({ count, urgent }) => {
+  const NavCountBadge = ({ count, urgent, inverted }) => {
     if (!count) return null;
-    return <Badge className={`ml-auto h-5 px-1.5 text-xs shrink-0 ${urgent ? 'bg-red-500 text-white' : 'bg-muted-foreground/20 text-foreground'}`}>{count}</Badge>;
+    const base = 'ml-auto h-5 min-w-[20px] px-1.5 text-[10px] font-semibold shrink-0 rounded-full flex items-center justify-center';
+    if (urgent) return <span className={`${base} bg-rose-500 text-white`}>{count}</span>;
+    return <span className={`${base} ${inverted ? 'bg-white/15 text-white' : 'bg-slate-200 text-slate-700'}`}>{count}</span>;
   };
 
+  const firstName = (user?.full_name || 'Admin').split(' ')[0];
+
   return (
-    <div className="min-h-screen bg-muted/30 lg:grid lg:grid-cols-[260px_1fr]" data-testid="admin-dashboard">
+    <div className="min-h-screen admin-surface lg:grid lg:grid-cols-[280px_1fr]" data-testid="admin-dashboard">
       {/* Mobile nav backdrop */}
       {mobileNavOpen && (
         <button
           onClick={() => setMobileNavOpen(false)}
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
           aria-label="Close admin navigation"
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white p-5 overflow-y-auto transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-lg font-bold">Rentora Admin</h1>
-            <p className="text-xs text-white/50 mt-0.5">Manage users, properties &amp; operations</p>
+      {/* Sidebar — light card style with dark active pill */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r border-slate-200/70 flex flex-col transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Brand */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-[hsl(206,100%,26%)] flex items-center justify-center text-white shadow-sm">
+              <Home className="w-4 h-4" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-[13px] font-bold text-slate-900">Rentora</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Admin console</p>
+            </div>
           </div>
-          <button onClick={() => setMobileNavOpen(false)} className="lg:hidden text-white/70 hover:text-white">
+          <button onClick={() => setMobileNavOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-700">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <nav className="space-y-1" aria-label="Admin navigation">
+
+        {/* Search */}
+        <div className="px-4 mb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              placeholder="Search…"
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200/70 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition"
+            />
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-1" aria-label="Admin navigation">
           {navGroups.map((group) => {
             if (!group.items) {
               const Icon = group.icon;
@@ -406,32 +428,40 @@ export function AdminDashboard() {
                 <button
                   key={group.id}
                   onClick={() => goTo(group.id)}
-                  className={`w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${isActive ? 'bg-white text-slate-900 font-semibold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                  className={`w-full group flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] text-left transition-all ${
+                    isActive
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="flex-1">{group.label}</span>
-                  <NavCountBadge count={group.count} urgent={group.urgent} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'}`} />
+                  <span className="flex-1 font-medium">{group.label}</span>
+                  <NavCountBadge count={group.count} urgent={group.urgent} inverted={isActive} />
                 </button>
               );
             }
-            const GroupIcon = group.icon;
-            const groupHasActive = group.items.some(i => i.id === activeTab);
             return (
-              <div key={group.label} className="pt-1">
-                <div className="px-3 pt-2 pb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/40">
-                  <GroupIcon className="w-3.5 h-3.5" />{group.label}
-                </div>
+              <div key={group.label} className="pt-3">
+                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {group.label}
+                </p>
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const isActive = activeTab === item.id;
+                    const ItemIcon = item.icon || ChevronRight;
                     return (
                       <button
                         key={item.id}
                         onClick={() => goTo(item.id)}
-                        className={`w-full flex items-center gap-2 rounded-lg pl-8 pr-3 py-2 text-sm text-left transition-colors ${isActive ? 'bg-white text-slate-900 font-semibold' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                        className={`w-full group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] text-left transition-all ${
+                          isActive
+                            ? 'bg-slate-900 text-white shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
                       >
-                        <span className="flex-1">{item.label}</span>
-                        <NavCountBadge count={item.count} urgent={item.urgent} />
+                        <ItemIcon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}`} />
+                        <span className="flex-1 font-medium">{item.label}</span>
+                        <NavCountBadge count={item.count} urgent={item.urgent} inverted={isActive} />
                       </button>
                     );
                   })}
@@ -440,101 +470,290 @@ export function AdminDashboard() {
             );
           })}
         </nav>
-      </aside>
 
-      {/* Main content */}
-      <main className="min-w-0">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b bg-background/95 backdrop-blur px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setMobileNavOpen(true)} className="lg:hidden shrink-0">
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Admin console</p>
-              <h2 className="font-semibold truncate">{activeGroupLabel}</h2>
+        {/* Footer profile card */}
+        <div className="border-t border-slate-200/60 p-3">
+          <div className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+              {firstName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-semibold text-slate-900 truncate">{user?.full_name || 'Admin'}</p>
+              <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
             </div>
           </div>
-          <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shrink-0">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="min-w-0">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 admin-topbar px-4 py-3 sm:px-8">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setMobileNavOpen(true)} className="lg:hidden shrink-0 w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center">
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="min-w-0 hidden sm:block">
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Section</p>
+              <h2 className="text-sm font-semibold text-slate-800 truncate">{activeGroupLabel}</h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center relative">
+              <MessageSquare className="w-4 h-4 text-slate-500" />
+              {messages.filter(m => m.status === 'unread').length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
+              )}
+            </button>
+            <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shrink-0 rounded-full border-slate-200 bg-white hover:bg-slate-50 h-9 px-3.5">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline text-xs font-semibold">Refresh</span>
+            </Button>
+          </div>
         </header>
 
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-8">
+          {/* Greeting hero — only on Overview */}
+          {activeTab === 'overview' && (
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                  Hello, {firstName} 👋
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Here's what's happening on Rentora today.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+            </div>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* ── Overview ── */}
         {/* ── Overview ── */}
         <TabsContent value="overview">
           {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[...Array(8)].map(i => <Card key={i} className="p-4 animate-pulse"><div className="h-14 bg-muted rounded" /></Card>)}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="admin-card p-5 animate-pulse">
+                  <div className="h-16 bg-slate-100 rounded-lg" />
+                </div>
+              ))}
             </div>
           ) : (
-            <>
-              {/* Escrow — front and center, not buried in the stat grid */}
-              <Card className="p-5 mb-4 border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100/50">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-amber-200 flex items-center justify-center shrink-0">
-                      <Lock className="w-6 h-6 text-amber-800" />
+            <div className="space-y-6">
+              {/* Hero row: featured accent card + 3 KPIs */}
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                {/* Featured — Total Revenue (like the dark/green highlighted card in refs) */}
+                <div className="lg:col-span-1 admin-card admin-card-accent p-6 relative overflow-hidden">
+                  <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Total Revenue</span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-amber-800">Total Escrow Held Right Now</p>
-                      <p className="text-2xl sm:text-3xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p>
-                      <p className="text-xs text-amber-700 mt-0.5">
-                        Across {stats?.held_rent_payments || 0} rent payment{stats?.held_rent_payments === 1 ? '' : 's'} awaiting move-in confirmation or auto-release
-                      </p>
+                    <p className="text-3xl font-bold text-white leading-none">{formatPrice(stats?.total_revenue || 0)}</p>
+                    <p className="text-[11px] text-white/70 mt-2">Rent service fee + withdrawal fee</p>
+                    <button
+                      onClick={() => setActiveTab('rentora-revenue')}
+                      className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur px-3 py-1.5 rounded-full transition"
+                    >
+                      Analyze performance <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI: Users */}
+                <div className="admin-card p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-blue-600" />
                     </div>
                   </div>
-                  <Button variant="outline" className="border-amber-400 text-amber-800 hover:bg-amber-100 gap-1.5 shrink-0" onClick={() => setActiveTab('escrow')}>
-                    <Lock className="w-4 h-4" /> View Escrow Details
-                  </Button>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Users</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.total_users || 0}</p>
+                  <p className="text-[11px] text-slate-500 mt-1.5">{stats?.total_agents || 0} agents</p>
                 </div>
-              </Card>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Users</p><p className="text-2xl font-bold mt-1">{stats?.total_users || 0}</p></div><Users className="w-6 h-6 text-primary opacity-70" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Total Agents</p><p className="text-2xl font-bold mt-1">{stats?.total_agents || 0}</p></div><UserCheck className="w-6 h-6 text-secondary opacity-70" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Properties</p><p className="text-2xl font-bold mt-1">{stats?.total_properties || 0}</p></div><Building2 className="w-6 h-6 text-primary opacity-70" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Inspections</p><p className="text-2xl font-bold mt-1">{stats?.total_inspections || 0}</p></div><Calendar className="w-6 h-6 text-secondary opacity-70" /></div></Card>
+                {/* KPI: Properties */}
+                <div className="admin-card p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                      <Building2 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    {stats?.pending_properties > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        {stats.pending_properties} pending
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Properties</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.total_properties || 0}</p>
+                  <p className="text-[11px] text-slate-500 mt-1.5">{stats?.approved_properties || 0} live</p>
+                </div>
+
+                {/* KPI: Inspections */}
+                <div className="admin-card p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
+                      <CalendarCheck className="w-4 h-4 text-violet-600" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Inspections</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.total_inspections || 0}</p>
+                  <p className="text-[11px] text-slate-500 mt-1.5">{stats?.completed_inspections || 0} completed</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Properties</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_properties || 0}</p></Card>
-                <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Verifications</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_verifications || 0}</p></Card>
-                <Card className="p-4 border-green-200 bg-green-50"><p className="text-xs text-green-700 font-medium">Approved Properties</p><p className="text-2xl font-bold mt-1 text-green-900">{stats?.approved_properties || 0}</p></Card>
-                <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Completed Inspections</p><p className="text-2xl font-bold mt-1 text-blue-900">{stats?.completed_inspections || 0}</p></Card>
+
+              {/* Escrow highlight strip */}
+              <div className="admin-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 border-amber-400">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <Lock className="w-5 h-5 text-amber-700" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Escrow Held</p>
+                    <p className="text-2xl font-bold text-slate-900">{formatPrice(stats?.total_escrow_held || 0)}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Across {stats?.held_rent_payments || 0} rent payment{stats?.held_rent_payments === 1 ? '' : 's'} awaiting move-in
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="rounded-full border-amber-300 text-amber-800 hover:bg-amber-50 gap-1.5 shrink-0"
+                  onClick={() => setActiveTab('escrow')}
+                >
+                  <Eye className="w-3.5 h-3.5" /> View Escrow
+                </Button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <Card className="p-5 border-2 border-secondary/20">
-                  <div className="w-11 h-11 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><Wallet className="w-6 h-6 text-secondary" /></div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Rent Service Fee</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p>
-                </Card>
-                <Card className="p-5 border-2 border-secondary/20">
-                  <div className="w-11 h-11 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><ArrowDownCircle className="w-6 h-6 text-secondary" /></div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Withdrawal Fee</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
-                </Card>
-                <Card className="p-5 bg-gradient-to-br from-primary to-primary/80 text-white">
-                  <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center mb-2"><TrendingUp className="w-6 h-6" /></div>
-                  <p className="text-xs sm:text-sm opacity-90">Total Revenue</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.total_revenue || 0)}</p>
-                </Card>
+
+              {/* Two-column: Revenue split + Attention queue */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Revenue breakdown */}
+                <div className="lg:col-span-2 admin-card p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Rentora Revenue Breakdown</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">What the platform actually earns</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">All-time</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wallet className="w-4 h-4 text-slate-400" />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Rent Service Fee</p>
+                      </div>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.rent_service_fee_revenue || 0)}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Added on top of rent, never a cut of it</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ArrowDownCircle className="w-4 h-4 text-slate-400" />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Withdrawal Fee</p>
+                      </div>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">1.3% of every agent withdrawal, once paid</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Receipt className="w-4 h-4 text-slate-400" />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Inspection Fees</p>
+                      </div>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.inspection_fees_processed || 0)}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">100% goes to agents (not Rentora revenue)</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Home className="w-4 h-4 text-slate-400" />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Rent Transactions</p>
+                      </div>
+                      <p className="text-xl font-bold text-slate-900">{stats?.total_rent_payments || 0}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{stats?.held_rent_payments || 0} held · {stats?.released_rent_payments || 0} released</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Attention queue */}
+                <div className="admin-card p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Needs Attention</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Queued for admin action</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2.5">
+                    {[
+                      { id: 'verification', label: 'Agent verifications', count: stats?.pending_verifications || 0, icon: Shield, color: 'amber' },
+                      { id: 'properties', label: 'Property approvals', count: stats?.pending_properties || 0, icon: Building2, color: 'blue' },
+                      { id: 'payouts', label: 'Agent payout requests', count: withdrawalRequests.filter(r => r.status === 'pending').length, icon: ArrowDownCircle, color: 'emerald' },
+                      { id: 'owner-payouts', label: 'Owner payouts', count: ownerPayouts.filter(p => p.status === 'pending').length, icon: Home, color: 'violet' },
+                      { id: 'messages', label: 'Unread messages', count: messages.filter(m => m.status === 'unread').length, icon: MessageSquare, color: 'rose' },
+                    ].map(row => {
+                      const Icon = row.icon;
+                      const active = row.count > 0;
+                      return (
+                        <button
+                          key={row.id}
+                          onClick={() => setActiveTab(row.id)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition text-left ${
+                            active
+                              ? 'border-slate-200 bg-white hover:border-primary/40 hover:bg-primary/5'
+                              : 'border-slate-100 bg-slate-50/50 opacity-60'
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-${row.color}-50 shrink-0`}>
+                            <Icon className={`w-4 h-4 text-${row.color}-600`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 truncate">{row.label}</p>
+                            <p className="text-[10px] text-slate-500">{active ? 'Tap to review' : 'All caught up'}</p>
+                          </div>
+                          {active ? (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">{row.count}</span>
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Rentora revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
-                <Card className="p-4 border-amber-300 bg-amber-50"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Lock className="w-5 h-5 text-amber-700" /></div><div><p className="text-xs text-amber-700 font-medium">Total Escrow Held <span className="italic font-normal">(awaiting move-in / release)</span></p><p className="text-xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p></div></div></Card>
+
+              {/* Bottom activity summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="admin-card p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Inspection Tx</p>
+                  <p className="text-lg font-bold text-slate-900 mt-1">{transactions.inspection_transactions.length}</p>
+                  <p className="text-[10px] text-emerald-600 mt-0.5">{transactions.inspection_transactions.filter(t => t.status === 'completed').length} completed</p>
+                </div>
+                <div className="admin-card p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pending Inspections</p>
+                  <p className="text-lg font-bold text-slate-900 mt-1">{stats?.pending_inspections || 0}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">awaiting completion</p>
+                </div>
+                <div className="admin-card p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approved Listings</p>
+                  <p className="text-lg font-bold text-slate-900 mt-1">{stats?.approved_properties || 0}</p>
+                  <p className="text-[10px] text-emerald-600 mt-0.5">live on platform</p>
+                </div>
+                <div className="admin-card p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rent Payments</p>
+                  <p className="text-lg font-bold text-slate-900 mt-1">{stats?.total_rent_payments || 0}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{stats?.released_rent_payments || 0} released</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.inspection_transactions.filter(t => t.status === 'completed').length} completed</p></div><Receipt className="w-6 h-6 text-secondary opacity-60" /></div></Card>
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Rent Transactions</p><p className="text-2xl font-bold mt-1">{stats?.total_rent_payments || 0}</p><p className="text-xs text-muted-foreground mt-0.5">{stats?.held_rent_payments || 0} held · {stats?.released_rent_payments || 0} released</p></div><Home className="w-6 h-6 text-primary opacity-60" /></div></Card>
-                <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Inspections</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_inspections || 0}</p><p className="text-xs text-yellow-600 mt-0.5">awaiting completion</p></Card>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Unread Messages</p><p className="text-2xl font-bold mt-1 text-blue-900">{messages.filter(m => m.status === 'unread').length}</p><p className="text-xs text-blue-600 mt-0.5">need response</p></Card>
-              </div>
-            </>
+            </div>
           )}
         </TabsContent>
+
 
         {/* ── Users ── */}
         <TabsContent value="users">
@@ -1642,7 +1861,7 @@ export function AdminDashboard() {
                           <div className="flex gap-2">
                             <Button size="sm" className="flex-1 h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => handleBankRequest(pending.id, 'approved')}>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Approve ��� Names Match
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Approve — Names Match
                             </Button>
                             <Button size="sm" variant="destructive" className="flex-1 h-9 gap-1.5"
                               onClick={() => { setBankRejectId(pending.id); setBankRejectNote('Account name does not match the name on your submitted ID. Please resubmit with the correct account.'); }}>
