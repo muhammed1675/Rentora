@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { Building2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { toast } from 'sonner';
 
@@ -93,9 +93,11 @@ export function Login() {
       <Card className="w-full max-w-md p-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-            <Building2 className="w-7 h-7 text-primary-foreground" />
-          </div>
+          <img 
+            src="/rentora-logo.svg" 
+            alt="Rentora Logo" 
+            className="h-10 w-auto object-contain bg-transparent" 
+          />
         </div>
 
         <div className="text-center mb-8">

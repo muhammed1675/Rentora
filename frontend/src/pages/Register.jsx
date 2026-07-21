@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { Building2, Mail, Lock, User, Eye, EyeOff, CheckCircle2, Phone } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, CheckCircle2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Register() {
@@ -96,14 +96,16 @@ export function Register() {
       <Card className="w-full max-w-md p-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-            <Building2 className="w-7 h-7 text-primary-foreground" />
-          </div>
+          <img 
+            src="/rentora-logo.svg" 
+            alt="Rentora Logo" 
+            className="h-10 w-auto object-contain bg-transparent" 
+          />
         </div>
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight">Create Account</h1>
-          <p className="text-muted-foreground mt-2">Join LAUTECH Rentals today</p>
+          <p className="text-muted-foreground mt-2">Join Rentora today</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
