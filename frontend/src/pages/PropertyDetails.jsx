@@ -281,7 +281,7 @@ export function PropertyDetails() {
   const TypeIcon = property.property_type === 'hostel' ? Home : Building;
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="property-details-page">
+    <div className="container mx-auto px-4 py-6 max-w-full overflow-x-hidden" data-testid="property-details-page">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" onClick={() => navigate('/browse')} className="gap-2" data-testid="back-btn">
           <ArrowLeft className="w-4 h-4" /> Back to Browse
@@ -483,25 +483,25 @@ export function PropertyDetails() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <Card className="p-6">
+          <Card className="p-6 overflow-hidden">
             <p className="text-sm text-muted-foreground">Annual Rent</p>
-            <p className="text-4xl font-bold text-primary mt-1">{formatPrice(property.price)}</p>
+            <p className="text-3xl sm:text-4xl font-bold text-primary mt-1 break-words">{formatPrice(property.price)}</p>
             <p className="text-sm text-muted-foreground">/year</p>
             {(property.caution_fee || property.price) && (
               <div className="mt-4 pt-4 border-t border-border/60 space-y-2">
                 {property.caution_fee > 0 && (
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">Caution Fee</p>
-                    <p className="text-sm font-semibold">{formatPrice(property.caution_fee)}</p>
-                  </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground">Agent Fee <span className="text-xs">(10% of rent)</span></p>
-                  <p className="text-sm font-semibold">{formatPrice(Math.round(Number(property.price || 0) * 0.10))}</p>
+                <div className="flex justify-between items-center gap-2">
+                  <p className="text-sm text-muted-foreground min-w-0">Caution Fee</p>
+                  <p className="text-sm font-semibold shrink-0">{formatPrice(property.caution_fee)}</p>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t border-border/40">
-                  <p className="text-sm font-semibold">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground">(+ small service fee at checkout)</span></p>
-                  <p className="text-sm font-bold text-primary">
+                )}
+                <div className="flex justify-between items-center gap-2">
+                  <p className="text-sm text-muted-foreground min-w-0">Agent Fee <span className="text-xs">(10% of rent)</span></p>
+                  <p className="text-sm font-semibold shrink-0">{formatPrice(Math.round(Number(property.price || 0) * 0.10))}</p>
+                </div>
+                <div className="flex justify-between items-start gap-2 pt-2 border-t border-border/40">
+                  <p className="text-sm font-semibold min-w-0">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground block sm:inline">(+ small service fee at checkout)</span></p>
+                  <p className="text-sm font-bold text-primary shrink-0">
                     {formatPrice(
                       Number(property.price || 0) +
                       Number(property.caution_fee || 0) +
@@ -510,7 +510,7 @@ export function PropertyDetails() {
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground pt-1">
-                  Rent, agent fee, and caution fee are all held safely by Rentora and released to the property owner once you confirm move-in.
+                  Rent, agent fee, and caution fee are all held safely by Rentora and released to the listing agent once you confirm move-in.
                 </p>
               </div>
             )}
@@ -557,18 +557,18 @@ export function PropertyDetails() {
                 const total = rent + agentFee + cautionFee + serviceFee;
                 return (
                   <div className="text-sm space-y-1 mb-3">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Rent</span><span>{formatPrice(rent)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Agent fee (10%)</span><span>{formatPrice(agentFee)}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Rent</span><span className="shrink-0">{formatPrice(rent)}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Agent fee (10%)</span><span className="shrink-0">{formatPrice(agentFee)}</span></div>
                     {cautionFee > 0 && (
-                      <div className="flex justify-between"><span className="text-muted-foreground">Caution fee</span><span>{formatPrice(cautionFee)}</span></div>
+                      <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Caution fee</span><span className="shrink-0">{formatPrice(cautionFee)}</span></div>
                     )}
-                    <div className="flex justify-between"><span className="text-muted-foreground">Service fee ({serviceFeePct}%)</span><span>{formatPrice(serviceFee)}</span></div>
-                    <div className="flex justify-between font-semibold pt-1.5 mt-1 border-t"><span>Total to pay</span><span className="text-primary">{formatPrice(total)}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Service fee ({serviceFeePct}%)</span><span className="shrink-0">{formatPrice(serviceFee)}</span></div>
+                    <div className="flex justify-between gap-2 font-semibold pt-1.5 mt-1 border-t"><span className="min-w-0">Total to pay</span><span className="text-primary shrink-0">{formatPrice(total)}</span></div>
                   </div>
                 );
               })()}
               <p className="text-xs text-muted-foreground mb-3">
-                Rentora holds your rent, agent fee, and caution fee safely until you confirm you've moved in.
+                Rentora holds your rent, agent fee, and caution fee safely until you confirm you've moved in, then releases them to the listing agent.
               </p>
               <Button
                 onClick={handlePayRent}

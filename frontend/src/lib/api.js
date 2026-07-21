@@ -224,23 +224,21 @@ export const inspectionAPI = {
     
     // Create inspection
     await supabase
-  .from('inspections')
-  .insert({
-    id: inspectionId,
-    user_id: user.id,
-    user_name: user.full_name,
-    user_email: data.email || user.email,   // ← use dialog email
-    user_phone: data.phone_number || null,  // ← NEW: save phone
-    property_id: data.property_id,
-    property_title: property.title,
-    agent_id: property.uploaded_by_agent_id,
-    agent_name: property.uploaded_by_agent_name,
-    inspection_date: data.inspection_date,
-    status: 'pending',
-    payment_status: 'pending',
-    payment_reference: reference,
-  });
-
+      .from('inspections')
+      .insert({
+        id: inspectionId,
+        user_id: user.id,
+        user_name: user.full_name,
+        user_email: user.email,
+        property_id: data.property_id,
+        property_title: property.title,
+        agent_id: property.uploaded_by_agent_id,
+        agent_name: property.uploaded_by_agent_name,
+        inspection_date: data.inspection_date,
+        status: 'pending',
+        payment_status: 'pending',
+        payment_reference: reference
+      });
     
     // Dynamic inspection fee set by the agent (min 1000, default 3000)
     const inspectionAmount = Number(property.inspection_fee) > 0
@@ -1041,12 +1039,9 @@ export const rentAPI = {
     if (property.availability === 'unavailable') {
       throw new Error('This property is no longer available');
     }
-    // Rent is paid out directly to the property owner's bank account, not
-    // the agent — so payment can't proceed until the agent has added the
-    // owner's details to the listing.
-    if (!property.owner_full_name || !property.owner_phone || !property.owner_bank_name || !property.owner_account_number || !property.owner_account_name) {
-      throw new Error('This property is missing the owner\'s payout details. Please ask the listing agent to update the listing before paying rent.');
-    }
+    // Rent, agent fee and caution fee are all credited to the listing
+    // agent's wallet — the property owner is no longer paid directly, so
+    // no bank details are required to start a rent payment.
 
     const feePct = await rentAPI.getServiceFeePct();
     const rentAmount    = Number(property.price);
@@ -1075,14 +1070,10 @@ export const rentAPI = {
         reference,
         status: 'pending',
         auto_release_at: autoRelease.toISOString(),
-        // Snapshot the owner's payout details at payment time, so a later
-        // edit to the listing doesn't retroactively change where an
-        // already-in-progress payment is owed.
+        // Snapshot the owner contact info at payment time for the receipt.
+        // Payout details are no longer stored — the agent is the payee.
         owner_name: property.owner_full_name,
         owner_phone: property.owner_phone,
-        owner_bank_name: property.owner_bank_name,
-        owner_account_number: property.owner_account_number,
-        owner_account_name: property.owner_account_name,
       })
       .select()
       .single();
