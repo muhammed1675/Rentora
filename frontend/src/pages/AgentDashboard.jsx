@@ -1014,7 +1014,7 @@ export function AgentDashboard() {
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Contact Information</h3>
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Contact Name *<span className="text-xs text-muted-foreground font-normal ml-1">shown to students who unlock this listing</span></Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
+                <div className="space-y-2"><Label>Contact Name *<span className="text-xs text-muted-foreground font-normal ml-1"></span></Label><Input value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} placeholder="John Doe" /></div>
                 <div className="space-y-2"><Label>Contact Phone *</Label><Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+234..." /></div>
               </div>
             </div>
