@@ -145,7 +145,7 @@ export function BecomeAgent() {
 
   if (submitted) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto py-6">
         <div className="max-w-lg mx-auto">
           <Card className="p-8 text-center">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -163,7 +163,7 @@ export function BecomeAgent() {
   const isLoading = uploading || loading;
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="become-agent-page">
+    <div className="container mx-auto py-6" data-testid="become-agent-page">
       <Button variant="ghost" onClick={() => navigate('/profile')} className="mb-4 gap-2">
         <ArrowLeft className="w-4 h-4" /> Back to Profile
       </Button>

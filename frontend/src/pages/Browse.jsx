@@ -108,7 +108,7 @@ export function Browse() {
   const formatPrice = (price) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="browse-page">
+    <div className="container mx-auto py-6" data-testid="browse-page">
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Browse Properties</h1>
         <p className="text-foreground/60 mt-1">Find verified hostels and apartments near LAUTECH</p>

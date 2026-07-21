@@ -77,7 +77,7 @@ export function BuyTokens() {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="buy-tokens-page">
+    <div className="container mx-auto py-6" data-testid="buy-tokens-page">
       <Button variant="ghost" onClick={() => navigate('/profile')} className="mb-4 gap-2">
         <ArrowLeft className="w-4 h-4" /> Back to Profile
       </Button>

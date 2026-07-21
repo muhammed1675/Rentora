@@ -61,7 +61,7 @@ export function Contact() {
   // ── Success screen ──
   if (submitted) {
     return (
-      <div className="container mx-auto px-4 py-16 max-w-lg text-center">
+      <div className="container mx-auto py-16 max-w-lg text-center">
         <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
           <CheckCircle2 className="w-10 h-10 text-green-600" />
         </div>
@@ -85,7 +85,7 @@ export function Contact() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
+    <div className="container mx-auto py-8 max-w-5xl">
       {/* Back button */}
       <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6 gap-2 -ml-2">
         <ArrowLeft className="w-4 h-4" /> Back

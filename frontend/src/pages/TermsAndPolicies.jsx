@@ -119,7 +119,7 @@ export function TermsAndPolicies() {
   const Icon = current.icon;
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+    <div className="container mx-auto py-6 max-w-4xl">
       <Button variant="ghost" onClick={() => navigate(-1)} className="mb-5 gap-2">
         <ArrowLeft className="w-4 h-4" /> Back
       </Button>

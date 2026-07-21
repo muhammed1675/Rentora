@@ -426,7 +426,7 @@ export function AgentDashboard() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-6" data-testid="agent-dashboard">
+    <div className="container mx-auto py-6" data-testid="agent-dashboard">
       {lightbox.open && <Lightbox images={lightbox.images} startIndex={lightbox.index} onClose={closeLightbox} />}
 
       {/* Header */}

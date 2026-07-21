@@ -265,7 +265,7 @@ export function PropertyDetails() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto py-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-muted rounded w-32" />
           <div className="aspect-video bg-muted rounded-xl" />
@@ -281,7 +281,7 @@ export function PropertyDetails() {
   const TypeIcon = property.property_type === 'hostel' ? Home : Building;
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-full overflow-x-hidden" data-testid="property-details-page">
+    <div className="container mx-auto py-6 max-w-full overflow-x-hidden" data-testid="property-details-page">
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" onClick={() => navigate('/browse')} className="gap-2" data-testid="back-btn">
           <ArrowLeft className="w-4 h-4" /> Back to Browse
