@@ -98,9 +98,6 @@ export function Login() {
             alt="Rentora Logo" 
             className="h-10 w-auto object-contain bg-transparent" 
           />
-          <span className="font-heading text-2xl font-semibold tracking-tight text-primary">
-            Rentora
-          </span>
         </div>
 
         <div className="text-center mb-8">
