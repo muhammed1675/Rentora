@@ -31,7 +31,7 @@ export function Layout({ children }) {
           <Link to="/" className="flex items-center gap-2 font-heading text-xl font-semibold tracking-tight text-primary" aria-label="Rentora home">
             {/* Direct reference to public folder logo */}
             <img 
-              src="/rentora-logo.png" 
+              src="/rentora-logo.svg" 
               alt="Rentora Logo" 
               className="h-8 w-auto object-contain" 
             />
@@ -123,7 +123,7 @@ export function Layout({ children }) {
             <div className="mb-4 flex items-center gap-2 text-xl font-semibold">
               {/* Footer logo reference */}
               <img 
-                src="/rentora-logo.png" 
+                src="/rentora-logo.svg" 
                 alt="Rentora Logo" 
                 className="h-8 w-auto object-contain" 
               />
