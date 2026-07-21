@@ -240,25 +240,6 @@ export function Profile() {
             <p className="text-2xl font-bold">{inspections.length}</p>
             <p className="text-xs text-muted-foreground">Inspections</p>
           </div>
-          
-          {/* Agent Verification CTA */}
-          {isUser && !verificationRequest && (
-            <Link to="/become-agent">
-              <Button variant="outline" className="w-full mt-4 gap-2" data-testid="become-agent-btn">
-                <Shield className="w-4 h-4" />
-                Become an Agent
-              </Button>
-            </Link>
-          )}
-          
-          {verificationRequest && (
-            <div className="mt-4 p-3 rounded-lg bg-muted">
-              <p className="text-sm font-medium">Agent Verification</p>
-              <Badge className={`mt-1 ${getStatusBadge(verificationRequest.status)}`}>
-                {verificationRequest.status}
-              </Badge>
-            </div>
-          )}
         </Card>
       </div>
 
