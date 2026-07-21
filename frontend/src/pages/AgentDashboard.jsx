@@ -1022,12 +1022,7 @@ export function AgentDashboard() {
             {/* ── Property Owner — Payout Details ── */}
             <div className="space-y-4">
               <div className="border-b pb-2">
-                <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">Property Owner — Payout Details</h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {ownerDetailsLocked
-                    ? "These are locked once set, to protect the owner's payout — contact support@rentora.com.ng if they need to change."
-                    : "Rent is paid directly to the owner's bank account when a tenant moves in — never to your own account. Once saved, these can't be edited."}
-                </p>
+                <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">Property Owner Details</h3>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Owner Full Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_full_name} onChange={(e) => setFormData({ ...formData, owner_full_name: e.target.value })} placeholder="Landlord's full name" /></div>
