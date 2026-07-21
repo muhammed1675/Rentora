@@ -417,12 +417,12 @@ export function AgentDashboard() {
     }
   };
 
-  // Once an existing listing already has owner payout details filled in,
+  // Once an existing listing already has owner details filled in,
   // they're locked (mirrors the DB trigger) — only support/admin can change
   // them from here on, to protect the owner from an agent quietly
-  // redirecting the payout to a different account.
+  // changing their contact information.
   const ownerDetailsLocked = !!(
-    editingProperty?.owner_full_name && editingProperty?.owner_bank_name && editingProperty?.owner_account_number
+    editingProperty?.owner_full_name && editingProperty?.owner_phone
   );
 
   return (
