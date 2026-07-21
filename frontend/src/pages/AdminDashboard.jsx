@@ -1642,7 +1642,7 @@ export function AdminDashboard() {
                           <div className="flex gap-2">
                             <Button size="sm" className="flex-1 h-9 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => handleBankRequest(pending.id, 'approved')}>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Approve — Names Match
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Approve ��� Names Match
                             </Button>
                             <Button size="sm" variant="destructive" className="flex-1 h-9 gap-1.5"
                               onClick={() => { setBankRejectId(pending.id); setBankRejectNote('Account name does not match the name on your submitted ID. Please resubmit with the correct account.'); }}>

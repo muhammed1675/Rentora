@@ -103,7 +103,7 @@ export function AgentDashboard() {
   const [formData, setFormData] = useState({
     title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
-    owner_full_name: '', owner_phone: '', owner_bank_name: '', owner_account_number: '', owner_account_name: '',
+    owner_full_name: '', owner_phone: '',
     google_maps_link: '', amenities: [],
   });
 
@@ -267,7 +267,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', owner_bank_name: '', owner_account_number: '', owner_account_name: '', google_maps_link: '', amenities: [] });
+    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
     setEditingProperty(null);
   };
 
@@ -281,8 +281,6 @@ export function AgentDashboard() {
         location: property.location, property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
         owner_full_name: property.owner_full_name || '', owner_phone: property.owner_phone || '',
-        owner_bank_name: property.owner_bank_name || '', owner_account_number: property.owner_account_number || '',
-        owner_account_name: property.owner_account_name || '',
         google_maps_link: property.google_maps_link || '', amenities: property.amenities || [],
       });
     } else { resetForm(); }
@@ -293,8 +291,8 @@ export function AgentDashboard() {
     if (!formData.title || !formData.price || !formData.location || !formData.contact_name || !formData.contact_phone) {
       toast.error('Please fill in all required fields'); return;
     }
-    if (!formData.owner_full_name || !formData.owner_phone || !formData.owner_bank_name || !formData.owner_account_number || !formData.owner_account_name) {
-      toast.error('Please fill in the property owner\'s payout details — rent is paid directly to the owner\'s bank account.'); return;
+    if (!formData.owner_full_name || !formData.owner_phone) {
+      toast.error('Please fill in the property owner\'s name and phone number.'); return;
     }
     try {
       const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
