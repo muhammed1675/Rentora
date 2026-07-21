@@ -29,7 +29,12 @@ export function Layout({ children }) {
       <header className="sticky top-0 z-40 w-full border-b border-black/5 bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2 font-heading text-xl font-semibold tracking-tight text-primary" aria-label="Rentora home">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">R</span>
+            {/* Direct reference to public folder logo */}
+            <img 
+              src="/rentora-logo.png" 
+              alt="Rentora Logo" 
+              className="h-8 w-auto object-contain" 
+            />
             Rentora
           </Link>
 
@@ -116,7 +121,12 @@ export function Layout({ children }) {
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <div className="mb-4 flex items-center gap-2 text-xl font-semibold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm text-[hsl(210_53%_13%)]">R</span>
+              {/* Footer logo reference */}
+              <img 
+                src="/rentora-logo.png" 
+                alt="Rentora Logo" 
+                className="h-8 w-auto object-contain" 
+              />
               Rentora
             </div>
             <p className="max-w-sm text-sm leading-6 text-white/60">
