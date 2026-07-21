@@ -1032,9 +1032,6 @@ export function AgentDashboard() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Owner Full Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_full_name} onChange={(e) => setFormData({ ...formData, owner_full_name: e.target.value })} placeholder="Landlord's full name" /></div>
                 <div className="space-y-2"><Label>Owner Phone *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_phone} onChange={(e) => setFormData({ ...formData, owner_phone: e.target.value })} placeholder="+234..." /></div>
-                <div className="space-y-2"><Label>Owner Bank Name *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_bank_name} onChange={(e) => setFormData({ ...formData, owner_bank_name: e.target.value })} placeholder="e.g. GTBank" /></div>
-                <div className="space-y-2"><Label>Owner Account Number *</Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_number} onChange={(e) => setFormData({ ...formData, owner_account_number: e.target.value })} placeholder="0123456789" /></div>
-                <div className="space-y-2 md:col-span-2"><Label>Owner Account Name *<span className="text-xs text-muted-foreground font-normal ml-1">must match the bank account exactly</span></Label><Input disabled={ownerDetailsLocked} value={formData.owner_account_name} onChange={(e) => setFormData({ ...formData, owner_account_name: e.target.value })} placeholder="Name on the bank account" /></div>
               </div>
             </div>
 
