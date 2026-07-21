@@ -15,15 +15,10 @@ const publicNav = [
 ];
 
 export function Layout({ children }) {
-  const { user, logout, isAuthenticated, isAdmin, isAgent: rawIsAgent } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isAgent } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-
-  // Flexible check to handle case-sensitivity or nested role properties
-  const userRole = (user?.role || user?.user_metadata?.role || '').toLowerCase();
-  const isAgent = rawIsAgent || userRole === 'agent';
-  const isUserAdmin = isAdmin || userRole === 'admin';
 
   const handleLogout = () => { logout(); navigate('/'); };
   const initials = (user?.full_name || user?.email || 'U')
@@ -34,6 +29,7 @@ export function Layout({ children }) {
       <header className="sticky top-0 z-40 w-full border-b border-black/5 bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2 font-heading text-xl font-semibold tracking-tight text-primary" aria-label="Rentora home">
+            {/* Direct reference to public folder logo */}
             <img 
               src="/rentora-logo.svg" 
               alt="Rentora Logo" 
@@ -71,16 +67,8 @@ export function Layout({ children }) {
                   <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/profile')}><UserIcon className="mr-2 h-4 w-4" />Profile</DropdownMenuItem>
-                  {isAgent && (
-                    <DropdownMenuItem onClick={() => navigate('/agent-dashboard')}>
-                      <LayoutDashboard className="mr-2 h-4 w-4" />Agent dashboard
-                    </DropdownMenuItem>
-                  )}
-                  {isUserAdmin && (
-                    <DropdownMenuItem onClick={() => navigate('/admin')}>
-                      <Shield className="mr-2 h-4 w-4" />Admin
-                    </DropdownMenuItem>
-                  )}
+                  {isAgent && <DropdownMenuItem onClick={() => navigate('/agent-dashboard')}><LayoutDashboard className="mr-2 h-4 w-4" />Agent dashboard</DropdownMenuItem>}
+                  {isAdmin && <DropdownMenuItem onClick={() => navigate('/admin')}><Shield className="mr-2 h-4 w-4" />Admin</DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Log out</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -106,16 +94,8 @@ export function Layout({ children }) {
               {isAuthenticated && (
                 <>
                   <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
-                  {isAgent && (
-                    <Link to="/agent-dashboard" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">
-                      Agent dashboard
-                    </Link>
-                  )}
-                  {isUserAdmin && (
-                    <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">
-                      Admin
-                    </Link>
-                  )}
+                  {isAgent && <Link to="/agent-dashboard" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
+                  {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}
                 </>
               )}
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -135,10 +115,11 @@ export function Layout({ children }) {
 
       <main className="flex-1">{children}</main>
 
-      <footer className="w-full border-t border-slate-200 bg-white py-20 md:py-28 text-slate-900">
+<footer className="w-full border-t border-slate-200 bg-white py-20 md:py-28 text-slate-900">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <div className="mb-4 flex items-center gap-2 text-xl font-semibold">
+              {/* Footer logo reference */}
               <img 
                 src="/rentora-logo.svg" 
                 alt="Rentora Logo" 
