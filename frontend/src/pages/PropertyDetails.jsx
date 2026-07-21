@@ -265,7 +265,7 @@ export function PropertyDetails() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="w-full max-w-full overflow-x-hidden px-3 py-4 sm:px-6 sm:py-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-muted rounded w-32" />
           <div className="aspect-video bg-muted rounded-xl" />
@@ -281,31 +281,31 @@ export function PropertyDetails() {
   const TypeIcon = property.property_type === 'hostel' ? Home : Building;
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 py-6 max-w-full overflow-x-hidden" data-testid="property-details-page">
-      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-        <Button variant="ghost" onClick={() => navigate('/browse')} className="gap-2" data-testid="back-btn">
-          <ArrowLeft className="w-4 h-4" /> Back to Browse
+    <div className="w-full max-w-full overflow-x-hidden px-3 py-4 sm:px-6 sm:py-6" data-testid="property-details-page">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-4">
+        <Button variant="ghost" onClick={() => navigate('/browse')} className="min-w-0 justify-start gap-2 px-2 text-xs sm:text-sm" data-testid="back-btn">
+          <ArrowLeft className="w-4 h-4 shrink-0" /> <span className="truncate">Back to Browse</span>
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Button variant="outline" size="sm" onClick={handleCompare}
-            className={`gap-1.5 h-9 text-xs ${inCompare ? 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100' : ''}`}>
+            className={`h-9 w-9 shrink-0 gap-1.5 px-0 text-xs sm:w-auto sm:px-3 ${inCompare ? 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100' : ''}`}>
             <GitCompare className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{inCompare ? 'In Compare' : 'Compare'}</span>
           </Button>
-          <Button variant="outline" size="icon" onClick={handleShare} className="rounded-full h-9 w-9">
+          <Button variant="outline" size="icon" onClick={handleShare} className="h-9 w-9 shrink-0 rounded-full">
             {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
           </Button>
           <Button variant="outline" size="icon" onClick={handleFavourite}
-            className={`rounded-full h-9 w-9 ${isFavourited ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}>
+            className={`h-9 w-9 shrink-0 rounded-full ${isFavourited ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}>
             <Heart className={`w-4 h-4 ${isFavourited ? 'fill-red-500 text-red-500' : ''}`} />
           </Button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:gap-8">
+        <div className="min-w-0 space-y-5 sm:space-y-6">
           {/* Image Gallery */}
-          <div className="relative aspect-video rounded-xl overflow-hidden group">
+          <div className="relative aspect-video w-full max-w-full overflow-hidden rounded-xl group">
             <img src={property.images?.[currentImageIndex] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
               alt={property.title} className="w-full h-full object-cover" />
             {property.images?.length > 1 && (
@@ -339,7 +339,7 @@ export function PropertyDetails() {
           </div>
 
           {property.images?.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            <div className="flex max-w-full gap-2 overflow-x-auto pb-1 scrollbar-hide">
               {property.images.map((img, index) => (
                 <button key={index} onClick={() => setCurrentImageIndex(index)}
                   className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${index === currentImageIndex ? 'border-primary' : 'border-transparent opacity-60'}`}>
@@ -350,35 +350,35 @@ export function PropertyDetails() {
           )}
 
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{property.title}</h1>
+            <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{property.title}</h1>
             <div className="flex items-center gap-2 mt-2 text-muted-foreground flex-wrap">
-              <MapPin className="w-5 h-5" /><span>{property.location}</span>
+              <MapPin className="w-5 h-5 shrink-0" /><span className="min-w-0 break-words">{property.location}</span>
             </div>
             {property.google_maps_link && (
               <a
                 href={property.google_maps_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-semibold shadow-sm"
+                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:px-4"
               >
-                <MapPin className="w-4 h-4" />Get Directions on Google Maps
+                <MapPin className="h-4 w-4 shrink-0" /><span className="min-w-0 truncate">Get Directions on Google Maps</span>
               </a>
             )}
           </div>
 
-          <Card className="p-6">
+          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
             <h2 className="text-xl font-semibold mb-4">Description</h2>
-            <p className="text-muted-foreground whitespace-pre-wrap">{property.description}</p>
+            <p className="whitespace-pre-wrap break-words text-muted-foreground">{property.description}</p>
           </Card>
 
           {property.amenities?.length > 0 && (
-            <Card className="p-6">
+            <Card className="max-w-full overflow-hidden p-4 sm:p-6">
               <h2 className="text-xl font-semibold mb-4">Amenities</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-3">
                 {property.amenities.map((item) => (
-                  <div key={item} className="flex items-center gap-2 text-sm">
+                  <div key={item} className="flex min-w-0 items-center gap-2 text-sm">
                     <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                    <span>{item}</span>
+                    <span className="min-w-0 break-words">{item}</span>
                   </div>
                 ))}
               </div>
@@ -391,7 +391,7 @@ export function PropertyDetails() {
               <div className="grid sm:grid-cols-2 gap-4">
                 {similarProperties.map(sim => (
                   <div key={sim.id} onClick={() => navigate(`/property/${sim.id}`)}
-                    className="flex gap-3 p-3 rounded-xl border border-border bg-card hover:shadow-md transition-shadow cursor-pointer group">
+                    className="flex min-w-0 cursor-pointer gap-3 rounded-xl border border-border bg-card p-3 transition-shadow hover:shadow-md group">
                     <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
                       <img src={sim.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
                         alt={sim.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -420,9 +420,9 @@ export function PropertyDetails() {
               )}
             </h2>
             {isAuthenticated && (
-              <Card className="p-4 mb-4">
+              <Card className="mb-4 max-w-full overflow-hidden p-4">
                 <p className="text-sm font-medium mb-2">Leave a Review</p>
-                <div className="flex gap-1 mb-3">
+                <div className="mb-3 flex flex-wrap gap-1">
                   {[1,2,3,4,5].map(star => (
                     <button key={star} type="button" onClick={() => setReviewRating(star)}
                       onMouseEnter={() => setHoverRating(star)} onMouseLeave={() => setHoverRating(0)}
@@ -436,10 +436,10 @@ export function PropertyDetails() {
                     </span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                   <Input placeholder="Share your experience..." value={reviewComment}
                     onChange={(e) => setReviewComment(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitReview()} className="flex-1" />
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitReview()} className="min-w-0" />
                   <Button size="icon" onClick={handleSubmitReview} disabled={submittingReview}>
                     <Send className="w-4 h-4" />
                   </Button>
@@ -447,16 +447,16 @@ export function PropertyDetails() {
               </Card>
             )}
             {reviews.length > 0 ? (
-              <div className="space-y-3">
+              <div className="min-w-0 space-y-3">
                 {reviews.map(review => (
-                  <Card key={review.id} className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                  <Card key={review.id} className="max-w-full overflow-hidden p-4">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                           <span className="text-xs font-bold text-primary">{(review.user_name || 'A').charAt(0).toUpperCase()}</span>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold">{review.user_name || 'Anonymous'}</p>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{review.user_name || 'Anonymous'}</p>
                           <div className="flex gap-0.5 mt-0.5">
                             {[1,2,3,4,5].map(s => (
                               <Star key={s} className={`w-3 h-3 ${review.rating >= s ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/20'}`} />
@@ -468,12 +468,12 @@ export function PropertyDetails() {
                         {new Date(review.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{review.comment}</p>
+                    <p className="mt-2 break-words text-sm leading-relaxed text-muted-foreground">{review.comment}</p>
                   </Card>
                 ))}
               </div>
             ) : (
-              <Card className="p-6 text-center border-dashed">
+              <Card className="max-w-full overflow-hidden border-dashed p-4 text-center sm:p-6">
                 <Star className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No reviews yet. Be the first to review!</p>
               </Card>
@@ -482,24 +482,24 @@ export function PropertyDetails() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
-          <Card className="p-6 overflow-hidden">
+        <div className="min-w-0 space-y-5 sm:space-y-6">
+          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
             <p className="text-sm text-muted-foreground">Annual Rent</p>
             <p className="text-3xl sm:text-4xl font-bold text-primary mt-1 break-words">{formatPrice(property.price)}</p>
             <p className="text-sm text-muted-foreground">/year</p>
             {(property.caution_fee || property.price) && (
               <div className="mt-4 pt-4 border-t border-border/60 space-y-2">
                 {property.caution_fee > 0 && (
-                <div className="flex justify-between items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                   <p className="text-sm text-muted-foreground min-w-0">Caution Fee</p>
                   <p className="text-sm font-semibold shrink-0">{formatPrice(property.caution_fee)}</p>
                 </div>
                 )}
-                <div className="flex justify-between items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                   <p className="text-sm text-muted-foreground min-w-0">Agent Fee <span className="text-xs">(10% of rent)</span></p>
                   <p className="text-sm font-semibold shrink-0">{formatPrice(Math.round(Number(property.price || 0) * 0.10))}</p>
                 </div>
-                <div className="flex justify-between items-start gap-2 pt-2 border-t border-border/40">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t border-border/40 pt-2">
                   <p className="text-sm font-semibold min-w-0">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground block sm:inline">(+ small service fee at checkout)</span></p>
                   <p className="text-sm font-bold text-primary shrink-0">
                     {formatPrice(
@@ -509,31 +509,31 @@ export function PropertyDetails() {
                     )}
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground pt-1">
+                <p className="break-words pt-1 text-xs text-muted-foreground">
                   Rent, agent fee, and caution fee are all held safely by Rentora and released to the listing agent once you confirm move-in.
                 </p>
               </div>
             )}
           </Card>
 
-          <Card className="p-6">
+          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
             <h3 className="font-semibold mb-4">Owner Contact</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="min-w-0 space-y-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
                   <User className="w-5 h-5 text-primary" />
                 </div>
-                <div>
-                  <p className="font-medium">{property.contact_name}</p>
+                <div className="min-w-0">
+                  <p className="break-words font-medium">{property.contact_name}</p>
                   <p className="text-sm text-muted-foreground">Property Owner</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
                   <Phone className="w-5 h-5 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <a href={`tel:${property.contact_phone}`} className="font-medium text-primary hover:underline">
+                <div className="min-w-0 flex-1">
+                  <a href={`tel:${property.contact_phone}`} className="break-all font-medium text-primary hover:underline">
                     {property.contact_phone}
                   </a>
                 </div>
@@ -541,10 +541,10 @@ export function PropertyDetails() {
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="mb-4 p-4 rounded-lg border bg-muted/30">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">Rent this property</h3>
+          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
+            <div className="mb-4 max-w-full overflow-hidden rounded-lg border bg-muted/30 p-3 sm:p-4">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-2">
+                <h3 className="min-w-0 font-semibold">Rent this property</h3>
                 {property?.availability === 'unavailable' && (
                   <span className="text-xs px-2 py-0.5 rounded bg-secondary">Taken</span>
                 )}
@@ -557,13 +557,13 @@ export function PropertyDetails() {
                 const total = rent + agentFee + cautionFee + serviceFee;
                 return (
                   <div className="text-sm space-y-1 mb-3">
-                    <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Rent</span><span className="shrink-0">{formatPrice(rent)}</span></div>
-                    <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Agent fee (10%)</span><span className="shrink-0">{formatPrice(agentFee)}</span></div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rent</span><span className="shrink-0 text-right">{formatPrice(rent)}</span></div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agent fee (10%)</span><span className="shrink-0 text-right">{formatPrice(agentFee)}</span></div>
                     {cautionFee > 0 && (
-                      <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Caution fee</span><span className="shrink-0">{formatPrice(cautionFee)}</span></div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>
                     )}
-                    <div className="flex justify-between gap-2"><span className="text-muted-foreground min-w-0">Service fee ({serviceFeePct}%)</span><span className="shrink-0">{formatPrice(serviceFee)}</span></div>
-                    <div className="flex justify-between gap-2 font-semibold pt-1.5 mt-1 border-t"><span className="min-w-0">Total to pay</span><span className="text-primary shrink-0">{formatPrice(total)}</span></div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Service fee ({serviceFeePct}%)</span><span className="shrink-0 text-right">{formatPrice(serviceFee)}</span></div>
+                    <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t pt-1.5 font-semibold"><span className="min-w-0">Total to pay</span><span className="shrink-0 text-right text-primary">{formatPrice(total)}</span></div>
                   </div>
                 );
               })()}
@@ -573,10 +573,10 @@ export function PropertyDetails() {
               <Button
                 onClick={handlePayRent}
                 disabled={payingRent || property?.availability === 'unavailable'}
-                className="w-full gap-2"
+                className="w-full min-w-0 gap-2"
                 data-testid="pay-rent-btn"
               >
-                {payingRent ? 'Processing...' : (<><ExternalLink className="w-4 h-4" />Pay Rent Securely</>)}
+                {payingRent ? 'Processing...' : (<><ExternalLink className="h-4 w-4 shrink-0" /><span className="truncate">Pay Rent Securely</span></>)}
               </Button>
             </div>
             <h3 className="font-semibold mb-2">Request Inspection</h3>
@@ -589,17 +589,17 @@ export function PropertyDetails() {
                   if (!isAuthenticated) { toast.error('Please login to request inspection'); navigate('/login'); return; }
                   setInspectionEmail(user?.email || '');
                   setShowInspectionDialog(true);
-                }} className="w-full gap-2" data-testid="request-inspection-btn">
-                  <CalendarIcon className="w-4 h-4" />Schedule Inspection
+                }} className="w-full min-w-0 gap-2" data-testid="request-inspection-btn">
+                  <CalendarIcon className="h-4 w-4 shrink-0" /><span className="truncate">Schedule Inspection</span>
                 </Button>
               </>
             )}
           </Card>
 
           {property.uploaded_by_agent_name && (
-            <Card className="p-6">
+            <Card className="max-w-full overflow-hidden p-4 sm:p-6">
               <h3 className="font-semibold mb-2">Listed By</h3>
-              <p className="text-muted-foreground">{property.uploaded_by_agent_name}</p>
+              <p className="break-words text-muted-foreground">{property.uploaded_by_agent_name}</p>
               <p className="text-xs text-muted-foreground mt-1">Verified Agent</p>
             </Card>
           )}
@@ -608,10 +608,10 @@ export function PropertyDetails() {
 
       {/* Inspection Dialog */}
       <Dialog open={showInspectionDialog} onOpenChange={setShowInspectionDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] overflow-hidden sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Request Property Inspection</DialogTitle>
-            <DialogDescription>Schedule a physical inspection with our verified agent. Payment of {formatPrice(Number(property?.inspection_fee) || 3000)} is required.</DialogDescription>
+            <DialogDescription className="break-words">Schedule a physical inspection with our verified agent. Payment of {formatPrice(Number(property?.inspection_fee) || 3000)} is required.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -635,16 +635,16 @@ export function PropertyDetails() {
               <Input type="tel" value={inspectionPhone} onChange={(e) => setInspectionPhone(e.target.value)} placeholder="+234..." data-testid="inspection-phone" />
             </div>
             <Card className="p-4 bg-muted/50">
-              <div className="flex justify-between items-center">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <span className="font-medium">Inspection Fee</span>
-                <span className="text-xl font-bold text-primary">{formatPrice(Number(property?.inspection_fee) || 3000)}</span>
+                <span className="shrink-0 text-right text-lg font-bold text-primary sm:text-xl">{formatPrice(Number(property?.inspection_fee) || 3000)}</span>
               </div>
             </Card>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInspectionDialog(false)}>Cancel</Button>
-            <Button onClick={handleRequestInspection} disabled={requestingInspection} className="gap-2" data-testid="confirm-inspection-btn">
-              {requestingInspection ? 'Processing...' : <><ExternalLink className="w-4 h-4" />Pay & Schedule</>}
+            <Button onClick={handleRequestInspection} disabled={requestingInspection} className="min-w-0 gap-2" data-testid="confirm-inspection-btn">
+              {requestingInspection ? 'Processing...' : <><ExternalLink className="h-4 w-4 shrink-0" /><span className="truncate">Pay & Schedule</span></>}
             </Button>
           </DialogFooter>
         </DialogContent>
