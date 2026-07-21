@@ -39,6 +39,7 @@ export function AdminDashboard() {
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
+  const [navSearch, setNavSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, property: null, deleting: false });
   const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -364,6 +365,24 @@ export function AdminDashboard() {
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
   ];
 
+  const navQuery = navSearch.trim().toLowerCase();
+  const filteredNavGroups = !navQuery
+    ? navGroups
+    : navGroups
+        .map((group) => {
+          if (!group.items) {
+            return group.label.toLowerCase().includes(navQuery) ? group : null;
+          }
+          const groupMatches = group.label.toLowerCase().includes(navQuery);
+          const items = group.items.filter((i) =>
+            i.label.toLowerCase().includes(navQuery)
+          );
+          if (groupMatches) return group;
+          if (items.length) return { ...group, items };
+          return null;
+        })
+        .filter(Boolean);
+
   const goTo = (id) => { setActiveTab(id); setMobileNavOpen(false); };
   const activeGroupLabel = navGroups.find(g => g.id === activeTab)?.label
     || navGroups.find(g => g.items?.some(i => i.id === activeTab))?.items.find(i => i.id === activeTab)?.label
@@ -412,7 +431,18 @@ export function AdminDashboard() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
-              placeholder="Search…"
+              value={navSearch}
+              onChange={(e) => setNavSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const first =
+                    filteredNavGroups.find((g) => !g.items) ||
+                    filteredNavGroups.find((g) => g.items?.length)?.items?.[0];
+                  if (first) goTo(first.id);
+                }
+                if (e.key === 'Escape') setNavSearch('');
+              }}
+              placeholder="Search sections…"
               className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200/70 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition"
             />
           </div>
@@ -420,7 +450,11 @@ export function AdminDashboard() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-1" aria-label="Admin navigation">
-          {navGroups.map((group) => {
+          {filteredNavGroups.length === 0 ? (
+            <p className="px-3 py-6 text-center text-[11px] text-slate-400">
+              No sections match “{navSearch}”.
+            </p>
+          ) : filteredNavGroups.map((group) => {
             if (!group.items) {
               const Icon = group.icon;
               const isActive = activeTab === group.id;
