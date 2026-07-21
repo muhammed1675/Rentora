@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { 
-  MapPin, Phone, User, Lock, Unlock, Calendar as CalendarIcon, ArrowLeft,
+  MapPin, Phone, User, Lock, Calendar as CalendarIcon, ArrowLeft,
   Home, Building, ChevronLeft, ChevronRight, ExternalLink, Heart, Share2,
   Check, CheckCircle2, Eye, GitCompare, Star, Send,
 } from 'lucide-react';
@@ -67,7 +67,6 @@ export function PropertyDetails() {
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [unlocking, setUnlocking] = useState(false);
   const [isFavourited, setIsFavourited] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inCompare, setInCompare] = useState(false);
@@ -118,21 +117,7 @@ export function PropertyDetails() {
     }
   };
 
-  const handleUnlock = async () => {
-    if (!isAuthenticated) { toast.error('Please login to unlock contact'); navigate('/login'); return; }
-    if ((user?.token_balance || 0) < 1) { toast.error('Insufficient tokens. Please buy more tokens.'); navigate('/buy-tokens'); return; }
-    setUnlocking(true);
-    try {
-      const response = await propertyAPI.unlock(id, user.id);
-      toast.success('Contact unlocked successfully!');
-      setProperty({ ...property, contact_unlocked: true, contact_phone: response.data.contact_phone });
-      await refreshUser();
-    } catch (error) {
-      toast.error(error.message || 'Failed to unlock contact');
-    } finally {
-      setUnlocking(false);
-    }
-  };
+  
 
   const handleFavourite = () => {
     const added = toggleFavourite(id);
@@ -548,26 +533,12 @@ export function PropertyDetails() {
                   <Phone className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  {property.contact_unlocked || property.contact_phone !== '***LOCKED***' ? (
-                    <a href={`tel:${property.contact_phone}`} className="font-medium text-primary hover:underline">
-                      {property.contact_phone}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">***LOCKED***</span>
-                  )}
+                  <a href={`tel:${property.contact_phone}`} className="font-medium text-primary hover:underline">
+                    {property.contact_phone}
+                  </a>
                 </div>
               </div>
             </div>
-            {(!property.contact_unlocked && property.contact_phone === '***LOCKED***') && (
-              <Button onClick={handleUnlock} disabled={unlocking} className="w-full mt-4 gap-2" data-testid="unlock-btn">
-                {unlocking ? 'Unlocking...' : <><Unlock className="w-4 h-4" />Unlock Contact (1 Token)</>}
-              </Button>
-            )}
-            {property.contact_unlocked && (
-              <div className="flex items-center gap-2 mt-4 text-secondary">
-                <Unlock className="w-4 h-4" /><span className="text-sm">Contact Unlocked</span>
-              </div>
-            )}
           </Card>
 
           <Card className="p-6">

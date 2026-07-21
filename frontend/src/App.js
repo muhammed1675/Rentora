@@ -11,7 +11,6 @@ import PropertyDetails from "./pages/PropertyDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
-import BuyTokens from "./pages/BuyTokens";
 import AgentDashboard from "./pages/AgentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import BecomeAgent from "./pages/BecomeAgent";
@@ -64,14 +63,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout><Profile /></Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/buy-tokens"
-        element={
-          <ProtectedRoute>
-            <Layout><BuyTokens /></Layout>
           </ProtectedRoute>
         }
       />

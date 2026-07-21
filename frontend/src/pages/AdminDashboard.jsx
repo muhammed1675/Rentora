@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
-  CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp, Coins,
+  CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
   Menu, X, ChevronRight, CalendarCheck
@@ -31,7 +31,7 @@ export function AdminDashboard() {
   const [verifications, setVerifications] = useState([]);
   const [properties, setProperties] = useState([]);
   const [inspections, setInspections] = useState([]);
-  const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
+  const [transactions, setTransactions] = useState({ inspection_transactions: [] });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -503,12 +503,7 @@ export function AdminDashboard() {
                 <Card className="p-4 border-green-200 bg-green-50"><p className="text-xs text-green-700 font-medium">Approved Properties</p><p className="text-2xl font-bold mt-1 text-green-900">{stats?.approved_properties || 0}</p></Card>
                 <Card className="p-4 border-blue-200 bg-blue-50"><p className="text-xs text-blue-700 font-medium">Completed Inspections</p><p className="text-2xl font-bold mt-1 text-blue-900">{stats?.completed_inspections || 0}</p></Card>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Card className="p-5 border-2 border-primary/20">
-                  <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center mb-2"><Coins className="w-6 h-6 text-primary" /></div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Token Revenue</p>
-                  <p className="text-2xl sm:text-3xl font-bold mt-0.5">{formatPrice(stats?.token_revenue || 0)}</p>
-                </Card>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <Card className="p-5 border-2 border-secondary/20">
                   <div className="w-11 h-11 rounded-full bg-secondary/10 flex items-center justify-center mb-2"><Wallet className="w-6 h-6 text-secondary" /></div>
                   <p className="text-xs sm:text-sm text-muted-foreground">Rent Service Fee</p>
@@ -529,8 +524,7 @@ export function AdminDashboard() {
                 <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0"><Calendar className="w-5 h-5 text-muted-foreground" /></div><div><p className="text-xs text-muted-foreground">Inspection Fees Processed <span className="italic">(100% to agents, not Rentora revenue)</span></p><p className="text-xl font-bold">{formatPrice(stats?.inspection_fees_processed || 0)}</p></div></div></Card>
                 <Card className="p-4 border-amber-300 bg-amber-50"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Lock className="w-5 h-5 text-amber-700" /></div><div><p className="text-xs text-amber-700 font-medium">Total Escrow Held <span className="italic font-normal">(awaiting move-in / release)</span></p><p className="text-xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p></div></div></Card>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Token Transactions</p><p className="text-2xl font-bold mt-1">{transactions.token_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.token_transactions.filter(t => t.status === 'completed').length} completed</p></div><Coins className="w-6 h-6 text-primary opacity-60" /></div></Card>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
                 <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p><p className="text-xs text-muted-foreground mt-0.5">{transactions.inspection_transactions.filter(t => t.status === 'completed').length} completed</p></div><Receipt className="w-6 h-6 text-secondary opacity-60" /></div></Card>
                 <Card className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Rent Transactions</p><p className="text-2xl font-bold mt-1">{stats?.total_rent_payments || 0}</p><p className="text-xs text-muted-foreground mt-0.5">{stats?.held_rent_payments || 0} held · {stats?.released_rent_payments || 0} released</p></div><Home className="w-6 h-6 text-primary opacity-60" /></div></Card>
                 <Card className="p-4 border-yellow-200 bg-yellow-50"><p className="text-xs text-yellow-700 font-medium">Pending Inspections</p><p className="text-2xl font-bold mt-1 text-yellow-900">{stats?.pending_inspections || 0}</p><p className="text-xs text-yellow-600 mt-0.5">awaiting completion</p></Card>
@@ -994,16 +988,9 @@ export function AdminDashboard() {
         {/* ── Transactions ── */}
         <TabsContent value="transactions">
           <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Card className="p-4 bg-primary/5 border-primary/20"><p className="text-xs text-muted-foreground">Token Transactions</p><p className="text-2xl font-bold mt-1">{transactions.token_transactions.length}</p></Card>
-              <Card className="p-4 bg-green-50 border-green-200"><p className="text-xs text-green-700 font-medium">Completed Token Tx</p><p className="text-2xl font-bold mt-1 text-green-900">{transactions.token_transactions.filter(t => t.status === 'completed').length}</p><p className="text-xs text-green-600 font-medium mt-0.5">{formatPrice(transactions.token_transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (t.amount || 0), 0))}</p></Card>
+            <div className="grid grid-cols-2 gap-3">
               <Card className="p-4 bg-blue-50 border-blue-200"><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p></Card>
               <Card className="p-4 bg-green-50 border-green-200"><p className="text-xs text-green-700 font-medium">Completed Inspection Tx</p><p className="text-2xl font-bold mt-1 text-green-900">{transactions.inspection_transactions.filter(t => t.status === 'completed').length}</p><p className="text-xs text-green-600 font-medium mt-0.5">{formatPrice(transactions.inspection_transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (t.amount || 0), 0))}</p></Card>
-            </div>
-            <div>
-              <h3 className="font-semibold text-sm mb-3">Token Transactions</h3>
-              <div className="sm:hidden space-y-3">{transactions.token_transactions.map((tx) => (<Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-mono text-xs text-muted-foreground truncate">{tx.reference}</p><p className="font-semibold text-sm mt-1">{tx.tokens_added} Tokens</p><p className="text-sm font-bold text-primary">{formatPrice(tx.amount)}</p></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge className={`${getStatusBadge(tx.status)} text-xs`}>{tx.status}</Badge><p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p></div></div></Card>))}{transactions.token_transactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No token transactions yet</p>}</div>
-              <Card className="hidden sm:block overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Tokens</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{transactions.token_transactions.map((tx) => (<TableRow key={tx.id}><TableCell className="font-mono text-sm">{tx.reference}</TableCell><TableCell>{tx.tokens_added}</TableCell><TableCell>{formatPrice(tx.amount)}</TableCell><TableCell><Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge></TableCell><TableCell className="text-sm text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</TableCell></TableRow>))}</TableBody></Table></Card>
             </div>
             <div>
               <h3 className="font-semibold text-sm mb-3">Inspection Transactions</h3>
@@ -1112,7 +1099,7 @@ export function AdminDashboard() {
                         <p className="text-sm text-muted-foreground">{req.agent_email}</p>
                         <p className="text-lg font-bold text-green-600">₦{Number(req.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">requested</span></p>
                         <div className="text-xs text-muted-foreground">
-                          Fee (3.5%): -₦{Number(req.fee_amount || 0).toLocaleString('en-NG')}
+                          Fee (1.3%): -₦{Number(req.fee_amount || 0).toLocaleString('en-NG')}
                         </div>
                         <p className="text-sm font-semibold text-foreground">
                           Pay out: ₦{Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}
@@ -1420,18 +1407,10 @@ export function AdminDashboard() {
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
             <p className="text-sm opacity-90 mb-1">Total Revenue (All-Time)</p>
             <p className="text-4xl sm:text-5xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p>
-            <p className="text-xs opacity-80 mt-2">Token purchases + rent service fee + withdrawal fee</p>
+            <p className="text-xs opacity-80 mt-2">Rent service fee + withdrawal fee</p>
           </Card>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="p-6 border-2 border-primary/20">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <Coins className="w-6 h-6 text-primary" />
-              </div>
-              <p className="text-sm text-muted-foreground mb-1">Token Revenue</p>
-              <p className="text-3xl font-bold">{formatPrice(stats?.token_revenue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">100% of every token purchase</p>
-            </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card className="p-6 border-2 border-secondary/20">
               <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
                 <Wallet className="w-6 h-6 text-secondary" />
@@ -1446,7 +1425,7 @@ export function AdminDashboard() {
               </div>
               <p className="text-sm text-muted-foreground mb-1">Withdrawal Fee</p>
               <p className="text-3xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">3.5% of every agent withdrawal, once paid</p>
+              <p className="text-xs text-muted-foreground mt-2">1.3% of every agent withdrawal, once paid</p>
             </Card>
           </div>
 

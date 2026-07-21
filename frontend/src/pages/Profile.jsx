@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { walletAPI, unlockAPI, inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, maintenanceAPI, userAPI, storageAPI } from '../lib/api';
+import { inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, maintenanceAPI, userAPI, storageAPI } from '../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -12,14 +12,10 @@ import { Label } from '../components/ui/label';
 import { downloadReceiptPNG } from '../lib/receipt';
 import { 
   User, 
-  Coins, 
-  Unlock, 
   Calendar, 
   Receipt, 
   Shield,
   Building2,
-  Plus,
-  ExternalLink,
   Phone,
   Home as HomeIcon,
   CheckCircle2,
@@ -33,8 +29,6 @@ export function Profile() {
   const navigate = useNavigate();
   const { user, isAuthenticated, refreshUser, isUser, changePassword } = useAuth();
   
-  const [wallet, setWallet] = useState(null);
-  const [unlocks, setUnlocks] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
   const [rentPayments, setRentPayments] = useState([]);
@@ -53,11 +47,7 @@ export function Profile() {
     const reference = params.get('reference') || params.get('trxref');
     if (reference) {
       paymentAPI.confirmPayment(reference).then(async (res) => {
-        if (res?.data?.type === 'token_purchase') {
-          await refreshUser();
-          await fetchData();
-          toast.success(`${res.data.tokens_added} token(s) added to your wallet!`);
-        } else if (res?.data?.type === 'inspection') {
+        if (res?.data?.type === 'inspection') {
           await fetchData();
           toast.success('Inspection payment confirmed!');
         }
@@ -71,16 +61,12 @@ export function Profile() {
     setLoading(true);
     maintenanceAPI.expireStalePending(); // fire-and-forget fallback, not awaited
     try {
-      const [walletRes, unlocksRes, inspectionsRes, txRes, rentRes] = await Promise.all([
-        walletAPI.get(user.id),
-        unlockAPI.getMyUnlocks(user.id),
+      const [inspectionsRes, txRes, rentRes] = await Promise.all([
         inspectionAPI.getMyInspections(user.id),
         transactionAPI.getMyTransactions(user.id),
         rentAPI.getMyPayments(user.id).catch(() => ({ data: [] })),
       ]);
       
-      setWallet(walletRes.data);
-      setUnlocks(unlocksRes.data);
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
       setRentPayments(rentRes.data || []);
@@ -225,7 +211,7 @@ export function Profile() {
         <p className="text-muted-foreground mt-1">Manage your account and view your activity</p>
       </div>
 
-      {/* User Info & Wallet */}
+      {/* User Info */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         {/* User Card */}
         <Card className="p-6">
@@ -248,38 +234,11 @@ export function Profile() {
           </div>
         </Card>
 
-        {/* Token Balance */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Token Balance</p>
-              <p className="text-4xl font-bold text-primary mt-1">
-                {user?.token_balance || wallet?.token_balance || 0}
-              </p>
-            </div>
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-              <Coins className="w-7 h-7 text-primary" />
-            </div>
-          </div>
-          <Link to="/buy-tokens">
-            <Button className="w-full mt-4 gap-2" data-testid="buy-tokens-btn">
-              <Plus className="w-4 h-4" />
-              Buy Tokens
-            </Button>
-          </Link>
-        </Card>
-
         {/* Quick Stats */}
         <Card className="p-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{unlocks.length}</p>
-              <p className="text-xs text-muted-foreground">Unlocked</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold">{inspections.length}</p>
-              <p className="text-xs text-muted-foreground">Inspections</p>
-            </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold">{inspections.length}</p>
+            <p className="text-xs text-muted-foreground">Inspections</p>
           </div>
           
           {/* Agent Verification CTA */}
@@ -304,15 +263,11 @@ export function Profile() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="unlocks" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+      <Tabs defaultValue="rent" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="rent" className="gap-2" data-testid="tab-rent">
             <HomeIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Rent &amp; Escrow</span>
-          </TabsTrigger>
-          <TabsTrigger value="unlocks" className="gap-2" data-testid="tab-unlocks">
-            <Unlock className="w-4 h-4" />
-            <span className="hidden sm:inline">Unlocked</span>
           </TabsTrigger>
           <TabsTrigger value="inspections" className="gap-2" data-testid="tab-inspections">
             <Calendar className="w-4 h-4" />
@@ -328,7 +283,6 @@ export function Profile() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Unlocked Properties */}
         {/* Rent payments (escrow) */}
         <TabsContent value="rent">
           <h3 className="font-semibold mb-3">Escrow Payment History</h3>
@@ -441,77 +395,6 @@ export function Profile() {
           )}
         </TabsContent>
 
-        <TabsContent value="unlocks">
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2].map(i => (
-                <Card key={i} className="p-4 animate-pulse">
-                  <div className="h-20 bg-muted rounded" />
-                </Card>
-              ))}
-            </div>
-          ) : unlocks.length > 0 ? (
-            <div className="space-y-4">
-              {unlocks.map((unlock) => (
-                <Card key={unlock.id} className="p-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex gap-4 min-w-0">
-                      <img
-                        src={unlock.property?.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
-                        alt=""
-                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">{unlock.property?.title}</h3>
-                        <p className="text-sm text-muted-foreground truncate">{unlock.property?.location}</p>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                          <span className="text-primary font-bold">
-                            {formatPrice(unlock.property?.price || 0)}
-                          </span>
-                          <span className="text-sm text-muted-foreground truncate">
-                            Contact: {unlock.property?.contact_phone}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex sm:flex-col gap-2 sm:w-40 shrink-0">
-                      <Link to={`/property/${unlock.property_id}`} className="flex-1 sm:flex-none">
-                        <Button variant="outline" size="sm" className="w-full gap-1">
-                          <ExternalLink className="w-4 h-4" />View
-                        </Button>
-                      </Link>
-                      {unlock.property?.availability !== 'unavailable' ? (
-                        <Link to={`/property/${unlock.property_id}`} className="flex-1 sm:flex-none">
-                          <Button
-                            size="sm"
-                            className="w-full gap-1"
-                            data-testid={`pay-rent-${unlock.property_id}`}
-                          >
-                            <CheckCircle2 className="w-4 h-4" />Pay Rent
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Badge variant="secondary" className="flex-1 sm:flex-none justify-center bg-green-100 text-green-700 hover:bg-green-100">Taken</Badge>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-8 text-center">
-              <Unlock className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold">No Unlocked Properties</h3>
-              <p className="text-sm text-muted-foreground mt-2">
-                Properties you unlock will appear here
-              </p>
-              <Link to="/browse">
-                <Button className="mt-4">Browse Properties</Button>
-              </Link>
-            </Card>
-          )}
-        </TabsContent>
-
         {/* Inspections */}
         <TabsContent value="inspections">
           {loading ? (
@@ -562,56 +445,6 @@ export function Profile() {
         {/* Transactions */}
         <TabsContent value="transactions">
           <div className="space-y-6">
-            <div>
-              <h3 className="font-semibold mb-4">Token Purchases</h3>
-              {transactions.token_transactions.length > 0 ? (
-                <div className="space-y-3">
-                  {transactions.token_transactions.map((tx) => (
-                    <Card key={tx.id} className="p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-medium">{tx.tokens_added} Tokens</p>
-                          <p className="text-sm text-muted-foreground">{tx.reference}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="font-bold text-primary">{formatPrice(tx.amount)}</p>
-                            <Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge>
-                          </div>
-                          {(tx.status === 'pending' || tx.status === 'failed') && (
-                            <Button
-                              size="sm" variant="outline" className="gap-1 shrink-0 text-primary border-primary/40"
-                              onClick={() => navigate('/tokens')}
-                            >
-                              <RefreshCw className="w-4 h-4" />Retry
-                            </Button>
-                          )}
-                          <Button
-                            size="sm" variant="outline" className="gap-1 shrink-0"
-                            onClick={() => downloadReceiptPNG({
-                              title: 'Token Purchase Receipt',
-                              reference: tx.reference,
-                              date: new Date(tx.created_at || Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
-                              status: tx.status,
-                              rows: [{ label: 'Tokens', value: `${tx.tokens_added}` }],
-                              total: { label: 'Amount Paid', value: formatPrice(tx.amount) },
-                              filename: `rentora-token-receipt-${tx.reference || tx.id}.png`,
-                            })}
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card className="p-4 text-center text-muted-foreground">
-                  No token purchases yet
-                </Card>
-              )}
-            </div>
-
             <div>
               <h3 className="font-semibold mb-4">Inspection Payments</h3>
               {transactions.inspection_transactions.length > 0 ? (

@@ -76,13 +76,7 @@ export const propertyAPI = {
     
     if (error) throw error;
     
-    return {
-      data: {
-        ...data,
-        contact_phone: '***LOCKED***',
-        contact_unlocked: false
-      }
-    };
+    return { data };
   },
 
   getById: async (id, userId) => {
@@ -94,21 +88,7 @@ export const propertyAPI = {
     
     if (error) throw error;
     
-    // Check if user has unlocked
-    const { data: unlock } = await supabase
-      .from('unlocks')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('property_id', id)
-      .single();
-    
-    return {
-      data: {
-        ...property,
-        contact_unlocked: !!unlock,
-        contact_phone: unlock ? property.contact_phone : '***LOCKED***'
-      }
-    };
+    return { data: property };
   },
 
   create: async (data, user) => {
@@ -218,151 +198,6 @@ export const propertyAPI = {
     if (error) throw error;
     return { data };
   },
-
-  unlock: async (propertyId, userId) => {
-    // Check if already unlocked
-    const { data: existing } = await supabase
-      .from('unlocks')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('property_id', propertyId)
-      .single();
-    
-    if (existing) {
-      throw new Error('Already unlocked');
-    }
-    
-    // Check wallet balance
-    const { data: wallet } = await supabase
-      .from('wallets')
-      .select('token_balance')
-      .eq('user_id', userId)
-      .single();
-    
-    if (!wallet || wallet.token_balance < 1) {
-      throw new Error('Insufficient token balance');
-    }
-    
-    // Get property
-    const { data: property } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('id', propertyId)
-      .eq('status', 'approved')
-      .single();
-    
-    if (!property) {
-      throw new Error('Property not found');
-    }
-    
-    // Deduct token
-    await supabase
-      .from('wallets')
-      .update({ token_balance: wallet.token_balance - 1 })
-      .eq('user_id', userId);
-    
-    // Create unlock
-    await supabase
-      .from('unlocks')
-      .insert({
-        id: uuidv4(),
-        user_id: userId,
-        property_id: propertyId
-      });
-    
-    return {
-      data: {
-        message: 'Contact unlocked',
-        contact_name: property.contact_name,
-        contact_phone: property.contact_phone
-      }
-    };
-  }
-};
-
-// ============== WALLET APIs ==============
-
-export const walletAPI = {
-  get: async (userId) => {
-    const { data, error } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (error && error.code !== 'PGRST116') throw error;
-    return { data: data || { user_id: userId, token_balance: 0 } };
-  },
-
-  getUserWallet: async (userId) => {
-    const { data, error } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    if (error) throw error;
-    return { data };
-  }
-};
-
-// ============== TOKEN APIs ==============
-
-export const tokenAPI = {
-  purchase: async (data, userId) => {
-    const reference = generateReference('TOKEN');
-    const amount = data.quantity * 1000;
-    
-    // Create transaction record
-    await supabase
-      .from('transactions')
-      .insert({
-        id: uuidv4(),
-        user_id: userId,
-        reference,
-        amount,
-        tokens_added: data.quantity,
-        status: 'pending'
-      });
-    
-    return {
-      data: {
-        reference,
-        amount,
-        quantity: data.quantity,
-        payment_type: 'token_purchase'
-      }
-    };
-  }
-};
-
-// ============== UNLOCK APIs ==============
-
-export const unlockAPI = {
-  getMyUnlocks: async (userId) => {
-    const { data: unlocks, error } = await supabase
-      .from('unlocks')
-      .select('*')
-      .eq('user_id', userId);
-    
-    if (error) throw error;
-    
-    // Get property details for each unlock
-    const result = [];
-    for (const unlock of unlocks) {
-      const { data: property } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('id', unlock.property_id)
-        .single();
-      
-      if (property) {
-        result.push({ ...unlock, property });
-      }
-    }
-    
-    return { data: result };
-  }
 };
 
 // ============== INSPECTION APIs ==============
@@ -1007,7 +842,7 @@ export const balanceAPI = {
 // ============== WITHDRAWAL APIs ==============
 
 export const withdrawalAPI = {
-  WITHDRAWAL_FEE_PCT: 3.5,
+  WITHDRAWAL_FEE_PCT: 1.3,
   MIN_WITHDRAWAL_AMOUNT: 3000, // minimum per request
 
   // Preview the fee/net split for a given withdrawal amount (used by the UI
@@ -1031,7 +866,7 @@ export const withdrawalAPI = {
     const available = Number(bal?.total_earned || 0) - Number(bal?.total_withdrawn || 0);
     if (amount > available) throw new Error(`Amount exceeds available balance (₦${available.toLocaleString('en-NG')})`);
 
-    // Rentora takes a 3.5% fee on every withdrawal. The agent's balance is
+    // Rentora takes a 1.3% fee on every withdrawal. The agent's balance is
     // still debited by the full requested amount (that's what leaves their
     // available balance) — the fee is what Rentora keeps out of it, and
     // net_amount is what actually gets paid out to their bank account.
@@ -1161,9 +996,6 @@ export default {
   propertyAPI,
   reviewAPI,
   contactAPI,
-  walletAPI,
-  tokenAPI,
-  unlockAPI,
   inspectionAPI,
   transactionAPI,
   verificationAPI,

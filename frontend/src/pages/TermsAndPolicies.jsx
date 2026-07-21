@@ -21,31 +21,27 @@ const sections = [
         body: `To access certain features, users must create an account.\n\nBy registering, you agree to:\n• Provide accurate and truthful information\n• Keep login credentials secure\n• Accept responsibility for all activities under your account\n\nRentora reserves the right to suspend accounts involved in fraudulent, abusive, or illegal behavior.`
       },
       {
-        title: '3. Token System',
-        body: `1 Token = ₦1,000\n\nTokens are used to unlock verified property owner contact details.\n\nToken Rules:\n• Tokens are non-transferable\n• Tokens are non-refundable once purchased\n• Tokens cannot be converted to cash\n• Unlocking contact details does not guarantee property availability or rental approval\n\nUnused tokens remain in the user's account balance.`
-      },
-      {
-        title: '4. Inspection Bookings',
+        title: '3. Inspection Bookings',
         body: `Each listing has its own inspection fee, set by the agent (minimum ₦1,000).\n\nImportant Conditions:\n• Payment confirms inspection scheduling\n• If the assigned agent fails to attend, a refund may be issued\n• If the user fails to attend, the inspection is considered completed\n• Rentora is not responsible for rental negotiations or final rental agreements`
       },
       {
-        title: '5. Rent Payments & Escrow',
-        body: `When a renter pays rent for a property through Rentora, the payment includes:\n• The rent amount set by the agent\n• An agent fee, automatically calculated as 20% of the rent\n• A service fee, Rentora's own fee for facilitating the transaction\n\nRentora holds the rent and agent fee in escrow — not released to the agent — until the renter confirms they have moved in, or for a maximum of 5 days after payment, whichever comes first.\n\nOnce released, the agent receives the rent and agent fee in full. Rentora's only revenue from a rent transaction is the service fee; Rentora does not take any share of the rent or agent fee itself.\n\nOnce a rent payment is held for a property, that property is marked unavailable to other renters until the payment is resolved.`
+        title: '4. Rent Payments & Escrow',
+        body: `When a renter pays rent for a property through Rentora, the payment includes:\n• The rent amount set by the agent\n• An agent fee, automatically calculated as 10% of the rent\n• A service fee, Rentora's own fee for facilitating the transaction\n\nRentora holds the rent and agent fee in escrow — not released to the agent — until the renter confirms they have moved in, or for a maximum of 5 days after payment, whichever comes first.\n\nOnce released, the agent receives the rent and agent fee in full. Rentora's only revenue from a rent transaction is the service fee; Rentora does not take any share of the rent or agent fee itself.\n\nOnce a rent payment is held for a property, that property is marked unavailable to other renters until the payment is resolved.`
       },
       {
-        title: '6. Property Information Disclaimer',
+        title: '5. Property Information Disclaimer',
         body: `While agents are required to upload verified and physically inspected properties, Rentora does not guarantee:\n• Property availability\n• Final rental price\n• Landlord approval\n• Accuracy of third-party information beyond agent submission\n\nUsers are advised to conduct independent verification before making rental payments.`
       },
       {
-        title: '7. Prohibited Activities',
+        title: '6. Prohibited Activities',
         body: `Users must NOT:\n• Attempt to bypass the platform for fraudulent purposes\n• Misuse agent or owner contact information\n• Harass agents or property owners\n• Attempt chargebacks after services have been delivered\n• Engage in illegal or abusive conduct\n\nViolation may result in suspension or termination.`
       },
       {
-        title: '8. Limitation of Liability',
+        title: '7. Limitation of Liability',
         body: `Rentora acts strictly as an intermediary and escrow holder between users and property agents.\n\nRentora shall not be liable for:\n• Rental disputes\n• Agreements between landlord and tenant\n• Off-platform payments\n• Financial losses resulting from rental decisions\n\nAll final agreements are strictly between the tenant and landlord.`
       },
       {
-        title: '9. Governing Law',
+        title: '8. Governing Law',
         body: `These Terms are governed by the laws of the Federal Republic of Nigeria.`
       },
     ]
@@ -63,7 +59,7 @@ const sections = [
       },
       {
         title: '2. How We Use Information',
-        body: `Your information is used to:\n• Create and manage accounts\n• Process token purchases\n• Facilitate inspection bookings\n• Prevent fraud\n• Improve platform performance`
+        body: `Your information is used to:\n• Create and manage accounts\n• Process rent and inspection payments\n• Facilitate inspection bookings\n• Prevent fraud\n• Improve platform performance`
       },
       {
         title: '3. Payment Information',
@@ -91,15 +87,11 @@ const sections = [
     bg: 'bg-green-50',
     content: [
       {
-        title: '1. Token Purchases',
-        body: `• Tokens are non-refundable once purchased\n• Used tokens cannot be reversed\n• Unused tokens remain in user balance`
-      },
-      {
-        title: '2. Inspection Fees',
+        title: '1. Inspection Fees',
         body: `Refund may be issued if:\n• The agent fails to attend a confirmed inspection\n• The property is confirmed unavailable at booking time\n\nRefund will NOT be issued if:\n• User fails to attend inspection\n• User changes mind after booking\n• Inspection has been completed\n\nRefund processing time: 3–7 business days.`
       },
       {
-        title: '3. Rent Payments',
+        title: '2. Rent Payments',
         body: `Rent, the agent fee, and the service fee are held in escrow once paid, and are not immediately refundable while held.\n\nA refund may be issued while a payment is still held if:\n• The property is confirmed unavailable, misrepresented, or does not exist\n• The agent is unresponsive or unable to complete the move-in process\n\nOnce a rent payment has been released to the agent (after move-in confirmation or the 5-day auto-release), it is no longer refundable through Rentora — any dispute at that point is handled directly between the tenant and agent, with Rentora's admin team available to assist per Section 8 of the Terms & Conditions.\n\nTo raise a rent payment issue before release, contact support@rentora.com.ng as soon as possible.`
       },
     ]

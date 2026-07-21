@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
-import { Menu, X, ChevronDown, User as UserIcon, LogOut, LayoutDashboard, Shield, Coins } from 'lucide-react';
+import { Menu, X, ChevronDown, User as UserIcon, LogOut, LayoutDashboard, Shield } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -67,7 +67,6 @@ export function Layout({ children }) {
                   <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/profile')}><UserIcon className="mr-2 h-4 w-4" />Profile</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/buy-tokens')}><Coins className="mr-2 h-4 w-4" />Tokens</DropdownMenuItem>
                   {isAgent && <DropdownMenuItem onClick={() => navigate('/agent-dashboard')}><LayoutDashboard className="mr-2 h-4 w-4" />Agent dashboard</DropdownMenuItem>}
                   {isAdmin && <DropdownMenuItem onClick={() => navigate('/admin')}><Shield className="mr-2 h-4 w-4" />Admin</DropdownMenuItem>}
                   <DropdownMenuSeparator />
@@ -95,7 +94,6 @@ export function Layout({ children }) {
               {isAuthenticated && (
                 <>
                   <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
-                  <Link to="/buy-tokens" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Tokens</Link>
                   {isAgent && <Link to="/agent-dashboard" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
                   {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}
                 </>

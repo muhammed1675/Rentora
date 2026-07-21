@@ -72,16 +72,10 @@ export function PaymentCallback() {
               <div className="text-left bg-muted rounded-lg p-4 my-4">
                 <p className="text-sm text-muted-foreground">Type</p>
                 <p className="font-medium capitalize mb-2">
-                  {paymentDetails.type === 'token_purchase' ? 'Token Purchase' : 'Inspection Fee'}
+                  Inspection Fee
                 </p>
                 <p className="text-sm text-muted-foreground">Amount</p>
                 <p className="font-medium mb-2">{formatPrice(paymentDetails.amount)}</p>
-                {paymentDetails.tokens && (
-                  <>
-                    <p className="text-sm text-muted-foreground">Tokens Added</p>
-                    <p className="font-medium">{paymentDetails.tokens}</p>
-                  </>
-                )}
               </div>
             )}
             <div className="flex gap-3 mt-4">
@@ -123,7 +117,7 @@ export function PaymentCallback() {
               <Button variant="outline" onClick={() => navigate('/profile')}>
                 Go to Profile
               </Button>
-              <Button onClick={() => navigate('/buy-tokens')}>
+              <Button onClick={() => navigate('/browse')}>
                 Try Again
               </Button>
             </div>
