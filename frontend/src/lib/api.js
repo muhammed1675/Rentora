@@ -224,21 +224,23 @@ export const inspectionAPI = {
     
     // Create inspection
     await supabase
-      .from('inspections')
-      .insert({
-        id: inspectionId,
-        user_id: user.id,
-        user_name: user.full_name,
-        user_email: user.email,
-        property_id: data.property_id,
-        property_title: property.title,
-        agent_id: property.uploaded_by_agent_id,
-        agent_name: property.uploaded_by_agent_name,
-        inspection_date: data.inspection_date,
-        status: 'pending',
-        payment_status: 'pending',
-        payment_reference: reference
-      });
+  .from('inspections')
+  .insert({
+    id: inspectionId,
+    user_id: user.id,
+    user_name: user.full_name,
+    user_email: data.email || user.email,   // ← use dialog email
+    user_phone: data.phone_number || null,  // ← NEW: save phone
+    property_id: data.property_id,
+    property_title: property.title,
+    agent_id: property.uploaded_by_agent_id,
+    agent_name: property.uploaded_by_agent_name,
+    inspection_date: data.inspection_date,
+    status: 'pending',
+    payment_status: 'pending',
+    payment_reference: reference,
+  });
+
     
     // Dynamic inspection fee set by the agent (min 1000, default 3000)
     const inspectionAmount = Number(property.inspection_fee) > 0

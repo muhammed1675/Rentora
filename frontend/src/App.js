@@ -109,7 +109,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-center" richColors expand toastOptions={{ style: { maxWidth: '92vw' } }} />
       </BrowserRouter>
     </AuthProvider>
   );

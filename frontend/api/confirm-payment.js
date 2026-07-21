@@ -228,15 +228,15 @@ async function sendRentHeldEmail(supabase, rentTx) {
       type: 'rent_payment_held',
       to: agent.email,
       data: {
-        agent_name: agent.full_name || 'there',
-        property_title: propertyTitle,
-        amount: rentTx.total_amount,
-        agent_fee: rentTx.agent_fee,
-        reference: rentTx.reference,
-        student_name: student?.full_name || 'A student',
-        student_email: student?.email || '',
-        student_phone: student?.phone || '',
-      },
+  agent_name: agent.full_name || 'there',
+  user_name:  inspection?.user_name  || student?.full_name || 'A student',
+  user_email: inspection?.user_email || student?.email     || '',
+  user_phone: inspection?.user_phone || student?.phone     || '',
+  property_title: inspection?.property_title || 'a property',
+  inspection_date: inspection?.inspection_date || '',
+  reference: inspTx.reference,
+},
+
     });
   }
   if (student?.email) {
