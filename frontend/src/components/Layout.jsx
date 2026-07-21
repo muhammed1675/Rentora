@@ -33,7 +33,7 @@ export function Layout({ children }) {
             <img 
               src="/rentora-logo.svg" 
               alt="Rentora Logo" 
-              className="h-8 w-auto object-contain" 
+              className="h-8 w-auto object-contain bg-transparent" 
             />
             Rentora
           </Link>
@@ -122,11 +122,11 @@ export function Layout({ children }) {
           <div>
             <div className="mb-4 flex items-center gap-2 text-xl font-semibold">
               {/* Footer logo reference */}
-              <img 
-                src="/rentora-logo.svg" 
-                alt="Rentora Logo" 
-                className="h-8 w-auto object-contain" 
-              />
+            <img 
+              src="/rentora-logo.svg" 
+              alt="Rentora Logo" 
+              className="h-8 w-auto object-contain bg-transparent" 
+            />
               Rentora
             </div>
             <p className="max-w-sm text-sm leading-6 text-white/60">
