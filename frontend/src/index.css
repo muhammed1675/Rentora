@@ -28,21 +28,24 @@ code { font-family: 'Geist Mono', monospace; }
         --card-foreground: 210 12% 10%;
         --popover: 0 0% 100%;
         --popover-foreground: 210 12% 10%;
-        --primary: 210 44% 17%;                /* #172b3d dark navy */
+        
+        /* Updated to Rentora Blue (#0062AE) */
+        --primary: 206 100% 34%;               /* #0062AE Rentora Blue */
         --primary-foreground: 0 0% 100%;
+        
         --secondary: 60 8% 93%;
-        --secondary-foreground: 210 44% 17%;
+        --secondary-foreground: 206 100% 34%;
         --muted: 60 8% 93%;
         --muted-foreground: 213 8% 40%;        /* #5d646d */
-        --accent: 210 30% 88%;
-        --accent-foreground: 210 44% 17%;
+        --accent: 206 60% 92%;                 /* Light subtle blue accent */
+        --accent-foreground: 206 100% 34%;
         --destructive: 0 72% 51%;
         --destructive-foreground: 0 0% 100%;
         --border: 60 6% 88%;
         --input: 60 6% 88%;
-        --ring: 210 44% 17%;
+        --ring: 206 100% 34%;
         --radius: 0.875rem;
-        --step-color: 210 44% 30%;
+        --step-color: 206 100% 26%;            /* #003A87 Dark Rentora Blue */
     }
 
     .dark {
@@ -52,8 +55,8 @@ code { font-family: 'Geist Mono', monospace; }
         --card-foreground: 60 11% 97%;
         --popover: 210 30% 12%;
         --popover-foreground: 60 11% 97%;
-        --primary: 60 11% 97%;
-        --primary-foreground: 210 44% 17%;
+        --primary: 206 100% 45%;               /* Slightly lighter Rentora Blue for dark mode */
+        --primary-foreground: 210 30% 8%;
         --secondary: 210 20% 18%;
         --secondary-foreground: 60 11% 97%;
         --muted: 210 20% 18%;
@@ -64,7 +67,7 @@ code { font-family: 'Geist Mono', monospace; }
         --destructive-foreground: 60 11% 97%;
         --border: 210 20% 22%;
         --input: 210 20% 22%;
-        --ring: 60 11% 80%;
+        --ring: 206 100% 45%;
     }
 }
 
@@ -73,14 +76,14 @@ code { font-family: 'Geist Mono', monospace; }
     body { @apply bg-background text-foreground; }
 }
 
-/* Glass header effect from old layout */
+/* Glass header effect */
 .glass {
     background: rgba(247, 247, 245, 0.9);
     backdrop-filter: saturate(180%) blur(12px);
     -webkit-backdrop-filter: saturate(180%) blur(12px);
 }
 
-/* Pill-shaped primary buttons per new design brief */
+/* Pill-shaped primary buttons */
 .btn-pill {
     border-radius: 9999px;
 }
