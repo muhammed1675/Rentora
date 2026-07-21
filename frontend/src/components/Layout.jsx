@@ -94,7 +94,7 @@ export function Layout({ children }) {
               {isAuthenticated && (
                 <>
                   <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
-                  {isAgent && <Link to="/agent-dashboard" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
+                  {isAgent && <Link to="/agent" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
                   {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}
                 </>
               )}
