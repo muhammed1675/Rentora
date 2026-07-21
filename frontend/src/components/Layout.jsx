@@ -117,44 +117,43 @@ export function Layout({ children }) {
 
       <main className="flex-1">{children}</main>
 
-      <footer className="w-full bg-slate-50 text-slate-900">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
-          <div>
-            <div className="mb-4 flex items-center gap-2 text-xl font-semibold">
-              {/* Footer logo reference */}
-            <img 
-              src="/rentora-logo.svg" 
-              alt="Rentora Logo" 
-              className="h-8 w-auto object-contain bg-transparent" 
-            />
-              Rentora
-            </div>
-            <p className="max-w-sm text-sm leading-6 text-slate-600">
-              Verified student housing, secure payments, and a clearer path home for LAUTECH students.
-            </p>
-          </div>
-          <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Explore</p>
-            <div className="flex flex-col gap-3 text-sm text-slate-700">
-              <Link to="/browse" className="transition-colors hover:text-primary">Browse homes</Link>
-              <Link to="/compare" className="transition-colors hover:text-primary">Compare</Link>
-              <Link to="/become-agent" className="transition-colors hover:text-primary">Become an agent</Link>
-            </div>
-          </div>
-          <div>
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support</p>
-            <div className="flex flex-col gap-3 text-sm text-slate-700">
-              <Link to="/contact" className="transition-colors hover:text-primary">Contact us</Link>
-              <Link to="/terms" className="transition-colors hover:text-primary">Terms &amp; policies</Link>
-              <Link to="/profile" className="transition-colors hover:text-primary">My profile</Link>
-            </div>
-          </div>
-        </div>
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-slate-200 px-5 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <span>© {new Date().getFullYear()} Rentora. Built for Ogbomosho.</span>
-          <span>Rent confidently. Move securely.</span>
-        </div>
-      </footer>
+<footer className="w-full border-t border-slate-200 bg-slate-50 text-slate-900">
+  <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
+    <div>
+      <div className="mb-4 flex items-center gap-2 text-xl font-semibold">
+        <img 
+          src="/rentora-logo.svg" 
+          alt="Rentora Logo" 
+          className="h-8 w-auto object-contain bg-transparent" 
+        />
+        Rentora
+      </div>
+      <p className="max-w-sm text-sm leading-6 text-slate-600">
+        Verified student housing, secure payments, and a clearer path home for LAUTECH students.
+      </p>
+    </div>
+    <div>
+      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Explore</p>
+      <div className="flex flex-col gap-3 text-sm text-slate-700">
+        <Link to="/browse" className="transition-colors hover:text-primary">Browse homes</Link>
+        <Link to="/compare" className="transition-colors hover:text-primary">Compare</Link>
+        <Link to="/become-agent" className="transition-colors hover:text-primary">Become an agent</Link>
+      </div>
+    </div>
+    <div>
+      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support</p>
+      <div className="flex flex-col gap-3 text-sm text-slate-700">
+        <Link to="/contact" className="transition-colors hover:text-primary">Contact us</Link>
+        <Link to="/terms" className="transition-colors hover:text-primary">Terms &amp; policies</Link>
+        <Link to="/profile" className="transition-colors hover:text-primary">My profile</Link>
+      </div>
+    </div>
+  </div>
+  <div className="mx-auto flex max-w-7xl flex-col gap-2 border-t border-slate-200 px-5 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+    <span>© {new Date().getFullYear()} Rentora. Built for Ogbomosho.</span>
+    <span>Rent confidently. Move securely.</span>
+  </div>
+</footer>
 
       <ConsentBanner />
     </div>
