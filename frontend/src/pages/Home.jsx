@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck, Lock, CheckCircle2, Zap } from 'lucide-react';
 import { AppBanner } from '../components/AppBanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 
@@ -123,23 +123,41 @@ export function Home() {
         </div>
       </section>
 
-      {/* Become an agent CTA */}
+      {/* Safety & Protection */}
       <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 md:py-24">
-        <div className="overflow-hidden rounded-[28px] bg-primary p-7 text-primary-foreground sm:p-12 md:p-16">
-          <div className="grid gap-10 md:grid-cols-[1.25fr_.75fr] md:items-end">
+        <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-blue-600 to-blue-800 p-7 text-white sm:p-12 md:p-16">
+          <div className="grid gap-10 lg:grid-cols-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/55">Build your business</p>
-              <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-[-0.035em] sm:text-5xl">
-                Earn more as a verified Rentora agent.
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-100">Peace of mind</p>
+              <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+                Every transaction protected.
               </h2>
-              <p className="mt-5 max-w-xl text-base leading-7 text-white/70">
-                Keep 100% of every inspection fee, plus receive the full rent and agent fee payout when students move in.
+              <p className="mt-5 max-w-xl text-base leading-7 text-blue-50">
+                Rentora holds your rent in secure escrow until you confirm you&apos;ve moved in. Only verified agents. Transparent fees. Your security, our priority.
               </p>
             </div>
-            <Link to="/become-agent"
-                  className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-primary md:justify-self-end">
-              Become an agent <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl bg-white/10 p-5 backdrop-blur-sm">
+                <Lock className="h-6 w-6 text-blue-200" />
+                <h3 className="mt-3 font-semibold">Escrow Protected</h3>
+                <p className="mt-1 text-sm text-blue-50">Rent held securely until move-in confirmed</p>
+              </div>
+              <div className="rounded-xl bg-white/10 p-5 backdrop-blur-sm">
+                <BadgeCheck className="h-6 w-6 text-blue-200" />
+                <h3 className="mt-3 font-semibold">Verified Agents</h3>
+                <p className="mt-1 text-sm text-blue-50">All agents vetted for reliability</p>
+              </div>
+              <div className="rounded-xl bg-white/10 p-5 backdrop-blur-sm">
+                <Zap className="h-6 w-6 text-blue-200" />
+                <h3 className="mt-3 font-semibold">Transparent Pricing</h3>
+                <p className="mt-1 text-sm text-blue-50">See all fees upfront, no surprises</p>
+              </div>
+              <div className="rounded-xl bg-white/10 p-5 backdrop-blur-sm">
+                <CheckCircle2 className="h-6 w-6 text-blue-200" />
+                <h3 className="mt-3 font-semibold">Buyer Protection</h3>
+                <p className="mt-1 text-sm text-blue-50">Dispute resolution & support team</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
