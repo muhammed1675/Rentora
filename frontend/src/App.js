@@ -19,6 +19,7 @@ import TermsAndPolicies from "./pages/TermsAndPolicies";
 import Contact from "./pages/Contact";
 import { Compare } from './pages/Compare';
 import { ResetPassword } from './pages/ResetPassword';
+import { NotFound } from './pages/NotFound';
 
 // Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -99,7 +100,7 @@ function AppRoutes() {
       <Route path="/terms" element={<Layout><TermsAndPolicies /></Layout>} />
 
       {/* Catch all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Layout><NotFound /></Layout>} />
     </Routes>
   );
 }
@@ -109,7 +110,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
-        <Toaster position="top-center" richColors expand toastOptions={{ style: { maxWidth: '92vw' } }} />
+        <Toaster position="top-center" expand toastOptions={{ style: { maxWidth: '92vw' } }} />
       </BrowserRouter>
     </AuthProvider>
   );
