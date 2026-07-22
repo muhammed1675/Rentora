@@ -177,11 +177,23 @@ export default async function handler(req, res) {
 async function callSupabaseSendEmail(payload) {
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
   const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-  await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error(`callSupabaseSendEmail: missing env vars (hasUrl=${!!SUPABASE_URL}, hasAnonKey=${!!SUPABASE_ANON_KEY}) for type=${payload?.type}`);
+  }
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    // Previously this response was never inspected, so a failed send here
+    // (bad payload, Resend error surfaced by the edge function, etc.) was
+    // completely invisible — the outer .catch() never fired because
+    // nothing rejected. Throwing here is what makes failures show up in
+    // Vercel logs instead of vanishing silently.
+    const body = await res.text().catch(() => '');
+    throw new Error(`callSupabaseSendEmail: send-email returned ${res.status} for type=${payload?.type} to=${payload?.to} — ${body}`);
+  }
 }
 
 async function sendTokenReceiptEmail(supabase, tokenTx) {
@@ -199,21 +211,30 @@ async function sendInspectionReceiptEmail(supabase, inspTx, inspection) {
     supabase.from('users').select('email, full_name, phone').eq('id', inspTx.user_id).maybeSingle(),
     inspection?.agent_id ? supabase.from('users').select('email, full_name').eq('id', inspection.agent_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  if (agent?.email) {
-    await callSupabaseSendEmail({
-      type: 'inspection_agent_notify',
-      to: agent.email,
-      data: {
-        agent_name: agent.full_name || 'there',
-        user_name: student?.full_name || 'A student',
-        user_email: student?.email || '',
-        user_phone: student?.phone || '',
-        property_title: inspection?.property_title || 'a property',
-        inspection_date: inspection?.inspection_date || '',
-        reference: inspTx.reference,
-      },
+  if (!agent?.email) {
+    // This used to fail silently — no error, no log, nothing. If agent_id
+    // was missing/wrong, or the agent's users row had no email, the whole
+    // notification just quietly never happened.
+    console.warn('sendInspectionReceiptEmail: skipping agent notify — no agent email found', {
+      inspection_id: inspection?.id,
+      agent_id: inspection?.agent_id,
+      agentLookupFoundRow: !!agent,
     });
+    return;
   }
+  await callSupabaseSendEmail({
+    type: 'inspection_agent_notify',
+    to: agent.email,
+    data: {
+      agent_name: agent.full_name || 'there',
+      user_name: student?.full_name || 'A student',
+      user_email: student?.email || '',
+      user_phone: student?.phone || '',
+      property_title: inspection?.property_title || 'a property',
+      inspection_date: inspection?.inspection_date || '',
+      reference: inspTx.reference,
+    },
+  });
 }
 
 async function sendRentHeldEmail(supabase, rentTx) {
@@ -228,15 +249,15 @@ async function sendRentHeldEmail(supabase, rentTx) {
       type: 'rent_payment_held',
       to: agent.email,
       data: {
-  agent_name: agent.full_name || 'there',
-  user_name:  inspection?.user_name  || student?.full_name || 'A student',
-  user_email: inspection?.user_email || student?.email     || '',
-  user_phone: inspection?.user_phone || student?.phone     || '',
-  property_title: inspection?.property_title || 'a property',
-  inspection_date: inspection?.inspection_date || '',
-  reference: inspTx.reference,
-},
-
+        agent_name: agent.full_name || 'there',
+        property_title: propertyTitle,
+        amount: rentTx.total_amount,
+        agent_fee: rentTx.agent_fee,
+        reference: rentTx.reference,
+        student_name: student?.full_name || 'A student',
+        student_email: student?.email || '',
+        student_phone: student?.phone || '',
+      },
     });
   }
   if (student?.email) {
