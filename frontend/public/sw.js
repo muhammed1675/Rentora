@@ -55,6 +55,11 @@ self.addEventListener('fetch', (event) => {
           if (event.request.destination === 'document') {
             return caches.match('/');
           }
+          // Previously fell through here and resolved to `undefined`,
+          // which event.respondWith() cannot use — that's what threw
+          // "Failed to convert value to 'Response'" for any uncached,
+          // non-document request (e.g. a blocked/failed asset fetch).
+          return new Response('', { status: 504, statusText: 'Offline and not cached' });
         });
       })
   );
