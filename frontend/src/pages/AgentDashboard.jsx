@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { propertyAPI, inspectionAPI, storageAPI, balanceAPI, withdrawalAPI, rentAPI } from '../lib/api';
+import { propertyAPI, inspectionAPI, storageAPI, balanceAPI, withdrawalAPI, rentAPI, locationAPI } from '../lib/api';
 import { downloadReceiptPNG } from '../lib/receipt';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
@@ -100,8 +100,9 @@ export function AgentDashboard() {
   const [editingProperty, setEditingProperty] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
+  const [locations, setLocations] = useState([]);
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '',
+    title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location_id: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
     owner_full_name: '', owner_phone: '',
     google_maps_link: '', amenities: [],
@@ -128,6 +129,10 @@ export function AgentDashboard() {
     if (!isAgent && !isAdmin) { toast.error('Access denied'); navigate('/'); return; }
     fetchData();
   }, [isAuthenticated, isAgent, isAdmin, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    locationAPI.getAll().then(res => setLocations(res.data)).catch(() => setLocations([]));
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -267,7 +272,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
+    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location_id: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
     setEditingProperty(null);
   };
 
@@ -278,7 +283,7 @@ export function AgentDashboard() {
         title: property.title, description: property.description, price: property.price.toString(),
         caution_fee: property.caution_fee ? property.caution_fee.toString() : '',
         inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
-        location: property.location, property_type: property.property_type, images: property.images || [],
+        location_id: property.location_id ? String(property.location_id) : '', property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
         owner_full_name: property.owner_full_name || '', owner_phone: property.owner_phone || '',
         google_maps_link: property.google_maps_link || '', amenities: property.amenities || [],
@@ -288,7 +293,7 @@ export function AgentDashboard() {
   };
 
   const handleSubmitProperty = async () => {
-    if (!formData.title || !formData.price || !formData.location || !formData.contact_name || !formData.contact_phone) {
+    if (!formData.title || !formData.price || !formData.location_id || !formData.contact_name || !formData.contact_phone) {
       toast.error('Please fill in all required fields'); return;
     }
     if (!formData.owner_full_name || !formData.owner_phone) {
@@ -297,12 +302,14 @@ export function AgentDashboard() {
     try {
       const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
       const priceVal = parseInt(formData.price);
+      const locationIdVal = parseInt(formData.location_id, 10);
+      const locationName = locations.find(l => l.id === locationIdVal)?.name || '';
 
       // Warn if another agent already has a listing that looks like the
       // same property — same type, similar price/title/location.
       const dupRes = await propertyAPI.checkPossibleDuplicates({
         title: formData.title,
-        location: formData.location,
+        location: locationName,
         price: priceVal,
         propertyType: formData.property_type,
         agentId: user.id,
@@ -316,7 +323,7 @@ export function AgentDashboard() {
         if (!proceed) return;
       }
 
-      const data = { ...formData, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
+      const data = { ...formData, location_id: locationIdVal, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
       if (editingProperty) {
         // Any edit to an existing listing's details must go back through admin
         // approval — status: 'pending' is enough to pull it out of "approved"
@@ -952,7 +959,17 @@ export function AgentDashboard() {
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2"><Label>Location *</Label><Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Near LAUTECH Main Gate" /></div>
+              <div className="space-y-2">
+                <Label>Location *</Label>
+                <Select value={formData.location_id ? String(formData.location_id) : ''} onValueChange={(v) => setFormData({ ...formData, location_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select a location" /></SelectTrigger>
+                  <SelectContent>
+                    {locations.map(loc => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Google Maps Link<span className="text-xs text-muted-foreground font-normal ml-1">so students can get directions</span></Label>
                 <Input

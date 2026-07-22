@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { propertyAPI } from '../lib/api';
+import { propertyAPI, locationAPI } from '../lib/api';
 import { PropertyCard, PropertyCardSkeleton } from '../components/PropertyCard';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -68,6 +68,8 @@ export function Browse() {
   const [propertyType, setPropertyType] = useState(searchParams.get('property_type') || 'all');
   const [priceRange, setPriceRange] = useState([0, 500000]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [locations, setLocations] = useState([]);
+  const [locationId, setLocationId] = useState(searchParams.get('location_id') || 'all');
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [favourites, setFavourites] = useState([]);
   const [showFavsOnly, setShowFavsOnly] = useState(false);
@@ -79,6 +81,7 @@ export function Browse() {
     try {
       const params = { status: 'approved' };
       if (propertyType && propertyType !== 'all') params.property_type = propertyType;
+      if (locationId && locationId !== 'all') params.location_id = locationId;
       if (priceRange[0] > 0) params.min_price = priceRange[0];
       if (priceRange[1] < 500000) params.max_price = priceRange[1];
       const response = await propertyAPI.getAll(params);
@@ -91,10 +94,13 @@ export function Browse() {
     }
   };
 
-  useEffect(() => { fetchProperties(); setRecentlyViewed(getRecentlyViewed()); setFavourites(getFavourites()); setCompareList(getCompareList()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchProperties(); setRecentlyViewed(getRecentlyViewed()); setFavourites(getFavourites()); setCompareList(getCompareList());
+    locationAPI.getAll().then(res => setLocations(res.data)).catch(() => setLocations([]));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApplyFilters = () => { fetchProperties(); setShowFilters(false); };
-  const handleResetFilters = () => { setPropertyType('all'); setPriceRange([0, 500000]); setSearchTerm(''); setShowFavsOnly(false); fetchProperties(); };
+  const handleResetFilters = () => { setPropertyType('all'); setLocationId('all'); setPriceRange([0, 500000]); setSearchTerm(''); setShowFavsOnly(false); fetchProperties(); };
 
   const handleToggleFav = (id) => { toggleFavourite(id); setFavourites(getFavourites()); };
 
@@ -176,6 +182,18 @@ export function Browse() {
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="hostel"><div className="flex items-center gap-2"><Home className="w-4 h-4" />Hostel</div></SelectItem>
                   <SelectItem value="apartment"><div className="flex items-center gap-2"><Building className="w-4 h-4" />Apartment</div></SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Location</label>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger data-testid="location-filter"><SelectValue placeholder="All Locations" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locations.map(loc => (
+                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

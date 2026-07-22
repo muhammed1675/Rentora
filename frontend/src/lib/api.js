@@ -7,6 +7,21 @@ const generateReference = (prefix) => {
   return `${prefix}-${date}-${uuidv4().slice(0, 8).toUpperCase()}`;
 };
 
+// Turns the nested `locations` join into a flat `location` string so every
+// existing screen that reads `property.location` keeps working unchanged.
+const withLocationName = (row) => row ? { ...row, location: row.locations?.name || null } : row;
+const withLocationNames = (rows) => (rows || []).map(withLocationName);
+
+// ============== LOCATION APIs ==============
+
+export const locationAPI = {
+  getAll: async () => {
+    const { data, error } = await supabase.from('locations').select('id, name').order('name');
+    if (error) throw error;
+    return { data: data || [] };
+  },
+};
+
 // ============== PROPERTY APIs ==============
 
 export const propertyAPI = {
@@ -32,7 +47,7 @@ export const propertyAPI = {
   getAll: async (params = {}) => {
     let query = supabase
       .from('properties')
-      .select('*')
+      .select('*, locations(name)')
       .order('created_at', { ascending: false });
     
     if (params.status) {
@@ -52,6 +67,10 @@ export const propertyAPI = {
     if (params.property_type) {
       query = query.eq('property_type', params.property_type);
     }
+
+    if (params.location_id) {
+      query = query.eq('location_id', params.location_id);
+    }
     
     if (params.min_price) {
       query = query.gte('price', params.min_price);
@@ -63,32 +82,32 @@ export const propertyAPI = {
     
     const { data, error } = await query;
     if (error) throw error;
-    return { data };
+    return { data: withLocationNames(data) };
   },
 
   getPublic: async (id) => {
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, locations(name)')
       .eq('id', id)
       .eq('status', 'approved')
       .single();
     
     if (error) throw error;
     
-    return { data };
+    return { data: withLocationName(data) };
   },
 
   getById: async (id, userId) => {
     const { data: property, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, locations(name)')
       .eq('id', id)
       .single();
     
     if (error) throw error;
     
-    return { data: property };
+    return { data: withLocationName(property) };
   },
 
   create: async (data, user) => {
@@ -171,32 +190,32 @@ export const propertyAPI = {
   getMyListings: async (userId) => {
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, locations(name)')
       .eq('uploaded_by_agent_id', userId)
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return { data };
+    return { data: withLocationNames(data) };
   },
 
   getPending: async () => {
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, locations(name)')
       .eq('status', 'pending');
     
     if (error) throw error;
-    return { data };
+    return { data: withLocationNames(data) };
   },
 
   getAllAdmin: async () => {
     const { data, error } = await supabase
       .from('properties')
-      .select('*')
+      .select('*, locations(name)')
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return { data };
+    return { data: withLocationNames(data) };
   },
 };
 
@@ -1167,11 +1186,11 @@ export const rentAPI = {
   getMyPayments: async (userId) => {
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('*, property:properties(*)')
+      .select('*, property:properties(*, locations(name))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return { data: data || [] };
+    return { data: (data || []).map(r => ({ ...r, property: withLocationName(r.property) })) };
   },
 
   // Admin visibility into every rent payment — used by the Escrow tab so
@@ -1180,10 +1199,10 @@ export const rentAPI = {
   getAllForAdmin: async () => {
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('*, property:properties(title, location)')
+      .select('*, property:properties(title, location_id, locations(name))')
       .order('created_at', { ascending: false });
     if (error) { console.warn('property_rent_payments:', error.message); return { data: [] }; }
-    return { data: data || [] };
+    return { data: (data || []).map(r => ({ ...r, property: withLocationName(r.property) })) };
   },
 };
 
