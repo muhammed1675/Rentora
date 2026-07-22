@@ -571,13 +571,7 @@ export function PropertyDetails() {
             )}
           </Card>
 
-          {property.uploaded_by_agent_name && (
-            <Card className="max-w-full overflow-hidden p-4 sm:p-6">
-              <h3 className="font-semibold mb-2">Listed By</h3>
-              <p className="break-words text-muted-foreground">{property.uploaded_by_agent_name}</p>
-              <p className="text-xs text-muted-foreground mt-1">Verified Agent</p>
-            </Card>
-          )}
+          {/* "Listed By" card removed intentionally. */}
         </div>
       </div>
 

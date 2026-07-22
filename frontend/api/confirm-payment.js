@@ -140,7 +140,21 @@ export default async function handler(req, res) {
 
       const { data: inspection } = await supabase.from('inspections').select('*').eq('id', inspTx.inspection_id).maybeSingle();
 
-      sendInspectionReceiptEmail(supabase, inspTx, inspection).catch((e) => console.warn('inspection receipt email failed (non-fatal):', e));
+      // Await so failures show up as a real 500 in Vercel logs instead of being swallowed.
+      // Both agent-notify and student-receipt are attempted; each is independently caught
+      // so one failing does not block the other.
+      const emailResults = await Promise.allSettled([
+        sendInspectionAgentNotify(supabase, inspTx, inspection),
+        sendInspectionStudentReceipt(supabase, inspTx, inspection),
+      ]);
+      emailResults.forEach((r, i) => {
+        const label = i === 0 ? 'agent_notify' : 'student_receipt';
+        if (r.status === 'rejected') {
+          console.error(`[inspection email] ${label} FAILED for reference=${reference}:`, r.reason?.message || r.reason);
+        } else {
+          console.log(`[inspection email] ${label} OK for reference=${reference}`);
+        }
+      });
 
       return res.status(200).json({ ok: true, type: 'inspection', amount: inspTx.amount, agent_name: inspection?.agent_name, property_title: inspection?.property_title });
     }
@@ -206,33 +220,75 @@ async function sendTokenReceiptEmail(supabase, tokenTx) {
   });
 }
 
-async function sendInspectionReceiptEmail(supabase, inspTx, inspection) {
+async function sendInspectionAgentNotify(supabase, inspTx, inspection) {
+  if (!inspection) {
+    throw new Error(`inspection row not found for inspection_id=${inspTx?.inspection_id}`);
+  }
+
+  // Self-heal: if agent_id is missing on the inspection row, look it up from
+  // the property. Older inspection rows created before agent_id was populated
+  // consistently would otherwise silently skip the notify.
+  let agentId = inspection.agent_id;
+  if (!agentId && inspection.property_id) {
+    const { data: prop } = await supabase
+      .from('properties')
+      .select('uploaded_by_agent_id')
+      .eq('id', inspection.property_id)
+      .maybeSingle();
+    agentId = prop?.uploaded_by_agent_id || null;
+    if (agentId) {
+      await supabase.from('inspections').update({ agent_id: agentId }).eq('id', inspection.id);
+      console.log(`[inspection email] backfilled agent_id=${agentId} on inspection=${inspection.id}`);
+    }
+  }
+
+  if (!agentId) {
+    throw new Error(`no agent_id on inspection=${inspection.id} and property has no uploaded_by_agent_id`);
+  }
+
   const [{ data: student }, { data: agent }] = await Promise.all([
     supabase.from('users').select('email, full_name, phone').eq('id', inspTx.user_id).maybeSingle(),
-    inspection?.agent_id ? supabase.from('users').select('email, full_name').eq('id', inspection.agent_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('users').select('email, full_name').eq('id', agentId).maybeSingle(),
   ]);
-  if (!agent?.email) {
-    // This used to fail silently — no error, no log, nothing. If agent_id
-    // was missing/wrong, or the agent's users row had no email, the whole
-    // notification just quietly never happened.
-    console.warn('sendInspectionReceiptEmail: skipping agent notify — no agent email found', {
-      inspection_id: inspection?.id,
-      agent_id: inspection?.agent_id,
-      agentLookupFoundRow: !!agent,
-    });
-    return;
+
+  if (!agent) {
+    throw new Error(`agent user row not found for agent_id=${agentId}`);
   }
+  if (!agent.email) {
+    throw new Error(`agent user row found but email is null for agent_id=${agentId}`);
+  }
+
+  console.log(`[inspection email] sending agent_notify to=${agent.email} for inspection=${inspection.id}`);
+
   await callSupabaseSendEmail({
     type: 'inspection_agent_notify',
     to: agent.email,
     data: {
       agent_name: agent.full_name || 'there',
       user_name: student?.full_name || 'A student',
-      user_email: student?.email || '',
+      user_email: student?.email || inspection.user_email || '',
       user_phone: student?.phone || '',
       property_title: inspection?.property_title || 'a property',
       inspection_date: inspection?.inspection_date || '',
       reference: inspTx.reference,
+    },
+  });
+}
+
+async function sendInspectionStudentReceipt(supabase, inspTx, inspection) {
+  const { data: student } = await supabase
+    .from('users').select('email, full_name').eq('id', inspTx.user_id).maybeSingle();
+  const to = student?.email || inspection?.user_email;
+  if (!to) throw new Error(`no student email for inspection=${inspection?.id}`);
+  await callSupabaseSendEmail({
+    type: 'inspection_booked',
+    to,
+    data: {
+      name: student?.full_name || inspection?.user_name || 'there',
+      property_title: inspection?.property_title || 'a property',
+      inspection_date: inspection?.inspection_date || '',
+      reference: inspTx.reference,
+      amount: inspTx.amount,
     },
   });
 }
