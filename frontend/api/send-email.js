@@ -223,6 +223,15 @@ export default async function handler(req) {
       }
     }
 
+    if (type === 'inspection_agent_notify') {
+      // Email to agent notifying about new inspection booking
+      await sendEmail(
+        data.agentEmail,
+        `Rentora – New Inspection Booked: ${data.propertyTitle}`,
+        inspectionEmailHtml({ ...data, toAgent: true, date })
+      );
+    }
+
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error('Email error:', err);

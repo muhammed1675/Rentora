@@ -517,31 +517,6 @@ export function PropertyDetails() {
           </Card>
 
           <Card className="max-w-full overflow-hidden p-4 sm:p-6">
-            <h3 className="font-semibold mb-4">Owner Contact</h3>
-            <div className="min-w-0 space-y-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <User className="w-5 h-5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="break-words font-medium">{property.contact_name}</p>
-                  <p className="text-sm text-muted-foreground">Property Owner</p>
-                </div>
-              </div>
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Phone className="w-5 h-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <a href={`tel:${property.contact_phone}`} className="break-all font-medium text-primary hover:underline">
-                    {property.contact_phone}
-                  </a>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
             <div className="mb-4 max-w-full overflow-hidden rounded-lg border bg-muted/30 p-3 sm:p-4">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-2">
                 <h3 className="min-w-0 font-semibold">Rent this property</h3>
