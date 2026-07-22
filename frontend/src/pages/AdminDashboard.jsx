@@ -208,7 +208,7 @@ export function AdminDashboard() {
   // agent double-renting an already-occupied room). Use this once a
   // tenancy has genuinely ended and the listing should go live again.
   // Opens the same property preview modal used in the Properties tab, from
-  // anywhere else in the dashboard (Escrow, Owner Payouts) that only has a
+  // anywhere else in the dashboard (e.g. Escrow) that only has a
   // property_id — looks it up from the already-fetched properties list.
   const openPropertyPreviewById = (propertyId) => {
     const full = properties.find((p) => p.id === propertyId);
@@ -1543,7 +1543,7 @@ export function AdminDashboard() {
 
         <TabsContent value="rentora-revenue">
           <div className="mb-4 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-800">
-            This is Rentora's own money — what the platform actually earns, separate from anything owed to agents or property owners. Inspection fees are excluded since agents keep 100% of those.
+            This is Rentora's own money — what the platform actually earns, separate from anything owed to agents. Inspection fees are excluded since agents keep 100% of those.
           </div>
 
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
@@ -2042,7 +2042,7 @@ export function AdminDashboard() {
               </div>
               {/* Property Owner — visible to admin at every stage, including before approval */}
               <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-                <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Property Owner (Payout Details)</p>
+                <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Property Owner</p>
                 {previewProperty.owner_full_name ? (
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
@@ -2052,18 +2052,6 @@ export function AdminDashboard() {
                     <div>
                       <p className="text-xs text-muted-foreground">Phone</p>
                       <p className="font-semibold">{previewProperty.owner_phone || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Bank</p>
-                      <p className="font-semibold">{previewProperty.owner_bank_name || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Account Number</p>
-                      <p className="font-semibold">{previewProperty.owner_account_number || '—'}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-xs text-muted-foreground">Account Name</p>
-                      <p className="font-semibold">{previewProperty.owner_account_name || '—'}</p>
                     </div>
                   </div>
                 ) : (

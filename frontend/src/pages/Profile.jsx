@@ -128,7 +128,7 @@ export function Profile() {
     }
     try {
       await rentAPI.confirmMoveIn(moveInDialogPayment.id, user.id, uploadedUrl);
-      toast.success('Move-in confirmed. Your rent has been released to the property owner.');
+      toast.success('Move-in confirmed. Your rent has been released to the agent.');
       setMoveInDialogPayment(null);
       fetchData();
     } catch (e) {
@@ -563,7 +563,7 @@ export function Profile() {
           <DialogHeader>
             <DialogTitle>Confirm Move-In</DialogTitle>
             <DialogDescription>
-              Upload a photo of yourself at the property to confirm you've moved in. This releases your rent, agent fee, and caution fee to the property owner — it can't be undone, so please only confirm once you've actually moved in. Note: Rentora does not yet have an automated refund process for the caution fee when you eventually move out — that's handled directly with your agent/landlord.
+              Upload a photo of yourself at the property to confirm you've moved in. This releases your rent, agent fee, and caution fee to the agent — it can't be undone, so please only confirm once you've actually moved in. Note: Rentora does not yet have an automated refund process for the caution fee when you eventually move out — that's handled directly with your agent/landlord.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

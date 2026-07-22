@@ -809,7 +809,7 @@ export const balanceAPI = {
         .eq('inspection.agent_id', agentId),
       supabase
         .from('property_rent_payments')
-        .select('id, agent_fee, released_at, property:properties(title)')
+        .select('id, rent_amount, agent_fee, caution_fee, released_at, property:properties(title)')
         .eq('agent_id', agentId)
         .eq('status', 'released'),
     ]);
@@ -823,12 +823,14 @@ export const balanceAPI = {
       date: tx.created_at,
     }));
 
+    // Rent, agent fee, and caution fee are all released to the agent as one
+    // payout — service fee is Rentora's cut and is never part of this.
     const rentRows = (rentRes.data || []).map((rp) => ({
       id: `rent_${rp.id}`,
       type: 'rent_agent_fee',
-      label: 'Agent Fee (Rent)',
+      label: 'Rent Released',
       property_title: rp.property?.title || 'Property',
-      amount: Number(rp.agent_fee || 0),
+      amount: Number(rp.rent_amount || 0) + Number(rp.agent_fee || 0) + Number(rp.caution_fee || 0),
       date: rp.released_at,
     }));
 
@@ -938,44 +940,7 @@ export const withdrawalAPI = {
   },
 };
 
-// Owner payouts — rent paid straight to the property owner, NOT the agent.
-// Owners aren't platform users, so there's no "withdrawal request" from
-// them; instead a payout obligation is created automatically the moment
-// rent is released, and an admin manually transfers the money and marks
-// it paid here. Kept as its own API/table so it never mixes with agent
-// withdrawal_requests in the UI.
-export const ownerPayoutAPI = {
-  getAll: async () => {
-    const res = await supabase
-      .from('owner_payouts')
-      .select('*, properties(title, location)')
-      .order('created_at', { ascending: false });
-    if (res.error) { console.warn('owner_payouts:', res.error.message); return { data: [] }; }
-    const rows = res.data || [];
 
-    // Attach the listing agent's name/email — fetched separately rather
-    // than guessing a foreign-key constraint name for an embedded join.
-    const agentIds = [...new Set(rows.map((r) => r.agent_id).filter(Boolean))];
-    if (agentIds.length > 0) {
-      const agentsRes = await supabase.from('users').select('id, full_name, email').in('id', agentIds);
-      const agentsById = {};
-      for (const a of (agentsRes.data || [])) agentsById[a.id] = a;
-      for (const r of rows) r.agent = agentsById[r.agent_id] || null;
-    }
-
-    return { data: rows };
-  },
-
-  markPaid: async (payoutId, adminId, notes) => {
-    const { error } = await supabase
-      .from('owner_payouts')
-      .update({ status: 'paid', paid_at: new Date().toISOString(), paid_by: adminId, notes: notes || null })
-      .eq('id', payoutId)
-      .eq('status', 'pending'); // guard against double-paying
-    if (error) throw error;
-    return { data: { ok: true } };
-  },
-};
 
 // Opportunistic fallback for the pending-payment expiry job. Safe to call
 // often — it's a no-op if nothing is actually stale. This exists in case
@@ -1047,7 +1012,7 @@ export const rentAPI = {
     const rentAmount    = Number(property.price);
     const agentFee      = Math.round(rentAmount * 0.10);      // 10% of rent, always
     const cautionFee    = Number(property.caution_fee) || 0;  // pass-through, no service fee applied
-    const baseAmount    = rentAmount + agentFee;               // rent portion goes to the owner, agent fee to the agent
+    const baseAmount    = rentAmount + agentFee;               // rent + agent fee — both go to the agent on release
     const serviceFee    = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut — never applied to the caution fee
     const totalAmount   = baseAmount + serviceFee + cautionFee;
     const reference     = generateReference('RENT');
