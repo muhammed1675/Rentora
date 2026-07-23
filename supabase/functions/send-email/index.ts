@@ -237,7 +237,7 @@ function emailRentPaymentHeld(agentName: string, propertyTitle: string, totalPai
       ${studentPhone ? `<div class="card-row"><span class="label">${icon.phone} Student Phone</span><span class="value">${studentPhone}</span></div>` : ""}
     </div>
     <p>The full rent, your agent fee, and the caution fee are released together to your Rentora balance once confirmed — Rentora's only cut is a separate service fee, which is not part of your payout. You'll get another email once it's released.</p>
-    <a href="https://www.rentora.com.ng/agent" class="btn">View on Agent Dashboard</a>
+    <a href="https://www.rentora.com.ng/agent?tab=rent-payments" class="btn">View on Agent Dashboard</a>
   `);
 }
 
@@ -274,7 +274,7 @@ function emailRentPaymentReleasedAgent(agentName: string, propertyTitle: string,
       <div class="card-row"><span class="label">${icon.tag} Reference</span><span class="value" style="font-size:12px">${reference}</span></div>
     </div>
     <p>You can request a withdrawal to your bank account any time from your Agent Dashboard (minimum ₦3,000 per request).</p>
-    <a href="https://www.rentora.com.ng/agent" class="btn">View on Agent Dashboard</a>
+    <a href="https://www.rentora.com.ng/agent?tab=rent-payments" class="btn">View on Agent Dashboard</a>
   `);
 }
 
@@ -300,7 +300,7 @@ function emailPropertyApproved(agentName: string, propertyTitle: string) {
       <div class="card-row"><span class="label">${icon.home} Property</span><span class="value">${propertyTitle}</span></div>
     </div>
     <p>You'll be notified as soon as a student books an inspection or pays rent on this listing.</p>
-    <a href="https://www.rentora.com.ng/agent" class="btn">View on Agent Dashboard</a>
+    <a href="https://www.rentora.com.ng/agent?tab=rent-payments" class="btn">View on Agent Dashboard</a>
   `);
 }
 

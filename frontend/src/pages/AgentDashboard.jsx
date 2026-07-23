@@ -123,6 +123,19 @@ export function AgentDashboard() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
 
+  // Active tab — driven by ?tab= or #tab= so the "View on Agent Dashboard"
+  // button in the rent-paid email can drop the agent straight on Rent Payments.
+  const [activeTab, setActiveTab] = useState('properties');
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const wanted = url.searchParams.get('tab') || (window.location.hash || '').replace(/^#/, '');
+      const allowed = ['properties', 'inspections', 'rent-payments', 'bank', 'earnings'];
+      if (wanted && allowed.includes(wanted)) setActiveTab(wanted);
+    } catch {}
+  }, []);
+  const [rentPaymentsList, setRentPaymentsList] = useState([]);
+
   // ── Load data on mount ───────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -161,10 +174,12 @@ export function AgentDashboard() {
       // If a property has both a held and a released record (shouldn't
       // normally happen), prefer 'released' since it's the more final state.
       const paymentMap = {};
-      for (const p of (rentPaymentsRes?.data || [])) {
+      const payments = rentPaymentsRes?.data || [];
+      for (const p of payments) {
         if (!paymentMap[p.property_id] || p.status === 'released') paymentMap[p.property_id] = p;
       }
       setRentPaymentsByProperty(paymentMap);
+      setRentPaymentsList(payments);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -475,13 +490,25 @@ export function AgentDashboard() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="properties">
-        <TabsList className="mb-5 w-full grid grid-cols-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v);
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', v);
+            window.history.replaceState({}, '', url.toString());
+          } catch {}
+        }}
+      >
+        <TabsList className="mb-5 w-full grid grid-cols-5">
           <TabsTrigger value="properties" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">My </span><span className="hidden sm:inline">Properties</span></TabsTrigger>
           <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned Inspections</span></TabsTrigger>
+          <TabsTrigger value="rent-payments" className="gap-1.5 text-xs sm:text-sm"><Lock className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Rent </span><span className="hidden sm:inline">Payments</span></TabsTrigger>
           <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Bank Details</span></TabsTrigger>
           <TabsTrigger value="earnings" className="gap-1.5 text-xs sm:text-sm"><Wallet className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Earnings</span></TabsTrigger>
         </TabsList>
+
 
         {/* ── Properties Tab ── */}
         <TabsContent value="properties">
@@ -884,7 +911,128 @@ export function AgentDashboard() {
             )}
           </Card>
         </TabsContent>
+
+        {/* ── Rent Payments Tab ── */}
+        <TabsContent value="rent-payments">
+          {(() => {
+            const held = rentPaymentsList.filter(p => p.status === 'held');
+            const released = rentPaymentsList.filter(p => p.status === 'released');
+            const sum = (arr, k) => arr.reduce((s, r) => s + Number(r[k] || 0), 0);
+            const totalHeldByRentora = sum(held, 'total_amount');
+            const totalReleased = sum(released, 'total_amount');
+            const heldRent = sum(held, 'rent_amount');
+            const heldAgentFee = sum(held, 'agent_fee');
+            const heldCaution = sum(held, 'caution_fee');
+            return (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                  <Card className="p-4 bg-yellow-50 border-yellow-200">
+                    <p className="text-xs text-yellow-800 font-medium flex items-center gap-1"><Lock className="w-3 h-3" /> Held by Rentora</p>
+                    <p className="text-2xl font-bold text-yellow-900 mt-1">₦{totalHeldByRentora.toLocaleString('en-NG')}</p>
+                    <p className="text-xs text-yellow-700 mt-0.5">{held.length} active payment{held.length === 1 ? '' : 's'}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground font-medium">Rent (Held)</p>
+                    <p className="text-xl font-bold mt-1">₦{heldRent.toLocaleString('en-NG')}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground font-medium">Agent Fee (Held)</p>
+                    <p className="text-xl font-bold mt-1">₦{heldAgentFee.toLocaleString('en-NG')}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground font-medium">Caution (Held)</p>
+                    <p className="text-xl font-bold mt-1">₦{heldCaution.toLocaleString('en-NG')}</p>
+                  </Card>
+                </div>
+
+                <Card className="p-4 mb-5 bg-blue-50 border-blue-200">
+                  <p className="text-sm text-blue-900">
+                    <strong>How this works:</strong> When a student pays rent, Rentora holds the full amount
+                    (rent + agent fee + caution fee) in escrow. It's released to your Rentora balance once
+                    the student confirms move-in, or automatically after 5 days.
+                  </p>
+                  <p className="text-xs text-blue-800 mt-2">
+                    Total released to date: <strong>₦{totalReleased.toLocaleString('en-NG')}</strong> across {released.length} payment{released.length === 1 ? '' : 's'}.
+                  </p>
+                </Card>
+
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1,2].map(i => <Card key={i} className="p-4 h-24 animate-pulse bg-muted" />)}
+                  </div>
+                ) : rentPaymentsList.length === 0 ? (
+                  <Card className="p-8 text-center">
+                    <Lock className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No rent payments yet.</p>
+                    <p className="text-xs text-muted-foreground mt-1">When a student pays rent for one of your properties, it will show up here.</p>
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    {rentPaymentsList.map((p) => {
+                      const propTitle = p.property?.title || 'Property';
+                      const locName = p.property?.locations?.name || '';
+                      const student = p.student || {};
+                      const isHeld = p.status === 'held';
+                      const releaseAt = p.auto_release_at ? new Date(p.auto_release_at) : null;
+                      const paidAt = p.held_at ? new Date(p.held_at) : (p.created_at ? new Date(p.created_at) : null);
+                      return (
+                        <Card key={p.id} className={`p-4 ${isHeld ? 'border-yellow-300' : 'border-green-300'}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold truncate">{propTitle}</p>
+                              {locName && <p className="text-xs text-muted-foreground">{locName}</p>}
+                            </div>
+                            <Badge className={isHeld ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
+                              {isHeld ? <><Lock className="w-3 h-3 mr-1 inline" /> Held by Rentora</> : <><CheckCircle2 className="w-3 h-3 mr-1 inline" /> Released</>}
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Rent</p>
+                              <p className="font-semibold">₦{Number(p.rent_amount || 0).toLocaleString('en-NG')}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Agent Fee</p>
+                              <p className="font-semibold">₦{Number(p.agent_fee || 0).toLocaleString('en-NG')}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Caution Fee</p>
+                              <p className="font-semibold">₦{Number(p.caution_fee || 0).toLocaleString('en-NG')}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">{isHeld ? 'Total Held' : 'Total Released'}</p>
+                              <p className={`font-bold ${isHeld ? 'text-yellow-700' : 'text-green-700'}`}>₦{Number(p.total_amount || 0).toLocaleString('en-NG')}</p>
+                            </div>
+                          </div>
+
+                          <div className="border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                            <div>
+                              <span className="font-medium text-foreground">Student:</span>{' '}
+                              {student.full_name || 'Rentora user'}
+                              {student.email && <> · <a href={`mailto:${student.email}`} className="text-blue-600">{student.email}</a></>}
+                              {student.phone && <> · <a href={`tel:${student.phone}`} className="text-blue-600">{student.phone}</a></>}
+                            </div>
+                            <div className="md:text-right">
+                              {paidAt && <>Paid: {paidAt.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</>}
+                              {isHeld && releaseAt && <> · Auto-release: {releaseAt.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</>}
+                              {!isHeld && p.released_at && <> · Released: {new Date(p.released_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</>}
+                            </div>
+                            {p.reference && (
+                              <div className="md:col-span-2 font-mono text-[11px] break-all">Ref: {p.reference}</div>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </TabsContent>
       </Tabs>
+
 
       {/* Withdrawal Dialog */}
       <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>

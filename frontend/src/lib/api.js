@@ -1086,10 +1086,21 @@ export const rentAPI = {
   getPaymentsForAgent: async (agentId) => {
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('id, property_id, status, rent_amount, agent_fee, total_amount, held_at, released_at, auto_release_at')
+      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .eq('agent_id', agentId)
-      .in('status', ['held', 'released']);
-    if (error) throw error;
+      .in('status', ['held', 'released'])
+      .order('created_at', { ascending: false });
+    if (error) {
+      // Fall back to the narrower shape if the join name differs — never break the dashboard.
+      const fallback = await supabase
+        .from('property_rent_payments')
+        .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, created_at')
+        .eq('agent_id', agentId)
+        .in('status', ['held', 'released'])
+        .order('created_at', { ascending: false });
+      if (fallback.error) throw fallback.error;
+      return { data: fallback.data || [] };
+    }
     return { data: data || [] };
   },
 
