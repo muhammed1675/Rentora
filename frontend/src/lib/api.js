@@ -1162,7 +1162,9 @@ export const rentAPI = {
             data: {
               agent_name: agent.full_name || 'there',
               property_title: row.property?.title || 'your property',
+              rent_amount: row.rent_amount,
               agent_fee: row.agent_fee,
+              caution_fee: row.caution_fee,
               reference: row.reference,
             },
           });

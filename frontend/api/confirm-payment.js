@@ -175,7 +175,21 @@ export default async function handler(req, res) {
         .eq('status', 'pending');
       if (rentErr) throw rentErr;
 
-      sendRentHeldEmail(supabase, rentTx).catch((e) => console.warn('rent held email failed (non-fatal):', e));
+      // Await this (same fix already applied to the inspection emails above) —
+      // firing this without awaiting let Vercel freeze/terminate the function
+      // as soon as res.status(200).json(...) was sent, often killing the
+      // in-flight request to send-email before it reached Resend. That's why
+      // the agent's "Rent Paid — Held" email wasn't arriving even though the
+      // payment itself was correctly marked "held".
+      const heldEmailResult = await sendRentHeldEmail(supabase, rentTx).then(
+        () => ({ status: 'fulfilled' }),
+        (e) => ({ status: 'rejected', reason: e }),
+      );
+      if (heldEmailResult.status === 'rejected') {
+        console.error(`[rent held email] FAILED for reference=${reference}:`, heldEmailResult.reason?.message || heldEmailResult.reason);
+      } else {
+        console.log(`[rent held email] OK for reference=${reference}`);
+      }
 
       return res.status(200).json({ ok: true, type: 'rent', amount: rentTx.total_amount, agent_fee: rentTx.agent_fee });
     }
@@ -308,7 +322,9 @@ async function sendRentHeldEmail(supabase, rentTx) {
         agent_name: agent.full_name || 'there',
         property_title: propertyTitle,
         amount: rentTx.total_amount,
+        rent_amount: rentTx.rent_amount,
         agent_fee: rentTx.agent_fee,
+        caution_fee: rentTx.caution_fee,
         reference: rentTx.reference,
         student_name: student?.full_name || 'A student',
         student_email: student?.email || '',
