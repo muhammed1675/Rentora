@@ -44,6 +44,9 @@ export function PropertyCard({ property }) {
               <MapPin className="h-3.5 w-3.5 shrink-0" />
               {property.location}
             </p>
+            {property.address && (
+              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{property.address}</p>
+            )}
           </div>
           <p className="whitespace-nowrap text-sm font-semibold text-foreground">
             {formatPrice(property.price)}

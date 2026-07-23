@@ -1132,6 +1132,9 @@ export function AdminDashboard() {
                           <div>
                             <h4 className="font-semibold text-sm line-clamp-1">{p.title}</h4>
                             <p className="text-xs text-muted-foreground line-clamp-1">{p.location}</p>
+                            {p.address && (
+                              <p className="text-xs text-muted-foreground line-clamp-1">{p.address}</p>
+                            )}
                             <p className="text-primary font-bold text-sm mt-1">{formatPrice(p.price)}/yr</p>
                             <p className="text-xs text-muted-foreground">By: {p.uploaded_by_agent_name}</p>
                             {dupMatch && (
@@ -1979,6 +1982,9 @@ export function AdminDashboard() {
               <div className="space-y-1">
                 <h2 className="text-lg font-bold">{previewProperty.title}</h2>
                 <p className="text-sm text-muted-foreground">{previewProperty.location}</p>
+                {previewProperty.address && (
+                  <p className="text-sm text-muted-foreground">{previewProperty.address}</p>
+                )}
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge className="bg-primary/10 text-primary capitalize">{previewProperty.property_type}</Badge>
                   <Badge className="bg-green-100 text-green-800 font-bold">{formatPrice(previewProperty.price)}/yr</Badge>

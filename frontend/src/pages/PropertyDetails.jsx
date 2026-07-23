@@ -354,6 +354,9 @@ export function PropertyDetails() {
             <div className="flex items-center gap-2 mt-2 text-muted-foreground flex-wrap">
               <MapPin className="w-5 h-5 shrink-0" /><span className="min-w-0 break-words">{property.location}</span>
             </div>
+            {property.address && (
+              <p className="mt-1 text-sm text-muted-foreground break-words">{property.address}</p>
+            )}
             {property.google_maps_link && (
               <a
                 href={property.google_maps_link}
