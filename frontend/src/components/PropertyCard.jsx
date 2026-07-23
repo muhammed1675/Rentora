@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MapPin } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
 
 export function PropertyCard({ property }) {
   const formatPrice = (price) =>
@@ -45,7 +45,14 @@ export function PropertyCard({ property }) {
               {property.location}
             </p>
             {property.address && (
-              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{property.address}</p>
+              <div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-muted/40 px-2 py-1.5">
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Address
+                </span>
+                <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">
+                  {property.address}
+                </p>
+              </div>
             )}
           </div>
           <p className="whitespace-nowrap text-sm font-semibold text-foreground">
@@ -55,8 +62,15 @@ export function PropertyCard({ property }) {
         </div>
         {property.google_maps_link && (
           <div className="mt-4 flex items-center justify-end border-t border-black/5 pt-3">
-            <a href={property.google_maps_link} target="_blank" rel="noreferrer"
-               className="text-xs font-semibold text-primary hover:underline">View map</a>
+            <a
+              href={property.google_maps_link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20"
+            >
+              <Navigation className="h-3.5 w-3.5" />
+              Get Directions
+            </a>
           </div>
         )}
       </div>
