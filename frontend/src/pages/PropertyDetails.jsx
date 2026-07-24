@@ -351,23 +351,44 @@ export function PropertyDetails() {
 
           <div>
             <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{property.title}</h1>
-            <div className="flex items-center gap-2 mt-2 text-muted-foreground flex-wrap">
-              <MapPin className="w-5 h-5 shrink-0" /><span className="min-w-0 break-words">{property.location}</span>
-            </div>
-            {property.address && (
-              <p className="mt-1 text-sm text-muted-foreground break-words">{property.address}</p>
-            )}
-            {property.google_maps_link && (
-              <a
-                href={property.google_maps_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:px-4"
-              >
-                <MapPin className="h-4 w-4 shrink-0" /><span className="min-w-0 truncate">Get Directions on Google Maps</span>
-              </a>
-            )}
           </div>
+
+          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
+            <h2 className="text-xl font-semibold mb-4">Location</h2>
+            <div className="flex items-start gap-2 text-muted-foreground flex-wrap">
+              <MapPin className="w-5 h-5 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-foreground font-medium">{property.location}</p>
+                {property.address && (
+                  <p className="mt-1 text-sm break-words">{property.address}</p>
+                )}
+              </div>
+            </div>
+
+            {(property.google_maps_link || property.location || property.address) && (
+              <div className="mt-4 space-y-3">
+                <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '16 / 9' }}>
+                  <iframe
+                    title="Property location map"
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(property.address || property.location)}&output=embed`}
+                    className="absolute inset-0 h-full w-full"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                  />
+                </div>
+                <a
+                  href={property.google_maps_link || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(property.address || property.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex max-w-full items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:px-4"
+                >
+                  <ExternalLink className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 truncate">Get Directions on Google Maps</span>
+                </a>
+              </div>
+            )}
+          </Card>
 
           <Card className="max-w-full overflow-hidden p-4 sm:p-6">
             <h2 className="text-xl font-semibold mb-4">Description</h2>
