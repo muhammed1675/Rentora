@@ -9,7 +9,7 @@ export function AgentRequirements() {
       icon: FileText,
       title: 'Valid Identification',
       items: [
-        'National ID Card, Driver's License, or International Passport',
+        "National ID Card, Driver's License, or International Passport",
         'Proof of address (utility bill or bank statement)',
         'Business registration documents (if applicable)',
       ],
@@ -37,7 +37,7 @@ export function AgentRequirements() {
       title: 'Payment & Pricing',
       items: [
         'Competitive and transparent pricing',
-        'Accept payments through Rentora's secure platform',
+        "Accept payments through Rentora's secure platform",
         'Clear cancellation and refund policies',
       ],
     },

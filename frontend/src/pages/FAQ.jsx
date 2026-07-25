@@ -15,7 +15,7 @@ const faqs = [
       },
       {
         q: 'Is Rentora only for LAUTECH students?',
-        a: 'Yes, Rentora is specifically designed for LAUTECH students. You'll need a valid LAUTECH student ID to register and access our platform.',
+        a: "Yes, Rentora is specifically designed for LAUTECH students. You'll need a valid LAUTECH student ID to register and access our platform.",
       },
       {
         q: 'How do I search for accommodation?',
@@ -28,7 +28,7 @@ const faqs = [
     questions: [
       {
         q: 'How do I book a property?',
-        a: 'Once you find a property you like, click "Book Now" on the property details page. You'll be guided through the payment process using Paystack. After payment confirmation, the agent will contact you to finalize the move-in details.',
+        a: 'Once you find a property you like, click "Book Now" on the property details page. You\'ll be guided through the payment process using Paystack. After payment confirmation, the agent will contact you to finalize the move-in details.',
       },
       {
         q: 'What payment methods are accepted?',
@@ -36,7 +36,7 @@ const faqs = [
       },
       {
         q: 'Can I get a refund if I change my mind?',
-        a: 'Refund policies depend on the agent and how far in advance you cancel. Generally, cancellations made 30+ days before move-in are eligible for full refunds. Check the property's cancellation policy before booking.',
+        a: "Refund policies depend on the agent and how far in advance you cancel. Generally, cancellations made 30+ days before move-in are eligible for full refunds. Check the property's cancellation policy before booking.",
       },
       {
         q: 'Do I pay the full rent upfront?',
@@ -49,10 +49,10 @@ const faqs = [
     questions: [
       {
         q: 'How do I know a property is verified?',
-        a: 'All verified properties display a blue "Verified" badge. This means our team has physically inspected the property, confirmed the agent's identity, and validated the listing details.',
+        a: 'All verified properties display a blue "Verified" badge. This means our team has physically inspected the property, confirmed the agent\'s identity, and validated the listing details.',
       },
       {
-        q: 'What if the property doesn't match the listing?',
+        q: "What if the property doesn't match the listing?",
         a: 'If a property significantly differs from its listing, contact us immediately via the Contact page or email support@rentora.com.ng. We take listing accuracy seriously and will investigate any discrepancies.',
       },
       {
@@ -70,15 +70,15 @@ const faqs = [
     questions: [
       {
         q: 'How do I contact a property agent?',
-        a: 'Each property listing includes the agent's contact information. You can call, email, or message them directly through the platform.',
+        a: "Each property listing includes the agent's contact information. You can call, email, or message them directly through the platform.",
       },
       {
-        q: 'What if an agent isn't responding?',
-        a: 'If an agent doesn't respond within 24 hours, please report them via the Contact page. We monitor agent responsiveness and take action against unresponsive agents.',
+        q: "What if an agent isn't responding?",
+        a: "If an agent doesn't respond within 24 hours, please report them via the Contact page. We monitor agent responsiveness and take action against unresponsive agents.",
       },
       {
         q: 'How do I become an agent on Rentora?',
-        a: 'Visit the "Become an Agent" page and submit your application. You'll need to provide verification documents, and our team will review your application within 3-5 business days.',
+        a: 'Visit the "Become an Agent" page and submit your application. You\'ll need to provide verification documents, and our team will review your application within 3-5 business days.',
       },
     ],
   },
@@ -87,7 +87,7 @@ const faqs = [
     questions: [
       {
         q: 'How do I reset my password?',
-        a: 'Click "Forgot Password" on the login page, enter your email, and we'll send you a password reset link. Follow the instructions in the email to create a new password.',
+        a: 'Click "Forgot Password" on the login page, enter your email, and we\'ll send you a password reset link. Follow the instructions in the email to create a new password.',
       },
       {
         q: 'Is my personal information safe?',
@@ -107,12 +107,12 @@ const faqs = [
     category: 'Troubleshooting',
     questions: [
       {
-        q: 'Why can't I log in?',
-        a: 'Make sure you're using the correct email and password. If you forgot your password, use the "Forgot Password" link. If the issue persists, clear your browser cache or contact support.',
+        q: "Why can't I log in?",
+        a: 'Make sure you\'re using the correct email and password. If you forgot your password, use the "Forgot Password" link. If the issue persists, clear your browser cache or contact support.',
       },
       {
-        q: 'My payment was successful but my booking wasn't confirmed. What should I do?',
-        a: 'Payment confirmations can take a few minutes. If your booking isn't confirmed within 10 minutes, contact us at support@rentora.com.ng with your payment reference number.',
+        q: "My payment was successful but my booking wasn't confirmed. What should I do?",
+        a: "Payment confirmations can take a few minutes. If your booking isn't confirmed within 10 minutes, contact us at support@rentora.com.ng with your payment reference number.",
       },
       {
         q: 'The website is loading slowly. What can I do?',
