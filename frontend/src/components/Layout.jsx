@@ -7,6 +7,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { ConsentBanner } from './ConsentBanner';
+import { MobileBottomNav } from './MobileBottomNav';
 
 const publicNav = [
   { label: 'Browse', to: '/browse' },
@@ -113,7 +114,8 @@ export function Layout({ children }) {
         )}
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 pb-20 md:pb-0">{children}</main>
+      <MobileBottomNav />
 
 <footer className="w-full border-t border-slate-200 bg-white py-20 md:py-28 text-slate-900">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">

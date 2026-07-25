@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck, Lock, CheckCircle2, Zap } from 'lucide-react';
+import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck, Lock, CheckCircle2, Zap, Star, Users, Home as HomeIcon } from 'lucide-react';
 import { AppBanner } from '../components/AppBanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 
@@ -98,6 +98,55 @@ export function Home() {
               </div>
             </Link>
           ))}
+        </div>
+      </section>
+
+      {/* Testimonials & Social Proof */}
+      <section className="bg-muted/30 py-20 md:py-28">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="mb-12 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Loved by Students</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">What our students say</h2>
+            <p className="mt-3 text-muted-foreground">Thousands of LAUTECH students have found their home on Rentora</p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3 mb-12">
+            {[
+              { name: 'Chioma O.', testimonial: 'Found my perfect hostel in just 2 days! The verification process gives me peace of mind knowing the place is legit.', rating: 5 },
+              { name: 'Tunde A.', testimonial: 'Best platform for student housing. The escrow protection means I don\'t have to worry about losing my money to dubious agents.', rating: 5 },
+              { name: 'Zainab M.', testimonial: 'Smooth booking experience from start to finish. The support team is responsive and helpful throughout the process.', rating: 5 },
+            ].map((testimonial, i) => (
+              <div key={i} className="rounded-2xl bg-white p-6 border border-border/60">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  ))}
+                </div>
+                <p className="text-foreground/70 leading-relaxed mb-4">"{testimonial.testimonial}"</p>
+                <p className="font-semibold text-foreground">{testimonial.name}</p>
+                <p className="text-xs text-foreground/50">LAUTECH Student</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Trust Badges */}
+          <div className="grid gap-6 sm:grid-cols-3">
+            <div className="rounded-2xl bg-white p-8 text-center border border-border/60">
+              <Users className="h-8 w-8 text-primary mx-auto mb-3" />
+              <p className="text-3xl font-bold text-foreground">1,200+</p>
+              <p className="text-sm text-foreground/60 mt-1">Students Served</p>
+            </div>
+            <div className="rounded-2xl bg-white p-8 text-center border border-border/60">
+              <HomeIcon className="h-8 w-8 text-primary mx-auto mb-3" />
+              <p className="text-3xl font-bold text-foreground">500+</p>
+              <p className="text-sm text-foreground/60 mt-1">Verified Properties</p>
+            </div>
+            <div className="rounded-2xl bg-white p-8 text-center border border-border/60">
+              <CheckCircle2 className="h-8 w-8 text-primary mx-auto mb-3" />
+              <p className="text-3xl font-bold text-foreground">98%</p>
+              <p className="text-sm text-foreground/60 mt-1">Satisfaction Rate</p>
+            </div>
+          </div>
         </div>
       </section>
 

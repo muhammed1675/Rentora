@@ -1,8 +1,10 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { Toaster } from "./components/ui/sonner";
 import Layout from "./components/Layout";
+import { initializeAnalytics, trackPageView } from "./lib/analytics";
 
 // Pages
 import Home from "./pages/Home";
@@ -20,6 +22,10 @@ import Contact from "./pages/Contact";
 import { Compare } from './pages/Compare';
 import { ResetPassword } from './pages/ResetPassword';
 import { NotFound } from './pages/NotFound';
+import { Privacy } from './pages/Privacy';
+import { About } from './pages/About';
+import { FAQ } from './pages/FAQ';
+import { AgentRequirements } from './pages/AgentRequirements';
 
 // Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -44,9 +50,21 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   return children;
 }
 
+function TrackPageViews() {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname, document.title);
+  }, [location]);
+
+  return null;
+}
+
 function AppRoutes() {
   return (
-    <Routes>
+    <>
+      <TrackPageViews />
+      <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Layout><Home /></Layout>} />
       <Route path="/browse" element={<Layout><Browse /></Layout>} />
@@ -98,14 +116,26 @@ function AppRoutes() {
 
       {/* Legal */}
       <Route path="/terms" element={<Layout><TermsAndPolicies /></Layout>} />
+      <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+
+      {/* Info Pages */}
+      <Route path="/about" element={<Layout><About /></Layout>} />
+      <Route path="/faq" element={<Layout><FAQ /></Layout>} />
+      <Route path="/agent-requirements" element={<Layout><AgentRequirements /></Layout>} />
 
       {/* Catch all */}
       <Route path="*" element={<Layout><NotFound /></Layout>} />
     </Routes>
+    </>
   );
 }
 
 function App() {
+  useEffect(() => {
+    // Initialize Analytics on app load
+    initializeAnalytics();
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

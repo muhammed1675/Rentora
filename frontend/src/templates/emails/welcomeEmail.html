@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #0062AE; }
+        .logo { font-size: 28px; font-weight: bold; color: #0062AE; }
+        .content { padding: 30px 0; }
+        .section { margin: 25px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; }
+        .section h3 { margin-top: 0; color: #0062AE; }
+        .button { display: inline-block; background: #0062AE; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; margin: 15px 0; }
+        .step { display: flex; margin: 15px 0; }
+        .step-num { width: 30px; height: 30px; background: #0062AE; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px; flex-shrink: 0; }
+        .footer { text-align: center; padding: 20px 0; border-top: 1px solid #eee; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Rentora</div>
+            <p style="color: #666; margin: 10px 0 0 0;">Verified Student Housing for LAUTECH</p>
+        </div>
+
+        <div class="content">
+            <h2>Welcome to Rentora, {{userName}}! 🎉</h2>
+            <p>Your account has been created and verified. You're now ready to find your perfect student accommodation at LAUTECH.</p>
+
+            <div class="section">
+                <h3>Get Started in 4 Simple Steps</h3>
+                
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div>
+                        <strong>Browse Verified Homes</strong><br>
+                        <p style="margin: 5px 0; font-size: 14px; color: #666;">Explore hundreds of verified student properties around LAUTECH.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div>
+                        <strong>Book an Inspection</strong><br>
+                        <p style="margin: 5px 0; font-size: 14px; color: #666;">Contact agents directly or request a paid property inspection.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div>
+                        <strong>Pay Securely</strong><br>
+                        <p style="margin: 5px 0; font-size: 14px; color: #666;">All fees are transparent. No hidden charges, we promise.</p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div>
+                        <strong>Move In Protected</strong><br>
+                        <p style="margin: 5px 0; font-size: 14px; color: #666;">Your rent is held in secure escrow until move-in is confirmed.</p>
+                    </div>
+                </div>
+            </div>
+
+            <center>
+                <a href="{{browseLink}}" class="button">Start Browsing Homes</a>
+            </center>
+
+            <div class="section">
+                <h3>Why Choose Rentora?</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Verified Properties:</strong> Every listing is inspected and verified</li>
+                    <li><strong>Trusted Agents:</strong> All agents go through our vetting process</li>
+                    <li><strong>Escrow Protection:</strong> Your money is safe with us</li>
+                    <li><strong>Transparent Pricing:</strong> No surprises, no hidden fees</li>
+                    <li><strong>Student-Focused:</strong> Built by students, for students</li>
+                </ul>
+            </div>
+
+            <p style="color: #666; background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <strong>Need Help?</strong><br>
+                Check out our <a href="{{faqLink}}" style="color: #0062AE; text-decoration: none;">FAQ</a> or <a href="{{contactLink}}" style="color: #0062AE; text-decoration: none;">contact support</a>. We're here to help!
+            </p>
+
+            <p style="color: #666; margin-top: 30px; font-size: 14px;">
+                Happy house hunting!<br>
+                The Rentora Team
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>© {{currentYear}} Rentora. All rights reserved.</p>
+            <p>Ogbomoso, Oyo State, Nigeria | support@rentora.com.ng</p>
+        </div>
+    </div>
+</body>
+</html>

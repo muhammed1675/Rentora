@@ -138,3 +138,82 @@ code { font-family: 'Geist Mono', monospace; }
     border-color: rgba(255, 255, 255, 0.15);
     transform: translateY(-1px);
 }
+
+/* ─────────────────────────────────────────────
+   Page Transitions & Animations
+   ───────────────────────────────────────────── */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+main {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.slide-up {
+    animation: slideUp 0.4s ease-out;
+}
+
+.slide-down {
+    animation: slideDown 0.4s ease-out;
+}
+
+.shimmer {
+    background-image: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+}
