@@ -114,7 +114,7 @@ export function Layout({ children }) {
         )}
       </header>
 
-      <main className="flex-1 pb-20 md:pb-0">{children}</main>
+      <main className="flex-1 pb-24 md:pb-0">{children}</main>
       <MobileBottomNav />
 
 <footer className="w-full border-t border-slate-200 bg-white py-20 md:py-28 text-slate-900">
@@ -138,6 +138,7 @@ export function Layout({ children }) {
             <div className="flex flex-col gap-3 text-sm text-slate-700">
               <Link to="/browse" className="transition-colors hover:text-primary">Browse homes</Link>
               <Link to="/compare" className="transition-colors hover:text-primary">Compare</Link>
+              <Link to="/become-agent" className="transition-colors hover:text-primary">Become an agent</Link>
             </div>
           </div>
           <div>

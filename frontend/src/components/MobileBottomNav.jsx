@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Heart, User } from 'lucide-react';
+import { Home, Search, Phone, User } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
 export function MobileBottomNav() {
@@ -9,12 +9,15 @@ export function MobileBottomNav() {
   const navItems = [
     { icon: Home, label: 'Home', to: '/' },
     { icon: Search, label: 'Browse', to: '/browse' },
-    { icon: Heart, label: 'Saved', to: isAuthenticated ? '/profile' : '/login' },
+    { icon: Phone, label: 'Contact', to: '/contact' },
     { icon: User, label: 'Account', to: isAuthenticated ? '/profile' : '/login' },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-black/5 backdrop-blur-lg bg-white/95">
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-black/5 backdrop-blur-lg bg-white/95"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="grid grid-cols-4 h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.to;
