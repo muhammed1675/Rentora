@@ -1,37 +1,25 @@
 /**
  * Google Analytics Integration
  * Tracks user interactions and conversions
- * 
- * To use:
- * 1. Get your Google Analytics Measurement ID from Google Analytics 4 property
- * 2. Set REACT_APP_GA_ID environment variable
- * 3. This module handles the rest
+ *
+ * The base Google tag (gtag.js) is already loaded once, correctly, in
+ * public/index.html — that's the single source of truth for the
+ * Measurement ID. This module does NOT load its own copy of the script
+ * or call gtag('config', ...) again; doing so would register a second,
+ * duplicate tag and split/duplicate traffic in GA4.
+ *
+ * This module just confirms the tag from index.html is present and
+ * gives the rest of the app a set of helper functions for firing
+ * business events (property views, searches, bookings, etc.) through
+ * that same tag via window.gtag / window.dataLayer.
  */
 
-// Initialize GA4
+// Confirm the Google tag from index.html is available
 export function initializeAnalytics() {
-  const measurementId = process.env.REACT_APP_GA_ID;
-  
-  if (!measurementId) {
-    console.warn('[Analytics] REACT_APP_GA_ID not set. Analytics disabled.');
+  if (typeof window === 'undefined' || !window.gtag) {
+    console.warn('[Analytics] window.gtag not found — check the Google tag in public/index.html.');
     return;
   }
-
-  // Add GA script to document
-  const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-  document.head.appendChild(script);
-
-  // Initialize gtag
-  window.dataLayer = window.dataLayer || [];
-  function gtag() {
-    window.dataLayer.push(arguments);
-  }
-  gtag('js', new Date());
-  gtag('config', measurementId);
-
-  window.gtag = gtag;
 }
 
 /**
@@ -173,10 +161,8 @@ export function trackPropertyComparison(propertyCount) {
  */
 export function setUserProperties(userId, userType, email) {
   if (!window.gtag) return;
-  
-  window.gtag('config', process.env.REACT_APP_GA_ID, {
-    'user_id': userId,
-  });
+
+  window.gtag('set', 'user_id', userId);
 
   window.gtag('event', 'user_engagement', {
     user_id: userId,
