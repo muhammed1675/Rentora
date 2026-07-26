@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentora-v2';
+const CACHE_NAME = 'rentora-v3';
 const STATIC_ASSETS = ['/', '/browse', '/manifest.json'];
 
 self.addEventListener('install', (event) => {

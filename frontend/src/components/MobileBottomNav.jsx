@@ -20,7 +20,7 @@ export function MobileBottomNav() {
     >
       <div className="grid grid-cols-4 h-16">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.to;
+          const isActive = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
           return (
             <Link
               key={item.to}
