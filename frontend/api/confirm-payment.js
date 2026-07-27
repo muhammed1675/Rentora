@@ -102,13 +102,30 @@ export default async function handler(req, res) {
     }
 
     // ---- 3. Match the charged amount against what we expect, then transition ----
-    const AMOUNT_TOLERANCE = 5; // allow ₦5 rounding/conversion slack for floating point issues
+    //
+    // IMPORTANT: Flutterwave's `charged_amount` is what the CUSTOMER paid,
+    // which is often HIGHER than the amount we requested. When "customer
+    // bears the transaction fee" is enabled on the Flutterwave dashboard
+    // (common/default for NG merchants, especially for bank transfer /
+    // USSD), Flutterwave adds its fee on top before charging the customer,
+    // e.g. we ask for ₦1000 and the customer is charged ₦1020 — we still
+    // receive the full ₦1000 at settlement (data.amount_settled).
+    // Flutterwave's own docs are explicit about this: verify that the
+    // charged amount is >= the amount you expect, not that it matches
+    // exactly. See: https://developer.flutterwave.com/docs/transaction-verification
+    //
+    // So we only fail closed when the customer was charged LESS than
+    // expected (an undercharge could indicate someone gaming the amount).
+    // We do NOT reject an overcharge — that's the customer legitimately
+    // covering Flutterwave's fee, and treating it as a mismatch is what was
+    // causing every real, successful payment to get stuck on "pending".
+    const UNDERCHARGE_TOLERANCE = 5; // ₦5 slack for rounding/floating point only
 
     if (tokenTx) {
       if (tokenTx.status === 'completed') {
         return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'token_purchase' });
       }
-      if (Math.abs(chargedAmount - Number(tokenTx.amount)) > AMOUNT_TOLERANCE) {
+      if (chargedAmount < Number(tokenTx.amount) - UNDERCHARGE_TOLERANCE) {
         console.error('confirm-payment: token amount mismatch', { expected: tokenTx.amount, charged: chargedAmount, reference });
         return res.status(409).json({ error: 'Charged amount does not match the expected token purchase amount.' });
       }
@@ -130,17 +147,17 @@ export default async function handler(req, res) {
       if (inspTx.status === 'completed') {
         return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection' });
       }
-      const amountDiff = Math.abs(chargedAmount - Number(inspTx.amount));
-      console.log('[confirm-payment] Inspection amount check:', { 
-        expected: inspTx.amount, 
-        charged: chargedAmount, 
-        difference: amountDiff, 
-        tolerance: AMOUNT_TOLERANCE,
-        withinTolerance: amountDiff <= AMOUNT_TOLERANCE,
-        reference 
+      const shortfall = Number(inspTx.amount) - chargedAmount; // positive => customer paid less than expected
+      console.log('[confirm-payment] Inspection amount check:', {
+        expected: inspTx.amount,
+        charged: chargedAmount,
+        shortfall,
+        tolerance: UNDERCHARGE_TOLERANCE,
+        withinTolerance: shortfall <= UNDERCHARGE_TOLERANCE,
+        reference
       });
-      if (amountDiff > AMOUNT_TOLERANCE) {
-        console.error('confirm-payment: inspection amount mismatch', { expected: inspTx.amount, charged: chargedAmount, reference, difference: amountDiff });
+      if (shortfall > UNDERCHARGE_TOLERANCE) {
+        console.error('confirm-payment: inspection amount mismatch', { expected: inspTx.amount, charged: chargedAmount, reference, shortfall });
         return res.status(409).json({ error: 'Charged amount does not match the expected inspection fee.' });
       }
 
@@ -180,7 +197,7 @@ export default async function handler(req, res) {
       if (rentTx.status !== 'pending') {
         return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'rent', status: rentTx.status });
       }
-      if (Math.abs(chargedAmount - Number(rentTx.total_amount)) > AMOUNT_TOLERANCE) {
+      if (chargedAmount < Number(rentTx.total_amount) - UNDERCHARGE_TOLERANCE) {
         console.error('confirm-payment: rent amount mismatch', { expected: rentTx.total_amount, charged: chargedAmount, reference });
         return res.status(409).json({ error: 'Charged amount does not match the expected rent total.' });
       }
