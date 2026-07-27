@@ -143,21 +143,26 @@ export default async function handler(req, res) {
 
       const { data: inspection } = await supabase.from('inspections').select('*').eq('id', inspTx.inspection_id).maybeSingle();
 
-      // Await so failures show up as a real 500 in Vercel logs instead of being swallowed.
-      // Both agent-notify and student-receipt are attempted; each is independently caught
-      // so one failing does not block the other.
-      const emailResults = await Promise.allSettled([
-        sendInspectionAgentNotify(supabase, inspTx, inspection),
-        sendInspectionStudentReceipt(supabase, inspTx, inspection),
-      ]);
-      emailResults.forEach((r, i) => {
-        const label = i === 0 ? 'agent_notify' : 'student_receipt';
-        if (r.status === 'rejected') {
-          console.error(`[inspection email] ${label} FAILED for reference=${reference}:`, r.reason?.message || r.reason);
-        } else {
-          console.log(`[inspection email] ${label} OK for reference=${reference}`);
+      // Send inspection emails in background without blocking the response.
+      // This ensures payment is confirmed immediately even if email delivery is slow or fails.
+      (async () => {
+        try {
+          const emailResults = await Promise.allSettled([
+            sendInspectionAgentNotify(supabase, inspTx, inspection),
+            sendInspectionStudentReceipt(supabase, inspTx, inspection),
+          ]);
+          emailResults.forEach((r, i) => {
+            const label = i === 0 ? 'agent_notify' : 'student_receipt';
+            if (r.status === 'rejected') {
+              console.error(`[inspection email] ${label} FAILED for reference=${reference}:`, r.reason?.message || r.reason);
+            } else {
+              console.log(`[inspection email] ${label} OK for reference=${reference}`);
+            }
+          });
+        } catch (emailErr) {
+          console.error(`[inspection email] background send failed for reference=${reference}:`, emailErr);
         }
-      });
+      })();
 
       return res.status(200).json({ ok: true, type: 'inspection', amount: inspTx.amount, agent_name: inspection?.agent_name, property_title: inspection?.property_title });
     }
