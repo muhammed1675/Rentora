@@ -1121,14 +1121,17 @@ export const rentAPI = {
     return { data: body };
   },
 
-  // User confirms move-in / keys received → release funds to agent.
+  // Student reports move-in (uploads proof photo) — this NO LONGER releases
+  // funds directly. It puts the payment into 'move_in_reported' so an admin
+  // can preview the photo and confirm before Rentora releases money to the
+  // agent. The DB also enforces this: rent_payments_update_own only allows
+  // a student to move status held -> move_in_reported, never -> released.
   confirmMoveIn: async (rentPaymentId, userId, moveInPhotoUrl) => {
     const { data: updatedRows, error } = await supabase
       .from('property_rent_payments')
       .update({
-        status: 'released',
-        released_by: 'user',
-        released_at: new Date().toISOString(),
+        status: 'move_in_reported',
+        move_in_reported_at: new Date().toISOString(),
         move_in_photo_url: moveInPhotoUrl || null,
       })
       .eq('id', rentPaymentId)
@@ -1137,11 +1140,29 @@ export const rentAPI = {
       .select('id');
     if (error) throw error;
 
-    // No row matched — either this was already confirmed (a second click
-    // after a slow first request, or a retry after a network hiccup on
-    // the response) or it's not actually held. Either way, don't send a
-    // second round of release emails.
+    // No row matched — already reported (slow double-click / retry), or not
+    // actually held. Don't treat this as a failure either way.
     if (!updatedRows || updatedRows.length === 0) return;
+  },
+
+  // Admin previews the move-in photo and confirms it's genuine → THIS is
+  // what actually releases funds to the agent (moves status to 'released',
+  // which fires release_rent_to_agent() and credits agent_balances).
+  adminConfirmMoveIn: async (rentPaymentId, adminId) => {
+    const { data: updatedRows, error } = await supabase
+      .from('property_rent_payments')
+      .update({
+        status: 'released',
+        released_by: 'admin',
+        released_at: new Date().toISOString(),
+      })
+      .eq('id', rentPaymentId)
+      .eq('status', 'move_in_reported')
+      .select('id');
+    if (error) throw error;
+    if (!updatedRows || updatedRows.length === 0) {
+      throw new Error('This payment is no longer awaiting move-in review (already released, or not reported yet).');
+    }
 
     // Notify agent + student that funds have been released — best-effort,
     // never allowed to affect the confirmation above (already succeeded).
@@ -1157,7 +1178,7 @@ export const rentAPI = {
         const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
         const [agentRes, studentRes] = await Promise.all([
           row.agent_id ? supabase.from('users').select('email, full_name').eq('id', row.agent_id).limit(1) : Promise.resolve({ data: [] }),
-          supabase.from('users').select('email, full_name').eq('id', userId).limit(1),
+          supabase.from('users').select('email, full_name').eq('id', row.user_id).limit(1),
         ]);
         const agent = agentRes.data?.[0];
         const student = studentRes.data?.[0];
@@ -1195,6 +1216,17 @@ export const rentAPI = {
     } catch (e) { console.warn('rent_payment_released email failed:', e); }
   },
 
+  // Admin queue: rent payments awaiting move-in photo review.
+  getMoveInReviewQueue: async () => {
+    const { data, error } = await supabase
+      .from('property_rent_payments')
+      .select('*, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
+      .eq('status', 'move_in_reported')
+      .order('move_in_reported_at', { ascending: true });
+    if (error) throw error;
+    return { data: (data || []).map(r => ({ ...r, property: withLocationName(r.property) })) };
+  },
+
   // Rent payments for the logged-in user (their held/released receipts).
   getMyPayments: async (userId) => {
     const { data, error } = await supabase
@@ -1212,7 +1244,7 @@ export const rentAPI = {
   getAllForAdmin: async () => {
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('*, property:properties(title, location_id, locations(name))')
+      .select('*, property:properties(title, location_id, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .order('created_at', { ascending: false });
     if (error) { console.warn('property_rent_payments:', error.message); return { data: [] }; }
     return { data: (data || []).map(r => ({ ...r, property: withLocationName(r.property) })) };

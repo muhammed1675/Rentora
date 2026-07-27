@@ -128,7 +128,7 @@ export function Profile() {
     }
     try {
       await rentAPI.confirmMoveIn(moveInDialogPayment.id, user.id, uploadedUrl);
-      toast.success('Move-in confirmed. Your rent has been released to the agent.');
+      toast.success("Move-in reported. Rentora will review your photo and release the rent to the agent shortly.");
       setMoveInDialogPayment(null);
       fetchData();
     } catch (e) {
@@ -285,6 +285,9 @@ export function Profile() {
                         <h3 className="font-semibold">{rp.property?.title || 'Property'}</h3>
                         {rp.status === 'held' && (
                           <Badge className="gap-1 bg-yellow-100 text-yellow-800 hover:bg-yellow-100"><Clock className="w-3 h-3" />Held by Rentora</Badge>
+                        )}
+                        {rp.status === 'move_in_reported' && (
+                          <Badge className="gap-1 bg-blue-100 text-blue-800 hover:bg-blue-100"><Clock className="w-3 h-3" />Move-in reported — awaiting Rentora review</Badge>
                         )}
                         {rp.status === 'released' && (
                           <Badge className="gap-1 bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle2 className="w-3 h-3" />Released</Badge>
@@ -561,9 +564,9 @@ export function Profile() {
       <Dialog open={!!moveInDialogPayment} onOpenChange={(open) => { if (!open) setMoveInDialogPayment(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Move-In</DialogTitle>
+            <DialogTitle>Report Move-In</DialogTitle>
             <DialogDescription>
-              Upload a photo of yourself at the property to confirm you've moved in. This releases your rent, agent fee, and caution fee to the agent — it can't be undone, so please only confirm once you've actually moved in. Note: Rentora does not yet have an automated refund process for the caution fee when you eventually move out — that's handled directly with your agent/landlord.
+              Upload a photo of yourself at the property to report that you've moved in. Rentora will review this photo and then release your rent, agent fee, and caution fee to the agent — it isn't released instantly, so it may take a little while after you submit. Note: Rentora does not yet have an automated refund process for the caution fee when you eventually move out — that's handled directly with your agent/landlord.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -582,7 +585,7 @@ export function Profile() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveInDialogPayment(null)}>Cancel</Button>
             <Button onClick={handleConfirmMoveIn} disabled={confirmingMoveIn || !moveInPhotoFile} data-testid="move-in-confirm-submit">
-              {confirmingMoveIn ? 'Confirming...' : 'Confirm Move-In'}
+              {confirmingMoveIn ? 'Submitting...' : 'Report Move-In'}
             </Button>
           </DialogFooter>
         </DialogContent>

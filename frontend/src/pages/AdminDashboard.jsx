@@ -203,6 +203,25 @@ export function AdminDashboard() {
     catch { toast.error('Failed to update property'); }
   };
 
+  // Reviewing a student's move-in photo: admin previews it in a dialog,
+  // then either confirms (releases funds to the agent) or dismisses.
+  const [moveInPreview, setMoveInPreview] = useState(null); // the rentPayment row being previewed
+  const [confirmingMoveIn, setConfirmingMoveIn] = useState(false);
+
+  const handleAdminConfirmMoveIn = async (rentPaymentId) => {
+    setConfirmingMoveIn(true);
+    try {
+      await rentAPI.adminConfirmMoveIn(rentPaymentId, user.id);
+      toast.success('Move-in confirmed — funds released to the agent.');
+      setMoveInPreview(null);
+      fetchData();
+    } catch (e) {
+      toast.error(e.message || 'Failed to confirm move-in');
+    } finally {
+      setConfirmingMoveIn(false);
+    }
+  };
+
   // Only admins can do this — agents are blocked from reopening a property
   // once any rent payment for it has been held or released (prevents an
   // agent double-renting an already-occupied room). Use this once a
@@ -355,7 +374,7 @@ export function AdminDashboard() {
       items: [
         { id: 'transactions', label: 'Transactions', icon: Receipt },
         { id: 'payouts', label: 'Agent Payouts', icon: ArrowDownCircle, count: withdrawalRequests.filter(r => r.status === 'pending').length, urgent: true },
-        { id: 'escrow', label: 'Escrow', icon: Lock, count: rentPayments.filter(p => p.status === 'held').length },
+        { id: 'escrow', label: 'Escrow', icon: Lock, count: rentPayments.filter(p => p.status === 'held' || p.status === 'move_in_reported').length },
         { id: 'rentora-revenue', label: 'Revenue', icon: TrendingUp },
       ],
     },
@@ -1497,6 +1516,45 @@ export function AdminDashboard() {
             </div>
           )}
 
+          <h3 className="font-semibold mb-3">Pending Move-In Review</h3>
+          {rentPayments.filter(p => p.status === 'move_in_reported').length === 0 ? (
+            <Card className="p-8 text-center text-muted-foreground mb-6">No move-ins waiting on review</Card>
+          ) : (
+            <div className="space-y-3 mb-6">
+              {rentPayments.filter(p => p.status === 'move_in_reported').map(payment => (
+                <Card key={payment.id} className="p-4 border-blue-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {payment.move_in_photo_url && (
+                        <button onClick={() => setMoveInPreview(payment)} className="shrink-0">
+                          <img src={payment.move_in_photo_url} alt="Move-in" className="w-14 h-14 rounded object-cover border hover:opacity-80" />
+                        </button>
+                      )}
+                      <div className="min-w-0">
+                        <button onClick={() => openPropertyPreviewById(payment.property_id)} className="font-semibold text-primary hover:underline text-left">
+                          {payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span>
+                        </button>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Student: {payment.student?.full_name || 'Unknown'} ({payment.student?.email || '—'})
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Reported {payment.move_in_reported_at ? new Date(payment.move_in_reported_at).toLocaleString('en-NG') : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-900">{formatPrice(payment.total_amount)}</p>
+                        <Badge variant="outline" className="border-blue-400 text-blue-700">Awaiting review</Badge>
+                      </div>
+                      <Button size="sm" onClick={() => setMoveInPreview(payment)}>Review</Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
           <h3 className="font-semibold mb-3">Recently Released</h3>
           <Card className="overflow-x-auto">
             <Table>
@@ -2113,6 +2171,38 @@ export function AdminDashboard() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, property: null, deleting: false })} disabled={deleteConfirm.deleting}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteProperty} disabled={deleteConfirm.deleting}>{deleteConfirm.deleting ? 'Deleting...' : 'Yes, Delete'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Move-In Review Dialog ── */}
+      <Dialog open={!!moveInPreview} onOpenChange={(open) => { if (!open) setMoveInPreview(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review Move-In Photo</DialogTitle>
+            <DialogDescription>
+              Confirming releases {moveInPreview ? formatPrice(moveInPreview.total_amount) : ''} (rent + agent fee{moveInPreview?.caution_fee > 0 ? ' + caution fee' : ''} + service fee) to the agent. This can't be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {moveInPreview && (
+            <div className="space-y-3">
+              {moveInPreview.move_in_photo_url ? (
+                <img src={moveInPreview.move_in_photo_url} alt="Move-in" className="w-full max-h-80 object-contain rounded-lg border bg-muted/30" />
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No photo was uploaded with this report.</p>
+              )}
+              <div className="text-sm space-y-0.5">
+                <div className="font-semibold">{moveInPreview.property?.title || 'Unknown property'}</div>
+                <div className="text-muted-foreground">Student: {moveInPreview.student?.full_name || 'Unknown'} ({moveInPreview.student?.email || '—'})</div>
+                <div className="text-muted-foreground">Reference: {moveInPreview.reference}</div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setMoveInPreview(null)} disabled={confirmingMoveIn}>Close</Button>
+            <Button onClick={() => handleAdminConfirmMoveIn(moveInPreview.id)} disabled={confirmingMoveIn}>
+              {confirmingMoveIn ? 'Confirming...' : 'Confirm Move-In & Release Funds'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
