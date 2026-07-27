@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { tokenAPI, walletAPI } from '../lib/api';
-import { openKorapayCheckout } from '../lib/korapay';
+import { openFlutterwaveCheckout } from '../lib/flutterwave';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -42,7 +42,7 @@ export function BuyTokens() {
     try {
       const response = await tokenAPI.purchase({ quantity, email, phone_number: phone }, user.id);
 
-      await openKorapayCheckout({
+      await openFlutterwaveCheckout({
         reference: response.data.reference,
         amount: response.data.amount,
         email,

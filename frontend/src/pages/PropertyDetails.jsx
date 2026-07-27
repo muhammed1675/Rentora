@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { propertyAPI, inspectionAPI, reviewAPI, rentAPI } from '../lib/api';
-import { openKorapayCheckout } from '../lib/korapay';
+import { openFlutterwaveCheckout } from '../lib/flutterwave';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -192,7 +192,7 @@ export function PropertyDetails() {
 
       setShowInspectionDialog(false);
 
-      await openKorapayCheckout({
+      await openFlutterwaveCheckout({
         reference: response.data.reference,
         amount: response.data.amount,
         email: inspectionEmail,
@@ -203,7 +203,7 @@ export function PropertyDetails() {
           setRequestingInspection(false);
           // Note: the agent + student inspection emails are already sent by
           // paymentAPI.confirmPayment() (called automatically inside
-          // openKorapayCheckout's onSuccess in korapay.js) — do not send a
+          // openFlutterwaveCheckout's onSuccess in flutterwave.js) — do not send a
           // second notification here, that was causing duplicate emails.
         },
         onFailed: () => {
@@ -233,8 +233,8 @@ export function PropertyDetails() {
     setPayingRent(true);
     try {
       const res = await rentAPI.initiate(id, user);
-      const { openKorapayCheckout } = await import('../lib/korapay');
-      await openKorapayCheckout({
+      const { openFlutterwaveCheckout } = await import('../lib/flutterwave');
+      await openFlutterwaveCheckout({
         reference: res.data.reference,
         amount: res.data.amount,
         email: user.email,

@@ -1,7 +1,10 @@
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const KORAPAY_SECRET_KEY = Deno.env.get("KORAPAY_SECRET_KEY") || "";
+// Flutterwave-backed bank list + account name resolution.
+// Set the secret with:  supabase secrets set FLW_SECRET_KEY=FLWSECK-...
+const FLW_SECRET_KEY = Deno.env.get("FLW_SECRET_KEY") || Deno.env.get("FLUTTERWAVE_SECRET_KEY") || "";
+const FLW_BASE_URL = "https://api.flutterwave.com/v3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,16 +19,22 @@ serve(async (req: Request) => {
 
   const url = new URL(req.url);
 
-  // GET /resolve-bank?list=true  → return Korapay's bank list
+  // GET /resolve-bank?list=true  → return Flutterwave's NG bank list,
+  // normalised to the { status, data: [{ name, code }] } shape the
+  // BecomeAgent page already expects.
   if (req.method === "GET" && url.searchParams.get("list") === "true") {
     try {
-      const res = await fetch("https://api.korapay.com/merchant/api/v1/misc/banks?country=NG", {
-        headers: { Authorization: `Bearer ${KORAPAY_SECRET_KEY}` },
+      const res = await fetch(`${FLW_BASE_URL}/banks/NG`, {
+        headers: { Authorization: `Bearer ${FLW_SECRET_KEY}` },
       });
       const data = await res.json();
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const banks = Array.isArray(data?.data)
+        ? data.data.map((b: any) => ({ name: b.name, code: b.code }))
+        : [];
+      return new Response(
+        JSON.stringify({ status: data?.status === "success", data: banks, message: data?.message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     } catch (err: any) {
       return new Response(JSON.stringify({ status: false, message: err.message }), {
         status: 500,
@@ -41,40 +50,38 @@ serve(async (req: Request) => {
     if (!account_number || !bank_code) {
       return new Response(
         JSON.stringify({ success: false, message: "account_number and bank_code are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const res = await fetch(
-      `https://api.korapay.com/merchant/api/v1/misc/banks/resolve?account=${account_number}&bank_code=${bank_code}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${KORAPAY_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const res = await fetch(`${FLW_BASE_URL}/accounts/resolve`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${FLW_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ account_number, account_bank: bank_code }),
+    });
 
     const data = await res.json();
-    console.log("Korapay resolve response:", JSON.stringify(data));
+    console.log("Flutterwave resolve response:", JSON.stringify(data));
 
-    if (data.status && data.data?.account_name) {
+    if (data?.status === "success" && data?.data?.account_name) {
       return new Response(
         JSON.stringify({ success: true, account_name: data.data.account_name }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({ success: false, message: data.message || "Could not resolve account" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    return new Response(
+      JSON.stringify({ success: false, message: data?.message || "Could not resolve account" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err: any) {
     console.error("resolve-bank error:", err.message);
     return new Response(
       JSON.stringify({ success: false, message: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

@@ -7,7 +7,7 @@ Student housing rental platform for LAUTECH — connects students with verified 
 ## Tech Stack
 - **Frontend:** React 19, React Router, Tailwind, shadcn/ui, CRACO (deployed on Vercel)
 - **Backend / DB:** Supabase (Postgres, RLS, Storage, Edge Functions)
-- **Payments:** Korapay
+- **Payments:** Flutterwave
 - **Email:** Resend
 
 ## Structure
@@ -24,7 +24,7 @@ See **[SETUP.md](./SETUP.md)** for the full setup, deployment, and handover guid
 
 ```bash
 cd frontend
-cp .env.example .env    # fill in Supabase + Korapay keys
+cp .env.example .env    # fill in Supabase + Flutterwave keys
 yarn install
 yarn start
 ```

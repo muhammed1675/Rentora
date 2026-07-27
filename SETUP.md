@@ -1,6 +1,6 @@
 # Rentora — Setup Guide
 
-Complete instructions to run, deploy, or hand off this project from zero. The app is a student‑housing platform (React + Supabase + Korapay) currently live at https://www.rentora.com.ng.
+Complete instructions to run, deploy, or hand off this project from zero. The app is a student‑housing platform (React + Supabase + Flutterwave) currently live at https://www.rentora.com.ng.
 
 ---
 
@@ -10,7 +10,7 @@ Complete instructions to run, deploy, or hand off this project from zero. The ap
 Rentora/
 ├── frontend/                 # React 19 app (CRACO). This is what Vercel deploys.
 │   ├── src/                  # Pages, components, lib (supabase client, auth, api)
-│   ├── api/                  # Vercel serverless functions (Korapay, contact form)
+│   ├── api/                  # Vercel serverless functions (Flutterwave, contact form)
 │   └── .env.example          # Frontend env vars (REACT_APP_*)
 ├── backend/                  # Optional Python service (FastAPI). Not required for prod.
 ├── supabase/
@@ -22,7 +22,7 @@ Rentora/
 │   │   ├── 05_indexes.sql
 │   │   └── 06_storage.sql
 │   └── functions/            # Edge Functions (Deno)
-│       ├── resolve-bank/     # Verifies bank accounts via Korapay
+│       ├── resolve-bank/     # Verifies bank accounts via Flutterwave
 │       └── send-email/       # Transactional email via Resend
 ├── .gitignore
 ├── README.md
@@ -38,7 +38,7 @@ You will need accounts and credentials for:
 | Service    | Why                                     | Where to get it                                      |
 |------------|-----------------------------------------|------------------------------------------------------|
 | Supabase   | Database, auth, storage, edge functions | https://supabase.com → new project                   |
-| Korapay    | Payments (tokens, inspections, rent)    | https://korapay.com → dashboard → API keys           |
+| Flutterwave    | Payments (tokens, inspections, rent)    | https://flutterwave.com → dashboard → API keys           |
 | Resend     | Transactional email (contact, receipts) | https://resend.com → API keys                        |
 | Vercel     | Frontend + serverless hosting           | https://vercel.com                                   |
 | GitHub     | Source hosting / CI                     | https://github.com                                   |
@@ -65,8 +65,8 @@ yarn start                       # http://localhost:3000
 ### 3.3 Create the env files
 Copy every `.env.example` to a real `.env` in the same folder and fill it in:
 
-- `frontend/.env` — client‑side (Supabase URL, anon key, Korapay PUBLIC key)
-- `frontend/api/.env` — Vercel functions (Supabase service role, Korapay SECRET, Resend)
+- `frontend/.env` — client‑side (Supabase URL, anon key, Flutterwave PUBLIC key)
+- `frontend/api/.env` — Vercel functions (Supabase service role, Flutterwave SECRET, Resend)
 - `supabase/functions/.env` — Edge Function secrets (or use `supabase secrets set`)
 - `backend/.env` — only if you run the Python service
 
@@ -93,7 +93,7 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
    supabase link --project-ref YOUR-PROJECT-REF
    supabase functions deploy resolve-bank
    supabase functions deploy send-email
-   supabase secrets set KORAPAY_SECRET_KEY=sk_live_xxx RESEND_API_KEY=re_xxx FROM_EMAIL=no-reply@yourdomain.com
+   supabase secrets set FLW_SECRET_KEY=sk_live_xxx RESEND_API_KEY=re_xxx FROM_EMAIL=no-reply@yourdomain.com
    ```
 6. Configure **Authentication → URL Configuration**:
    - Site URL: `https://yourdomain.com`
@@ -127,10 +127,10 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
 
 ---
 
-## 7. Korapay setup
+## 7. Flutterwave setup
 
-1. In Korapay dashboard → **API Keys**, copy the **public** key (for the browser) and **secret** key (for Vercel functions + Supabase edge functions).
-2. Configure webhook (if used): point it at `https://yourdomain.com/api/korapay-webhook` and paste the webhook secret into Vercel env as `KORAPAY_WEBHOOK_SECRET` if the handler expects one.
+1. In Flutterwave dashboard → **API Keys**, copy the **public** key (for the browser) and **secret** key (for Vercel functions + Supabase edge functions).
+2. Configure webhook (if used): point it at `https://yourdomain.com/api/flutterwave-webhook` and paste the webhook secret into Vercel env as `FLUTTERWAVE_WEBHOOK_SECRET` if the handler expects one.
 3. Test with the built‑in "Simulate Payment Success" button before flipping to live keys.
 
 ---
@@ -142,7 +142,7 @@ Everything a buyer needs is in this repo **except** live credentials and live da
 1. **This repository** (source of truth for code + schema).
 2. **Credentials handover** — share via a password manager (1Password, Bitwarden shared vault):
    - Supabase project URL, anon key, service_role key, project ref, dashboard access
-   - Korapay account access + API keys
+   - Flutterwave account access + API keys
    - Resend API key
    - Vercel project access + custom domain / DNS registrar login
    - GitHub repo access
@@ -153,7 +153,7 @@ Everything a buyer needs is in this repo **except** live credentials and live da
    - Restore data dump (if included) via Supabase SQL Editor or `psql`
    - Import to their Vercel account, set env vars, deploy
    - Point their domain
-5. **Rotate everything after handover** — the seller must reset Supabase service_role, Korapay keys, Resend key, and any OAuth client secrets so the previous owner loses access. Buyer generates their own.
+5. **Rotate everything after handover** — the seller must reset Supabase service_role, Flutterwave keys, Resend key, and any OAuth client secrets so the previous owner loses access. Buyer generates their own.
 6. **Optional extras to include with the sale:**
    - Screenshots / demo video of the live app
    - Traffic + revenue analytics
@@ -169,7 +169,7 @@ These live only in third‑party dashboards and must be captured manually if you
 - Supabase Auth settings (site URL, redirect URLs, OAuth client IDs/secrets, email templates)
 - Supabase project secrets (edge function env vars) — mirror them in `supabase/functions/.env.example` names, values in your password manager
 - Vercel environment variables and domain config
-- Korapay webhook + payout account config
+- Flutterwave webhook + payout account config
 - Resend domain verification records
 - Live table data (use Supabase backups / `pg_dump`)
 
@@ -185,7 +185,7 @@ Keep a private "operations" doc in your password manager listing where each of t
 | RLS "permission denied"                | Re‑run `04_policies.sql`; confirm user role in `public.users`  |
 | Storage upload fails                   | Bucket missing or wrong policy — re‑run `06_storage.sql`       |
 | Edge function 500                      | `supabase functions logs <name>` → check missing secret        |
-| Payments not verifying                 | Korapay secret key not set in Vercel env / edge function       |
+| Payments not verifying                 | Flutterwave secret key not set in Vercel env / edge function       |
 | Vercel 404 on refresh                  | Root Directory not set to `frontend`                            |
 
 ---

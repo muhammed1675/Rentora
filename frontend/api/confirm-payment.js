@@ -2,7 +2,7 @@
 //
 // This is the ONLY place a payment (token purchase, inspection fee, or
 // rent) should ever be marked as paid/held/completed. Previously this
-// happened directly from the browser, trusting the Korapay SDK's
+// happened directly from the browser, trusting the Flutterwave SDK's
 // onSuccess callback with no independent verification — which meant
 // anyone calling the Supabase REST API directly (bypassing the app
 // entirely) could mark their own payment "complete" without ever
@@ -12,25 +12,26 @@
 // This function:
 //   1. Looks up the reference in whichever table it belongs to
 //      (transactions / inspection_transactions / property_rent_payments)
-//   2. Verifies the charge with Korapay SERVER-SIDE using the secret key
+//   2. Verifies the charge with Flutterwave SERVER-SIDE using the secret key
 //      (the browser never sees this key)
-//   3. Confirms the amount Korapay actually charged matches what our
+//   3. Confirms the amount Flutterwave actually charged matches what our
 //      database expects for that reference
 //   4. Only if both checks pass does it perform the status transition,
 //      using the Supabase SERVICE ROLE key (bypasses RLS — safe here
 //      because this code never runs in the browser)
 //
-// FAILS CLOSED: if Korapay's response is missing, ambiguous, or
+// FAILS CLOSED: if Flutterwave's response is missing, ambiguous, or
 // doesn't match, this returns an error and does NOT mark anything
 // paid. A legitimate payment stuck as "pending" is a visible, reportable
 // problem. A forged payment silently marked "paid" is a bankruptcy risk.
 //
 // Requires two Vercel environment variables:
-//   - KORALPAY_SECRET_KEY        (should already exist — used by korapay-verify.js)
+//   - FLW_SECRET_KEY        (should already exist — used by flutterwave-verify.js)
 //   - SUPABASE_SERVICE_ROLE_KEY  (NEW — from Supabase Dashboard > Project Settings > API)
 // Also needs SUPABASE_URL (should already exist).
 
 import { createClient } from '@supabase/supabase-js';
+import { verifyByReference, readCharge, getSecretKey } from './_flutterwave.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
   const { reference } = req.body || {};
   if (!reference) return res.status(400).json({ error: 'Missing reference' });
 
-  const secretKey = process.env.KORALPAY_SECRET_KEY;
+  const secretKey = getSecretKey();
   const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -72,30 +73,32 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'No transaction found for this reference' });
     }
 
-    // ---- 2. Verify with Korapay server-side ----
-    const koraRes = await fetch(`https://api.korapay.com/merchant/api/v1/charges/${reference}`, {
-      headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
-    });
-    const koraBody = await koraRes.json();
+    // ---- 2. Verify with Flutterwave server-side ----
+    const { ok: flwOk, body: flwBody } = await verifyByReference(reference);
 
-    if (!koraRes.ok) {
-      console.error('confirm-payment: Korapay verify failed', koraBody);
-      return res.status(402).json({ error: 'Could not verify payment with Korapay', detail: koraBody?.message });
+    if (!flwOk || flwBody?.status !== 'success') {
+      console.error('confirm-payment: Flutterwave verify failed', flwBody);
+      return res.status(402).json({ error: 'Could not verify payment with Flutterwave', detail: flwBody?.message });
     }
 
-    // Korapay's response shape can nest the charge under `data`. Handle
-    // both to be safe, but require an explicit "success" status — never
-    // assume success from the mere presence of a response.
-    const chargeStatus = koraBody?.data?.status || koraBody?.status;
-    const chargedAmountRaw = koraBody?.data?.amount ?? koraBody?.amount;
-    const chargedAmount = Number(chargedAmountRaw);
+    // Flutterwave marks a completed payment as data.status === "successful".
+    // Never assume success from the mere presence of a response.
+    const charge = readCharge(flwBody);
+    const chargeStatus = charge.status;
+    const chargedAmount = charge.amount;
 
-    if (chargeStatus !== 'success') {
-      return res.status(402).json({ error: `Payment not successful (Korapay status: ${chargeStatus || 'unknown'})` });
+    if (chargeStatus !== 'successful') {
+      return res.status(402).json({ error: `Payment not successful (Flutterwave status: ${chargeStatus || 'unknown'})` });
     }
     if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) {
-      console.error('confirm-payment: could not parse charged amount', koraBody);
-      return res.status(502).json({ error: 'Could not confirm the charged amount with Korapay — payment not completed.' });
+      console.error('confirm-payment: could not parse charged amount', flwBody);
+      return res.status(502).json({ error: 'Could not confirm the charged amount with Flutterwave — payment not completed.' });
+    }
+    if (charge.currency && charge.currency !== 'NGN') {
+      return res.status(409).json({ error: `Unexpected payment currency: ${charge.currency}` });
+    }
+    if (charge.txRef && charge.txRef !== reference) {
+      return res.status(409).json({ error: 'Payment reference mismatch' });
     }
 
     // ---- 3. Match the charged amount against what we expect, then transition ----
@@ -170,7 +173,7 @@ export default async function handler(req, res) {
 
       const { error: rentErr } = await supabase
         .from('property_rent_payments')
-        .update({ status: 'held', held_at: new Date().toISOString(), koralpay_reference: koraBody?.data?.reference || reference })
+        .update({ status: 'held', held_at: new Date().toISOString(), koralpay_reference: charge.flwRef || reference })
         .eq('reference', reference)
         .eq('status', 'pending');
       if (rentErr) throw rentErr;

@@ -34,7 +34,7 @@ api_router = APIRouter(prefix="/api")
 
 # Security
 security = HTTPBearer(auto_error=False)
-KORALPAY_SECRET = os.environ.get('KORALPAY_SECRET_KEY', '')
+KORALPAY_SECRET = os.environ.get('FLW_SECRET_KEY', '')
 KORALPAY_WEBHOOK_SECRET = os.environ.get('KORALPAY_WEBHOOK_SECRET', '')
 
 # Configure logging
@@ -496,7 +496,7 @@ async def initiate_token_purchase(data: TokenPurchaseRequest, user: dict = Depen
     supabase_admin.table('transactions').insert(transaction).execute()
     
     koralpay_public_key = os.environ.get('KORALPAY_PUBLIC_KEY', 'pk_test_xxx')
-    checkout_url = f"https://checkout.korapay.com/checkout?amount={amount}&currency=NGN&reference={reference}&merchant={koralpay_public_key}"
+    checkout_url = f"https://checkout.flutterwave.com/checkout?amount={amount}&currency=NGN&reference={reference}&merchant={koralpay_public_key}"
     
     return {
         "reference": reference,
@@ -604,7 +604,7 @@ async def request_inspection(data: InspectionRequest, user: dict = Depends(get_c
     supabase_admin.table('inspection_transactions').insert(transaction).execute()
     
     koralpay_public_key = os.environ.get('KORALPAY_PUBLIC_KEY', 'pk_test_xxx')
-    checkout_url = f"https://checkout.korapay.com/checkout?amount=2000&currency=NGN&reference={reference}&merchant={koralpay_public_key}"
+    checkout_url = f"https://checkout.flutterwave.com/checkout?amount=2000&currency=NGN&reference={reference}&merchant={koralpay_public_key}"
     
     return {
         "inspection_id": inspection_id,
@@ -787,7 +787,7 @@ async def get_admin_stats(user: dict = Depends(get_current_user)):
 @api_router.post("/webhooks/koralpay")
 async def handle_koralpay_webhook(request: Request):
     body = await request.body()
-    signature = request.headers.get("x-korapay-signature", "")
+    signature = request.headers.get("x-flutterwave-signature", "")
     
     # Verify signature (in production)
     if KORALPAY_WEBHOOK_SECRET:
@@ -817,7 +817,7 @@ async def handle_koralpay_webhook(request: Request):
             token_tx = token_result.data
             supabase_admin.table('transactions').update({
                 "status": "completed",
-                "koralpay_reference": data.get("korapay_reference")
+                "koralpay_reference": data.get("flutterwave_reference")
             }).eq('reference', reference).execute()
             
             # Add tokens to wallet
@@ -832,7 +832,7 @@ async def handle_koralpay_webhook(request: Request):
             insp_tx = insp_result.data
             supabase_admin.table('inspection_transactions').update({
                 "status": "completed",
-                "koralpay_reference": data.get("korapay_reference")
+                "koralpay_reference": data.get("flutterwave_reference")
             }).eq('reference', reference).execute()
             
             # Update inspection payment status

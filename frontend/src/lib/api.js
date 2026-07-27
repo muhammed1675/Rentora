@@ -650,7 +650,7 @@ export const adminAPI = {
 export const paymentAPI = {
   // Calls the server-side verified confirmation endpoint (/api/confirm-payment)
   // instead of writing to the database directly. That endpoint independently
-  // verifies the charge with Korapay using the secret key before marking
+  // verifies the charge with Flutterwave using the secret key before marking
   // anything paid — this function no longer trusts the browser's own word
   // that a payment succeeded. Works for token purchases, inspections, and
   // rent (the endpoint auto-detects which one based on the reference).
@@ -1078,7 +1078,7 @@ export const rentAPI = {
     };
   },
 
-  // Called by the Korapay success callback: mark the rent as held in escrow.
+  // Called by the Flutterwave success callback: mark the rent as held in escrow.
   // Returns held/released rent payments for properties this agent owns, so
   // the Agent Dashboard can show an accurate "Taken" state and block the
   // availability toggle client-side (the DB also blocks it — this is just
@@ -1106,7 +1106,7 @@ export const rentAPI = {
 
   // Calls the server-side verified confirmation endpoint — no longer
   // writes directly to the database or trusts the browser's own claim
-  // that Korapay succeeded. See /api/confirm-payment.js. The endpoint
+  // that Flutterwave succeeded. See /api/confirm-payment.js. The endpoint
   // handles the agent/student notification emails itself, only on the
   // actual first transition (never on a repeat call), which also closes
   // the duplicate-email risk from a double-fired success callback.

@@ -42,7 +42,7 @@ export function Profile() {
     }
     fetchData();
 
-    // Auto-confirm payment if redirected back from Korapay
+    // Auto-confirm payment if redirected back from Flutterwave
     const params = new URLSearchParams(window.location.search);
     const reference = params.get('reference') || params.get('trxref');
     if (reference) {
