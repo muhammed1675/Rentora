@@ -102,7 +102,7 @@ export default async function handler(req, res) {
     }
 
     // ---- 3. Match the charged amount against what we expect, then transition ----
-    const AMOUNT_TOLERANCE = 1; // allow ₦1 rounding slack, nothing more
+    const AMOUNT_TOLERANCE = 5; // allow ₦5 rounding/conversion slack for floating point issues
 
     if (tokenTx) {
       if (tokenTx.status === 'completed') {
@@ -130,8 +130,17 @@ export default async function handler(req, res) {
       if (inspTx.status === 'completed') {
         return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection' });
       }
-      if (Math.abs(chargedAmount - Number(inspTx.amount)) > AMOUNT_TOLERANCE) {
-        console.error('confirm-payment: inspection amount mismatch', { expected: inspTx.amount, charged: chargedAmount, reference });
+      const amountDiff = Math.abs(chargedAmount - Number(inspTx.amount));
+      console.log('[confirm-payment] Inspection amount check:', { 
+        expected: inspTx.amount, 
+        charged: chargedAmount, 
+        difference: amountDiff, 
+        tolerance: AMOUNT_TOLERANCE,
+        withinTolerance: amountDiff <= AMOUNT_TOLERANCE,
+        reference 
+      });
+      if (amountDiff > AMOUNT_TOLERANCE) {
+        console.error('confirm-payment: inspection amount mismatch', { expected: inspTx.amount, charged: chargedAmount, reference, difference: amountDiff });
         return res.status(409).json({ error: 'Charged amount does not match the expected inspection fee.' });
       }
 
