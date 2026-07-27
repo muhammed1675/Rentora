@@ -28,7 +28,13 @@ In Vercel Settings > Environment Variables, confirm these exist:
 - [ ] `SUPABASE_URL`
 - [ ] `FLW_SECRET_KEY`
 - [ ] `REACT_APP_FLW_PUBLIC_KEY`
-- [ ] `FLW_WEBHOOK_HASH`
+- [ ] `FLW_WEBHOOK_HASH` (CRITICAL - if missing, payments won't update from webhook)
+
+**⚠️ If `FLW_WEBHOOK_HASH` is missing:**
+1. Go to Flutterwave Dashboard → Settings → Webhooks
+2. Copy the "Secret Hash" value
+3. Add to Vercel as `FLW_WEBHOOK_HASH`
+4. Redeploy
 
 ### 2. Add Missing Environment Variables (CRITICAL)
 These are required for email notifications to work:
@@ -91,6 +97,34 @@ git push origin main
 
 ---
 
+## Critical: Webhook Configuration
+
+The webhook is how Flutterwave notifies your server when payments are complete. If not configured correctly, payments will show as "pending" even though Flutterwave received the money.
+
+### Webhook Setup
+
+1. **Go to Flutterwave Dashboard → Settings → Webhooks**
+2. **Set Webhook URL to:** `https://rentora.com.ng/api/flutterwave-webhook`
+3. **Copy the Secret Hash value**
+4. **In Vercel, set environment variable:**
+   - Name: `FLW_WEBHOOK_HASH`
+   - Value: (paste the Secret Hash)
+5. **Redeploy:** `vercel deploy --prod`
+6. **Test Webhook:** Click "Test Webhook" in Flutterwave dashboard (should return 200 OK)
+
+### If You Receive "Unsuccessful Webhook Delivery" Email
+
+This means Flutterwave can't reach your webhook. See **WEBHOOK_SETUP_AND_TROUBLESHOOTING.md** for complete troubleshooting guide.
+
+Quick checklist:
+- [ ] `FLW_WEBHOOK_HASH` is set in Vercel
+- [ ] `FLW_WEBHOOK_HASH` matches Flutterwave Secret Hash exactly (case-sensitive!)
+- [ ] Webhook URL is exactly: `https://rentora.com.ng/api/flutterwave-webhook`
+- [ ] Project is redeployed after env var changes
+- [ ] Webhook test returns 200 OK
+
+---
+
 ## Post-Deployment Verification
 
 ### Test 1: Token Purchase
@@ -98,6 +132,8 @@ git push origin main
 2. Select token amount
 3. Click "Buy Tokens"
 4. Complete payment in Flutterwave
+5. **Payment should immediately show "completed"** (not "pending")
+6. Check email for confirmation
 5. Verify:
    - [ ] Payment shows "completed" instantly
    - [ ] Tokens appear in wallet
