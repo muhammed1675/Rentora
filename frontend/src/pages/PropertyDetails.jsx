@@ -206,8 +206,12 @@ export function PropertyDetails() {
           // openFlutterwaveCheckout's onSuccess in flutterwave.js) — do not send a
           // second notification here, that was causing duplicate emails.
         },
-        onFailed: () => {
-          toast.error('Payment was not successful. Please try again.');
+        onFailed: (data) => {
+          if (data?.pendingConfirmation) {
+            toast.info("Payment received — we're still confirming it with Flutterwave. Check your profile in a minute; you'll also get an email once it's done.");
+          } else {
+            toast.error('Payment was not successful. Please try again.');
+          }
           setRequestingInspection(false);
         },
         onClose: () => {
@@ -245,7 +249,14 @@ export function PropertyDetails() {
           toast.success('Rent held by Rentora. Confirm move-in from your profile to release funds.');
           setPayingRent(false);
         },
-        onFailed: () => { toast.error('Payment failed. Please try again.'); setPayingRent(false); },
+        onFailed: (data) => {
+          if (data?.pendingConfirmation) {
+            toast.info("Payment received — we're still confirming it with Flutterwave. Check your profile in a minute.");
+          } else {
+            toast.error('Payment failed. Please try again.');
+          }
+          setPayingRent(false);
+        },
         onClose: () => setPayingRent(false),
       });
     } catch (e) {
