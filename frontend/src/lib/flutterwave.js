@@ -1,6 +1,6 @@
 import { paymentAPI } from './api';
 
-// Flutterwave Inline checkout (replaces the old Korapay modal).
+// Flutterwave Inline checkout.
 // Docs: https://developer.flutterwave.com/v3.0/docs/inline
 const SCRIPT_URL = 'https://checkout.flutterwave.com/v3.js';
 
@@ -21,7 +21,7 @@ function loadScript() {
   });
 }
 
-// Korapay channel names -> Flutterwave payment_options
+// Map internal channel names -> Flutterwave payment_options
 function mapChannel(channel) {
   switch (channel) {
     case 'card': return 'card';
@@ -56,8 +56,7 @@ export async function openFlutterwaveCheckout({
   window.FlutterwaveCheckout({
     public_key: key,
     tx_ref: reference,
-    // Flutterwave amounts are in naira (major units), same as Korapay's
-    // decimal amount — no ×100 conversion.
+    // Flutterwave amounts are in naira (major units) — no ×100 conversion.
     amount,
     currency: 'NGN',
     payment_options: paymentOptions.join(','),
@@ -73,7 +72,7 @@ export async function openFlutterwaveCheckout({
     callback: async (data) => {
       // The browser callback is NEVER trusted on its own — /api/confirm-payment
       // re-verifies the charge with Flutterwave using the secret key before
-      // anything is marked paid. Same guarantee as the old Korapay flow.
+      // anything is marked paid.
       try {
         await paymentAPI.confirmPayment(reference);
       } catch (err) {
@@ -92,5 +91,3 @@ export async function openFlutterwaveCheckout({
   });
 }
 
-// Back-compat alias so any straggling import keeps working.
-export const openKorapayCheckout = openFlutterwaveCheckout;

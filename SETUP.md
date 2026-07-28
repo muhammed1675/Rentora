@@ -24,6 +24,7 @@ Rentora/
 │   └── functions/            # Edge Functions (Deno)
 │       ├── resolve-bank/     # Verifies bank accounts via Flutterwave
 │       └── send-email/       # Transactional email via Resend
+├── legal-documents/          # CAC certificate, TIN, and other Nigerian registration docs
 ├── .gitignore
 ├── README.md
 └── SETUP.md                  # ← you are here
@@ -130,8 +131,13 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
 ## 7. Flutterwave setup
 
 1. In Flutterwave dashboard → **API Keys**, copy the **public** key (for the browser) and **secret** key (for Vercel functions + Supabase edge functions).
-2. Configure webhook (if used): point it at `https://yourdomain.com/api/flutterwave-webhook` and paste the webhook secret into Vercel env as `FLUTTERWAVE_WEBHOOK_SECRET` if the handler expects one.
-3. Test with the built‑in "Simulate Payment Success" button before flipping to live keys.
+2. Configure the webhook: Flutterwave Dashboard → Settings → Webhooks. Set the URL to `https://yourdomain.com/api/flutterwave-webhook` and copy the **Secret Hash** into Vercel env as `FLW_WEBHOOK_HASH` — this must match exactly (case-sensitive) or every webhook delivery is rejected as an invalid signature.
+3. Click **Test Webhook** in the Flutterwave dashboard and confirm it returns `200 OK`. If it doesn't:
+   - Confirm the domain has a valid SSL certificate (the URL loads over HTTPS in a browser).
+   - Confirm `FLW_WEBHOOK_HASH` is set in Vercel and the project has been redeployed since adding it.
+   - Check `vercel logs | grep webhook` for `[webhook] ERROR:` lines — the message there points at the specific failure.
+4. Test with the built‑in "Simulate Payment Success" button before flipping to live keys.
+5. **Settlement is not instant.** Local (NGN) transactions settle from Flutterwave's collection balance into your payout balance / bank account on a T+1 schedule — money collected today lands the next business day, later if it lands on a weekend. This is normal Flutterwave behavior, not a bug in the integration; it only affects when Rentora's own revenue reaches its bank account, not when a student's payment is marked as received in the app (that happens as soon as the webhook + `confirm-payment.js` verify the charge).
 
 ---
 
@@ -186,6 +192,8 @@ Keep a private "operations" doc in your password manager listing where each of t
 | Storage upload fails                   | Bucket missing or wrong policy — re‑run `06_storage.sql`       |
 | Edge function 500                      | `supabase functions logs <name>` → check missing secret        |
 | Payments not verifying                 | Flutterwave secret key not set in Vercel env / edge function       |
+| "Unsuccessful Webhook Delivery" email  | `FLW_WEBHOOK_HASH` missing/mismatched in Vercel, or webhook URL/SSL wrong — see §7 |
+| Flutterwave balance not in bank account yet | Normal T+1 local settlement delay, not an integration bug — see §7 |
 | Vercel 404 on refresh                  | Root Directory not set to `frontend`                            |
 
 ---
