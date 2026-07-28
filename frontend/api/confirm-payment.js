@@ -33,7 +33,36 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyByReference, readCharge, getSecretKey } from './_flutterwave.js';
 
+// Admin notification wrapper: every attempt to confirm a payment (success or
+// failure) is reported by email to every user with role='admin' in Supabase,
+// with the reason/outcome spelled out. Adding/removing an admin in the users
+// table is all that's needed to change who gets alerted.
 export default async function handler(req, res) {
+  const captured = { status: 200, body: null, headers: {} };
+  const shim = {
+    status(code) { captured.status = code; return this; },
+    json(body) { captured.body = body; return this; },
+    end() { captured.ended = true; return this; },
+    setHeader(k, v) { captured.headers[k] = v; },
+    get method() { return req.method; },
+  };
+
+  await handlePayment(req, shim);
+
+  // Never let a notification problem change the payment outcome.
+  try {
+    await notifyAdminsOfPaymentAttempt(req, captured);
+  } catch (e) {
+    console.error('[admin payment alert] failed:', e?.message || e);
+  }
+
+  for (const [k, v] of Object.entries(captured.headers)) res.setHeader(k, v);
+  res.status(captured.status);
+  if (captured.body !== null) return res.json(captured.body);
+  return res.end();
+}
+
+async function handlePayment(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -385,4 +414,127 @@ async function sendRentHeldEmail(supabase, rentTx) {
       data: { student_name: student.full_name || 'there', property_title: propertyTitle, amount: rentTx.total_amount, reference: rentTx.reference },
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Admin payment notifications
+// ---------------------------------------------------------------------------
+// Recipients are NOT hardcoded: anyone in the Supabase `users` table with
+// role = 'admin' receives every payment alert.
+async function getAdminEmails(supabase) {
+  const { data, error } = await supabase.from('users').select('email, full_name').eq('role', 'admin');
+  if (error) throw error;
+  return (data || []).filter((u) => !!u.email);
+}
+
+function describeOutcome(status, body) {
+  if (status === 200 && body?.alreadyProcessed) {
+    return { outcome: 'duplicate', title: 'Payment already processed', reason: 'This reference was confirmed earlier — no changes were made (idempotent replay of the callback or webhook).' };
+  }
+  if (status === 200) {
+    return { outcome: 'success', title: 'Payment successful', reason: 'Flutterwave verified the charge server-side and the amount matched what Rentora expected, so the payment was completed.' };
+  }
+  if (status === 404) return { outcome: 'failed', title: 'Payment could not be matched', reason: body?.error || 'No transaction in Rentora matches this reference.' };
+  if (status === 402) return { outcome: 'failed', title: 'Payment not verified by Flutterwave', reason: body?.error || 'Flutterwave did not report this charge as successful.' };
+  if (status === 409) return { outcome: 'failed', title: 'Payment rejected — mismatch', reason: body?.error || 'The charged amount, currency or reference did not match Rentora records.' };
+  if (status === 502) return { outcome: 'failed', title: 'Payment rejected — unreadable amount', reason: body?.error || 'Could not confirm the charged amount with Flutterwave.' };
+  return { outcome: 'failed', title: 'Payment confirmation error', reason: body?.error || body?.detail || `Server returned status ${status}.` };
+}
+
+async function notifyAdminsOfPaymentAttempt(req, captured) {
+  const reference = req?.body?.reference;
+  if (!reference) return; // nothing meaningful to report (OPTIONS / bad request)
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const admins = await getAdminEmails(supabase);
+  if (!admins.length) return;
+
+  const { status, body } = captured;
+  const { outcome, title, reason } = describeOutcome(status, body);
+
+  // Figure out what was being paid for and by whom.
+  const [tokenRes, inspRes, rentRes] = await Promise.all([
+    supabase.from('transactions').select('*').eq('reference', reference).maybeSingle(),
+    supabase.from('inspection_transactions').select('*').eq('reference', reference).maybeSingle(),
+    supabase.from('property_rent_payments').select('*').eq('reference', reference).maybeSingle(),
+  ]);
+  const tx = tokenRes.data || inspRes.data || rentRes.data || null;
+
+  let paymentType = 'Unknown payment';
+  let purpose = 'Could not determine what this payment was for.';
+  let amount = null;
+  let breakdown = [];
+
+  if (tokenRes.data) {
+    paymentType = 'Token purchase';
+    purpose = `User bought ${tokenRes.data.tokens_added} Rentora token(s) to unlock agent contacts.`;
+    amount = tokenRes.data.amount;
+    breakdown = [['Tokens', String(tokenRes.data.tokens_added)]];
+  } else if (inspRes.data) {
+    paymentType = 'Inspection fee';
+    amount = inspRes.data.amount;
+    const { data: inspection } = await supabase.from('inspections').select('property_title, inspection_date, agent_name').eq('id', inspRes.data.inspection_id).maybeSingle();
+    purpose = `Student paid the inspection fee to book a viewing of "${inspection?.property_title || 'a property'}".`;
+    breakdown = [
+      ['Property', inspection?.property_title || '—'],
+      ['Inspection date', inspection?.inspection_date || '—'],
+      ['Agent', inspection?.agent_name || '—'],
+    ];
+  } else if (rentRes.data) {
+    paymentType = 'Rent payment';
+    amount = rentRes.data.total_amount;
+    const { data: property } = await supabase.from('properties').select('title').eq('id', rentRes.data.property_id).maybeSingle();
+    purpose = `Student paid rent for "${property?.title || 'a property'}". Funds are held by Rentora until move-in is confirmed.`;
+    breakdown = [
+      ['Property', property?.title || '—'],
+      ['Rent', formatNaira(rentRes.data.rent_amount)],
+      ['Agent fee', formatNaira(rentRes.data.agent_fee)],
+      ['Caution fee', formatNaira(rentRes.data.caution_fee)],
+    ];
+  }
+
+  let payer = null;
+  if (tx?.user_id) {
+    const { data: u } = await supabase.from('users').select('full_name, email, phone').eq('id', tx.user_id).maybeSingle();
+    payer = u || null;
+  }
+
+  const payload = {
+    outcome,
+    title,
+    reason,
+    payment_type: paymentType,
+    purpose,
+    amount,
+    reference,
+    status_code: status,
+    payer_name: payer?.full_name || '—',
+    payer_email: payer?.email || '—',
+    payer_phone: payer?.phone || '—',
+    breakdown,
+    occurred_at: new Date().toISOString(),
+  };
+
+  const results = await Promise.allSettled(
+    admins.map((admin) =>
+      callSupabaseSendEmail({
+        type: 'admin_payment_alert',
+        to: admin.email,
+        data: { ...payload, admin_name: admin.full_name || 'Admin' },
+      }),
+    ),
+  );
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') console.error(`[admin payment alert] failed for ${admins[i].email}:`, r.reason?.message || r.reason);
+    else console.log(`[admin payment alert] sent to ${admins[i].email} (${outcome}, ${reference})`);
+  });
+}
+
+function formatNaira(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? `NGN ${n.toLocaleString('en-NG')}` : '—';
 }

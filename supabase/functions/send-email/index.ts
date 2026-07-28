@@ -304,6 +304,36 @@ function emailPropertyApproved(agentName: string, propertyTitle: string) {
   `);
 }
 
+function emailAdminPaymentAlert(d: any) {
+  const ok = d.outcome === "success";
+  const dup = d.outcome === "duplicate";
+  const badge = ok ? "badge" : dup ? "badge badge-blue" : "badge badge-red";
+  const badgeText = ok ? "Payment successful" : dup ? "Already processed" : "Payment failed";
+  const amount = Number.isFinite(Number(d.amount)) ? `NGN ${Number(d.amount).toLocaleString("en-NG")}` : "—";
+  const rows = (d.breakdown || [])
+    .map((r: any[]) => `<div class="card-row"><span class="label">${r[0]}</span><span class="value">${r[1]}</span></div>`)
+    .join("");
+  return baseTemplate(`
+    <span class="eyebrow">Admin notification</span>
+    <div class="${badge}">${badgeText}</div>
+    <h2>${d.title || "Payment update"}</h2>
+    <p><strong>What happened:</strong> ${d.reason || "—"}</p>
+    <p><strong>Why this payment was made:</strong> ${d.purpose || "—"}</p>
+    <div class="card">
+      <div class="card-row"><span class="label">Type</span><span class="value">${d.payment_type || "—"}</span></div>
+      <div class="card-row"><span class="label">Amount</span><span class="value">${amount}</span></div>
+      <div class="card-row"><span class="label">Reference</span><span class="value">${d.reference || "—"}</span></div>
+      ${rows}
+      <div class="card-row"><span class="label">Payer</span><span class="value">${d.payer_name || "—"}</span></div>
+      <div class="card-row"><span class="label">Payer email</span><span class="value">${d.payer_email || "—"}</span></div>
+      <div class="card-row"><span class="label">Payer phone</span><span class="value">${d.payer_phone || "—"}</span></div>
+      <div class="card-row"><span class="label">Time</span><span class="value">${d.occurred_at || "—"}</span></div>
+      <div class="card-row"><span class="label">Server status</span><span class="value">${d.status_code ?? "—"}</span></div>
+    </div>
+    <a href="https://www.rentora.com.ng/admin" class="btn">Open Admin Dashboard</a>
+  `);
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -386,6 +416,12 @@ serve(async (req) => {
         subject = "New Sign-In to Your Rentora Account";
         html = emailSignIn(data.name, data.ip, data.location, data.time, data.device);
         break;
+      case "admin_payment_alert": {
+        const label = data.outcome === "success" ? "Payment received" : data.outcome === "duplicate" ? "Duplicate payment callback" : "Payment FAILED";
+        subject = `[Rentora Admin] ${label}: ${data.payment_type || "payment"} — ${data.reference}`;
+        html = emailAdminPaymentAlert(data);
+        break;
+      }
       default:
         throw new Error(`Unknown email type: ${type}`);
     }
