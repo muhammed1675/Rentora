@@ -256,7 +256,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     role text NOT NULL DEFAULT 'user'::text,
     suspended boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
-    phone text
+    phone text,
+    avatar_url text
 );
 
 -- ── wallets ──────────────────────────────

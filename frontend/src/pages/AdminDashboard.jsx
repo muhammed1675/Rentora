@@ -814,6 +814,13 @@ export function AdminDashboard() {
             {filteredUsers.map((u) => (
               <Card key={u.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                    {u.avatar_url ? (
+                      <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-5 h-5 text-primary" />
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm truncate">{u.full_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
@@ -842,7 +849,18 @@ export function AdminDashboard() {
               <TableBody>
                 {filteredUsers.map((u) => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.full_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                          {u.avatar_url ? (
+                            <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-4 h-4 text-primary" />
+                          )}
+                        </div>
+                        {u.full_name}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">{u.email}</TableCell>
                     <TableCell>
                       <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>

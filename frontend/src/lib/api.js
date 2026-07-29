@@ -513,7 +513,7 @@ export const userAPI = {
   getAll: async () => {
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, role, suspended, created_at, phone')
+      .select('id, email, full_name, role, suspended, created_at, phone, avatar_url')
       .order('created_at', { ascending: false });
     
     if (error) throw error;
@@ -523,7 +523,7 @@ export const userAPI = {
   getById: async (userId) => {
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, role, suspended, created_at, phone')
+      .select('id, email, full_name, role, suspended, created_at, phone, avatar_url')
       .eq('id', userId)
       .single();
     
@@ -545,10 +545,14 @@ export const userAPI = {
   // to change themselves (phone, etc). full_name/email/role/suspended are
   // locked to admin-only at the DB level (trg_restrict_self_profile_edits)
   // and will be rejected here if included.
-  updateProfile: async (userId, { phone }) => {
+  updateProfile: async (userId, { phone, avatar_url }) => {
+    const patch = {};
+    if (phone !== undefined) patch.phone = phone;
+    if (avatar_url !== undefined) patch.avatar_url = avatar_url;
+
     const { error } = await supabase
       .from('users')
-      .update({ phone })
+      .update(patch)
       .eq('id', userId);
     if (error) throw new Error(error.message || 'Failed to update profile');
     return { data: { ok: true } };

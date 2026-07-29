@@ -54,6 +54,7 @@ export function AuthProvider({ children }) {
               id: authUser.id,
               email: authUser.email,
               full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+              avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
               role: 'user',
               suspended: false
             })
