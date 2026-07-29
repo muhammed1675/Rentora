@@ -17,13 +17,12 @@ import AgentDashboard from "./pages/AgentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import BecomeAgent from "./pages/BecomeAgent";
 import PaymentCallback from "./pages/PaymentCallback";
-import TermsAndPolicies from "./pages/TermsAndPolicies";
+import { PolicyPage } from "./pages/PolicyPage";
 import Contact from "./pages/Contact";
 import { Compare } from './pages/Compare';
 import { ResetPassword } from './pages/ResetPassword';
 import { AuthCallback } from './pages/AuthCallback';
 import { NotFound } from './pages/NotFound';
-import { Privacy } from './pages/Privacy';
 import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
 import { AgentRequirements } from './pages/AgentRequirements';
@@ -117,8 +116,10 @@ function AppRoutes() {
       />
 
       {/* Legal */}
-      <Route path="/terms" element={<Layout><TermsAndPolicies /></Layout>} />
-      <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+      <Route path="/terms" element={<Layout><PolicyPage sectionId="terms" /></Layout>} />
+      <Route path="/privacy" element={<Layout><PolicyPage sectionId="privacy" /></Layout>} />
+      <Route path="/refund" element={<Layout><PolicyPage sectionId="refund" /></Layout>} />
+      <Route path="/disclaimer" element={<Layout><PolicyPage sectionId="disclaimer" /></Layout>} />
 
       {/* Info Pages */}
       <Route path="/about" element={<Layout><About /></Layout>} />
