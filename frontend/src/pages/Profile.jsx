@@ -22,7 +22,8 @@ import {
   RefreshCw,
   Clock,
   Download,
-  Camera
+  Camera,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,14 +45,32 @@ export function Profile() {
     if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
 
+    const previousAvatarUrl = user?.avatar_url;
     setAvatarUploading(true);
     try {
       const { data } = await storageAPI.uploadImage(file, 'avatars');
       await userAPI.updateProfile(user.id, { avatar_url: data.url });
+      if (previousAvatarUrl) await storageAPI.deleteImage(previousAvatarUrl, 'avatars');
       await refreshUser();
       toast.success('Profile picture updated');
     } catch (err) {
       toast.error(err.message || 'Failed to upload picture');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!user?.avatar_url) return;
+    const previousAvatarUrl = user.avatar_url;
+    setAvatarUploading(true);
+    try {
+      await userAPI.updateProfile(user.id, { avatar_url: null });
+      await storageAPI.deleteImage(previousAvatarUrl, 'avatars');
+      await refreshUser();
+      toast.success('Profile picture removed');
+    } catch (err) {
+      toast.error(err.message || 'Failed to remove picture');
     } finally {
       setAvatarUploading(false);
     }
@@ -238,26 +257,40 @@ export function Profile() {
         {/* User Card */}
         <Card className="p-6">
           <div className="flex items-center gap-4">
-            <label className="relative shrink-0 cursor-pointer group" data-testid="profile-avatar-label">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-8 h-8 text-primary" />
-                )}
-              </div>
-              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center border-2 border-white group-hover:opacity-90">
-                {avatarUploading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-                disabled={avatarUploading}
-                data-testid="profile-avatar-input"
-              />
-            </label>
+            <div className="relative shrink-0" data-testid="profile-avatar-wrapper">
+              <label className="block cursor-pointer group" data-testid="profile-avatar-label">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-8 h-8 text-primary" />
+                  )}
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center border-2 border-white group-hover:opacity-90">
+                  {avatarUploading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                  disabled={avatarUploading}
+                  data-testid="profile-avatar-input"
+                />
+              </label>
+              {user?.avatar_url && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={avatarUploading}
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white border border-destructive text-destructive flex items-center justify-center shadow-sm hover:bg-destructive hover:text-white transition-colors"
+                  aria-label="Remove profile picture"
+                  data-testid="profile-avatar-remove"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
             <div>
               <h2 className="font-semibold text-lg">{user?.full_name}</h2>
               <p className="text-sm text-muted-foreground">{user?.email}</p>

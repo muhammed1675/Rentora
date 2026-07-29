@@ -707,6 +707,21 @@ export const storageAPI = {
       .getPublicUrl(fileName);
 
     return { data: { url: publicUrl, path: data.path } };
+  },
+
+  // Removes a previously uploaded file given its public URL (best-effort —
+  // failures here shouldn't block the calling flow, just log a warning).
+  deleteImage: async (publicUrl, bucket) => {
+    if (!publicUrl) return;
+    try {
+      const marker = `/${bucket}/`;
+      const idx = publicUrl.indexOf(marker);
+      if (idx === -1) return;
+      const path = publicUrl.substring(idx + marker.length);
+      await supabase.storage.from(bucket).remove([path]);
+    } catch (e) {
+      console.warn('Failed to delete old file from storage (non-critical):', e.message);
+    }
   }
 };
 
