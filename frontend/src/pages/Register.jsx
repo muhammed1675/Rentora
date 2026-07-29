@@ -6,11 +6,12 @@ import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Mail, Lock, User, Eye, EyeOff, CheckCircle2, Phone } from 'lucide-react';
+import { GoogleButton } from '../components/GoogleButton';
 import { toast } from 'sonner';
 
 export function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -19,8 +20,20 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+
+  const handleGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      // Browser redirects to Google here; no further code runs.
+    } catch (error) {
+      toast.error(error.message || 'Could not start Google sign-up');
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -230,6 +243,22 @@ export function Register() {
             {loading ? 'Creating account...' : 'Create Account'}
           </Button>
         </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+          </div>
+        </div>
+
+        <GoogleButton
+          onClick={handleGoogleSignUp}
+          loading={googleLoading}
+          label="Sign up with Google"
+          data-testid="google-signup"
+        />
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           Already have an account?{' '}

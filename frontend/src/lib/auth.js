@@ -261,6 +261,75 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Google OAuth: kick off redirect to Google ───────────────
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
+    if (error) throw new Error(parseAuthError(error));
+  };
+
+  // ── Google OAuth: finish sign-in after redirect back from Google ──
+  // Called from the /auth/callback page. Supabase's PKCE flow sends the
+  // user back with a `code` param in the URL, which we exchange for a
+  // session here (detectSessionInUrl is disabled globally, see supabase.js).
+  const completeOAuthSignIn = async () => {
+    const href = window.location.href;
+    if (!href.includes('code=')) {
+      throw new Error('No sign-in code found in the URL.');
+    }
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(href);
+    if (error) throw new Error(parseAuthError(error));
+
+    window.history.replaceState(null, '', window.location.pathname);
+
+    const authUser = data?.session?.user;
+    if (!authUser) throw new Error('Could not complete sign-in. Please try again.');
+
+    const isBrandNewUser = authUser.created_at &&
+      (Date.now() - new Date(authUser.created_at).getTime()) < 60000;
+
+    const profile = await loadUserProfile(authUser);
+    if (!profile) throw new Error('Could not load your profile. Please try again.');
+
+    if (profile.suspended) {
+      await supabase.auth.signOut();
+      throw new Error('Your account has been suspended. Please contact support for assistance.');
+    }
+
+    setUser(profile);
+    setSession(data.session);
+
+    // Send a welcome email for genuinely new sign-ups (non-blocking)
+    if (isBrandNewUser) {
+      try {
+        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'welcome',
+            to: profile.email,
+            data: { name: profile.full_name },
+          }),
+        });
+      } catch (e) {
+        console.warn('Welcome email failed (non-critical):', e.message);
+      }
+    }
+
+    return profile;
+  };
+
   // ── Logout ───────────────────────────────────────────────────
   const logout = async () => {
     await supabase.auth.signOut();
@@ -269,9 +338,11 @@ export function AuthProvider({ children }) {
   };
 
   // ── Request password reset email ────────────────────────────
-  // Sends a recovery link to the given email. Supabase redirects the
-  // user to /reset-password with a recovery token in the URL hash,
-  // handled by ResetPassword.jsx.
+  // Sends a recovery email containing BOTH a link (to /reset-password,
+  // handled by ResetPassword.jsx) AND a 6-digit code the user can paste
+  // into the "forgot password" dialog instead (see confirmPasswordResetWithCode).
+  // Requires the Supabase "Reset Password" email template to include
+  // {{ .Token }} alongside {{ .ConfirmationURL }}.
   const requestPasswordReset = async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
@@ -283,6 +354,30 @@ export function AuthProvider({ children }) {
   const changePassword = async (newPassword) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw new Error(parseAuthError(error));
+  };
+
+  // ── Confirm password reset using a 6-digit code (alternative to the
+  // email link — same recovery email, user pastes the code instead) ──
+  const confirmPasswordResetWithCode = async (email, code, newPassword) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'recovery',
+    });
+    if (error) throw new Error(parseAuthError(error));
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) throw new Error(parseAuthError(updateError));
+
+    // verifyOtp logs the user in — reflect that in app state right away.
+    const authUser = data?.session?.user;
+    if (authUser) {
+      const profile = await loadUserProfile(authUser);
+      if (profile) {
+        setUser(profile);
+        setSession(data.session);
+      }
+    }
   };
 
   // ── Refresh user ─────────────────────────────────────────────
@@ -306,6 +401,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, session, loading,
       login, register, logout, refreshUser, requestPasswordReset, changePassword,
+      loginWithGoogle, completeOAuthSignIn, confirmPasswordResetWithCode,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',
       isAgent: user?.role === 'agent',

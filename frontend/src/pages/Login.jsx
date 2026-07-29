@@ -7,24 +7,44 @@ import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
+import { GoogleButton } from '../components/GoogleButton';
 import { toast } from 'sonner';
 
 export function Login() {
   const navigate = useNavigate();
-  const { login, requestPasswordReset } = useAuth();
+  const { login, requestPasswordReset, loginWithGoogle, confirmPasswordResetWithCode } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [codeSubmitLoading, setCodeSubmitLoading] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      // Browser redirects to Google here; no further code runs.
+    } catch (error) {
+      toast.error(error.message || 'Could not start Google sign-in');
+      setGoogleLoading(false);
+    }
+  };
 
   const openForgotPassword = () => {
     setResetEmail(email);
     setResetSent(false);
+    setResetCode('');
+    setNewPassword('');
+    setConfirmNewPassword('');
     setShowForgotPassword(true);
   };
 
@@ -38,6 +58,24 @@ export function Login() {
       toast.error(err.message || 'Failed to send reset link');
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleResetWithCode = async () => {
+    if (!resetCode.trim()) { toast.error('Enter the code from your email'); return; }
+    if (!newPassword || newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+    if (newPassword !== confirmNewPassword) { toast.error('Passwords do not match'); return; }
+
+    setCodeSubmitLoading(true);
+    try {
+      await confirmPasswordResetWithCode(resetEmail, resetCode.trim(), newPassword);
+      toast.success('Password updated! You are now signed in.');
+      setShowForgotPassword(false);
+      navigate('/browse');
+    } catch (err) {
+      toast.error(err.message || 'Invalid or expired code');
+    } finally {
+      setCodeSubmitLoading(false);
     }
   };
 
@@ -167,6 +205,17 @@ export function Login() {
           </Button>
         </form>
 
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+          </div>
+        </div>
+
+        <GoogleButton onClick={handleGoogleLogin} loading={googleLoading} data-testid="google-login" />
+
         <p className="text-center text-sm text-muted-foreground mt-6">
           Don't have an account?{' '}
           <Link to="/register" className="text-primary font-medium hover:underline">
@@ -181,15 +230,72 @@ export function Login() {
             <DialogTitle>Reset your password</DialogTitle>
             <DialogDescription>
               {resetSent
-                ? "Check your inbox for a reset link."
-                : "Enter your email and we'll send you a link to reset your password."}
+                ? "Click the link in your email, or enter the 6-digit code below."
+                : "Enter your email and we'll send you a reset link and a code."}
             </DialogDescription>
           </DialogHeader>
           {resetSent ? (
-            <div className="py-2">
+            <div className="py-2 space-y-4">
               <p className="text-sm text-muted-foreground">
-                We've sent a password reset link to <span className="font-medium text-foreground">{resetEmail}</span>. It may take a minute to arrive — check your spam folder if you don't see it.
+                We've sent a reset link and a 6-digit code to <span className="font-medium text-foreground">{resetEmail}</span>. It may take a minute to arrive — check your spam folder if you don't see it.
               </p>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">Have the code?</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reset-code">6-digit code</Label>
+                <Input
+                  id="reset-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  className="h-12 tracking-widest text-center text-lg"
+                  data-testid="reset-code"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reset-new-password">New password</Label>
+                <Input
+                  id="reset-new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="h-12"
+                  autoComplete="new-password"
+                  data-testid="reset-new-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reset-confirm-password">Confirm new password</Label>
+                <Input
+                  id="reset-confirm-password"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="h-12"
+                  autoComplete="new-password"
+                  data-testid="reset-confirm-password"
+                />
+              </div>
+              <Button
+                onClick={handleResetWithCode}
+                disabled={codeSubmitLoading}
+                className="w-full h-12"
+                data-testid="reset-with-code-submit"
+              >
+                {codeSubmitLoading ? 'Updating password...' : 'Reset Password'}
+              </Button>
             </div>
           ) : (
             <div className="space-y-2 py-2">
@@ -211,7 +317,7 @@ export function Login() {
           )}
           <DialogFooter>
             {resetSent ? (
-              <Button onClick={() => setShowForgotPassword(false)} className="w-full">Done</Button>
+              <Button variant="outline" onClick={() => setShowForgotPassword(false)} className="w-full">Cancel</Button>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setShowForgotPassword(false)}>Cancel</Button>

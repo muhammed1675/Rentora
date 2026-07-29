@@ -21,6 +21,7 @@ import TermsAndPolicies from "./pages/TermsAndPolicies";
 import Contact from "./pages/Contact";
 import { Compare } from './pages/Compare';
 import { ResetPassword } from './pages/ResetPassword';
+import { AuthCallback } from './pages/AuthCallback';
 import { NotFound } from './pages/NotFound';
 import { Privacy } from './pages/Privacy';
 import { About } from './pages/About';
@@ -75,6 +76,7 @@ function AppRoutes() {
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
       <Route path="/compare" element={<Layout><Compare /></Layout>} />
       <Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />
+      <Route path="/auth/callback" element={<Layout><AuthCallback /></Layout>} />
 
       {/* Protected Routes - Any authenticated user */}
       <Route
