@@ -274,16 +274,30 @@ export function AuthProvider({ children }) {
   };
 
   // ── Google OAuth: finish sign-in after redirect back from Google ──
-  // Called from the /auth/callback page. Supabase's PKCE flow sends the
-  // user back with a `code` param in the URL, which we exchange for a
-  // session here (detectSessionInUrl is disabled globally, see supabase.js).
+  // Called from the /auth/callback page. This project uses Supabase's
+  // implicit flow (same as the password-reset link in ResetPassword.jsx),
+  // so Google/Supabase send the user back with tokens in the URL HASH
+  // (e.g. #access_token=...&refresh_token=...), not a `?code=` query param.
   const completeOAuthSignIn = async () => {
-    const href = window.location.href;
-    if (!href.includes('code=')) {
-      throw new Error('No sign-in code found in the URL.');
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.replace('#', ''));
+
+    const errorDescription = params.get('error_description') || params.get('error');
+    if (errorDescription) {
+      throw new Error(decodeURIComponent(errorDescription.replace(/\+/g, ' ')));
     }
 
-    const { data, error } = await supabase.auth.exchangeCodeForSession(href);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken) {
+      throw new Error('No sign-in credentials found in the URL.');
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken || '',
+    });
     if (error) throw new Error(parseAuthError(error));
 
     window.history.replaceState(null, '', window.location.pathname);
