@@ -146,6 +146,7 @@ export function Layout({ children }) {
             <div className="flex flex-col gap-3 text-sm text-slate-700">
               <Link to="/contact" className="transition-colors hover:text-primary">Contact us</Link>
               <Link to="/terms" className="transition-colors hover:text-primary">Terms &amp; policies</Link>
+              <Link to="/privacy" className="transition-colors hover:text-primary">Privacy policy</Link>
               <Link to="/profile" className="transition-colors hover:text-primary">My profile</Link>
             </div>
           </div>
