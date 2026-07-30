@@ -120,6 +120,13 @@ CREATE POLICY "rent_payments_update_admin" ON public.property_rent_payments FOR 
 CREATE POLICY "rent_payments_update_own" ON public.property_rent_payments FOR UPDATE
   USING (((user_id = auth.uid()) AND (status = 'held'::text)))
   WITH CHECK (((user_id = auth.uid()) AND (status = 'released'::text)));
+-- ── property_reports ──────────────────────────────
+CREATE POLICY "reports_insert_own" ON public.property_reports FOR INSERT
+  WITH CHECK ((auth.uid() = reporter_id));
+CREATE POLICY "reports_select_admin" ON public.property_reports FOR SELECT
+  USING (is_admin());
+CREATE POLICY "reports_update_admin" ON public.property_reports FOR UPDATE
+  USING (is_admin());
 -- ── property_reviews ──────────────────────────────
 CREATE POLICY "Anyone can read reviews" ON public.property_reviews FOR SELECT
   USING (true);

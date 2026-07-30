@@ -131,6 +131,24 @@ export function AuthProvider({ children }) {
       }
 
       if (error) {
+        const msg = (error.message || '').toLowerCase();
+        // Supabase deliberately returns the same generic error for "wrong
+        // password" and "no such account" (to prevent email enumeration
+        // via the login form itself). We check the public users table
+        // separately — it's already world-readable — to tell users which
+        // one actually happened, so they know to register instead of
+        // retrying a password forever.
+        if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
+          const { data: existing } = await supabase
+            .from('users')
+            .select('id')
+            .ilike('email', email.trim())
+            .maybeSingle();
+
+          if (!existing) {
+            throw new Error('No account found with this email. Please register first.');
+          }
+        }
         throw new Error(parseAuthError(error));
       }
 

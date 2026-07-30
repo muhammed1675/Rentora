@@ -763,6 +763,51 @@ export const reviewAPI = {
   },
 };
 
+// ============== REPORT-A-LISTING APIs ==============
+
+export const reportAPI = {
+  // Requires login — reporter_id must match auth.uid() per RLS.
+  submit: async ({ property_id, reason, details }, user) => {
+    const { error } = await supabase
+      .from('property_reports')
+      .insert({
+        property_id,
+        reporter_id: user.id,
+        reporter_name: user.full_name,
+        reporter_email: user.email,
+        reason,
+        details: details || null,
+      });
+    if (error) throw new Error(error.message || 'Failed to submit report');
+    return { data: { ok: true } };
+  },
+
+  // Admin only (RLS-enforced) — includes the reported property's title
+  // and location via the FK relationship to properties.
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('property_reports')
+      .select('*, property:properties(title, location_text)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data: data || [] };
+  },
+
+  resolve: async (id, status, adminNote, adminId) => {
+    const { error } = await supabase
+      .from('property_reports')
+      .update({
+        status,
+        admin_note: adminNote || null,
+        resolved_by: adminId,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) throw error;
+    return { data: { ok: true } };
+  },
+};
+
 // ============== CONTACT APIs ==============
 
 export const contactAPI = {
@@ -998,6 +1043,7 @@ export const maintenanceAPI = {
 export default {
   propertyAPI,
   reviewAPI,
+  reportAPI,
   contactAPI,
   inspectionAPI,
   transactionAPI,

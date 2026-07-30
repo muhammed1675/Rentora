@@ -5,6 +5,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const FROM = "Rentora <support@rentora.com.ng>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +19,42 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function sendAccountDeletedEmail(to: string, name: string) {
+  if (!RESEND_API_KEY || !to) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM,
+        to: [to],
+        subject: "Your Rentora account has been deleted",
+        html: `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#153E75;">
+            <h2 style="margin:0 0 12px;">Hi ${name || 'there'},</h2>
+            <p style="color:#5b6b7d;font-size:14px;line-height:1.6;">
+              This confirms that your Rentora account has been permanently deleted, as you requested.
+              Your login and personal details have been removed and can no longer be accessed.
+            </p>
+            <p style="color:#5b6b7d;font-size:14px;line-height:1.6;">
+              If you didn't request this, or believe this was done in error, please contact us immediately at
+              <a href="mailto:support@rentora.com.ng" style="color:#2E86D8;">support@rentora.com.ng</a>.
+            </p>
+            <p style="color:#8a97a6;font-size:12px;margin-top:24px;">— The Rentora Team</p>
+          </div>
+        `,
+      }),
+    });
+  } catch (_e) {
+    // Non-critical — a failed confirmation email should never block
+    // the deletion itself, since the account is already gone by the
+    // time this runs.
+  }
 }
 
 serve(async (req: Request) => {
@@ -40,7 +78,7 @@ serve(async (req: Request) => {
 
   const { data: profile, error: profileError } = await admin
     .from("users")
-    .select("id, role, avatar_url")
+    .select("id, role, avatar_url, email, full_name")
     .eq("id", userId)
     .single();
 
@@ -119,6 +157,8 @@ serve(async (req: Request) => {
   if (deleteAuthError) {
     return json({ success: false, message: "Your data was cleared but sign-in removal failed: " + deleteAuthError.message }, 500);
   }
+
+  await sendAccountDeletedEmail(profile.email, profile.full_name);
 
   return json({ success: true, message: "Account deleted." });
 });

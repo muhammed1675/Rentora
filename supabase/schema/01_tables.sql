@@ -206,6 +206,22 @@ CREATE TABLE IF NOT EXISTS public.property_rent_payments (
     caution_fee integer NOT NULL DEFAULT 0
 );
 
+-- ── property_reports ──────────────────────────────
+CREATE TABLE IF NOT EXISTS public.property_reports (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    property_id uuid NOT NULL,
+    reporter_id uuid NOT NULL,
+    reporter_name text,
+    reporter_email text,
+    reason text NOT NULL,
+    details text,
+    status text NOT NULL DEFAULT 'pending'::text,
+    admin_note text,
+    resolved_by uuid,
+    resolved_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ── property_reviews ──────────────────────────────
 CREATE TABLE IF NOT EXISTS public.property_reviews (
     id uuid NOT NULL,

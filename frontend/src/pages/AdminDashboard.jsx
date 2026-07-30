@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -17,7 +17,7 @@ import {
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
-  Menu, X, ChevronRight, CalendarCheck
+  Menu, X, ChevronRight, CalendarCheck, Flag
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -42,6 +42,7 @@ export function AdminDashboard() {
   const [navSearch, setNavSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, property: null, deleting: false });
   const [messages, setMessages] = useState([]);
+  const [reports, setReports] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [bankRequests, setBankRequests] = useState([]);
   const [bankRejectNote, setBankRejectNote] = useState('');
@@ -66,11 +67,11 @@ export function AdminDashboard() {
     setLoading(true);
     await maintenanceAPI.expireStalePending().catch(() => {});
     try {
-      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, rentPaymentsRes] = await Promise.all([
+      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, rentPaymentsRes, reportsRes] = await Promise.all([
         adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(),
         propertyAPI.getAllAdmin(), inspectionAPI.getAll(), transactionAPI.getAll(),
         contactAPI.getAll(), withdrawalAPI.getAll(), balanceAPI.getAllBalances(),
-        rentAPI.getAllForAdmin(),
+        rentAPI.getAllForAdmin(), reportAPI.getAll(),
       ]);
       const allUsers = usersRes.data || [];
       setStats(statsRes.data);
@@ -86,6 +87,7 @@ export function AdminDashboard() {
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
       setMessages(messagesRes.data);
+      if (reportsRes?.data) setReports(reportsRes.data);
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
       if (balancesRes?.data) setAgentBalances(balancesRes.data);
       if (rentPaymentsRes?.data) setRentPayments(rentPaymentsRes.data);
@@ -271,6 +273,14 @@ export function AdminDashboard() {
     } catch { toast.error('Failed to delete message'); }
   };
 
+  const handleResolveReport = async (id, status) => {
+    try {
+      await reportAPI.resolve(id, status, null, user.id);
+      setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      toast.success(status === 'resolved' ? 'Report marked resolved' : 'Report dismissed');
+    } catch { toast.error('Failed to update report'); }
+  };
+
   const handleReply = async (msg) => {
     if (!replyText.trim()) { toast.error('Please write a reply first'); return; }
     setSendingReply(true);
@@ -379,6 +389,7 @@ export function AdminDashboard() {
       ],
     },
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
+    { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
   ];
 
   const navQuery = navSearch.trim().toLowerCase();
@@ -1348,6 +1359,58 @@ export function AdminDashboard() {
             </div>
           )}
 
+        </TabsContent>
+
+        {/* ── Reports Tab ── */}
+        <TabsContent value="reports">
+          {reports.length === 0 ? (
+            <Card className="p-12 text-center border-border/60">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <Flag className="w-7 h-7 text-foreground/30" />
+              </div>
+              <h3 className="font-semibold">No Reports Yet</h3>
+              <p className="text-sm text-foreground/55 mt-1">Reports users submit from a listing's "Report" button will appear here</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {reports.map((r) => (
+                <Card key={r.id} className="p-4 border-border/60">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <Badge className={
+                          r.status === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100'
+                          : r.status === 'resolved' ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-100'
+                        }>{r.status}</Badge>
+                        <span className="text-xs text-foreground/40">{new Date(r.created_at).toLocaleString()}</span>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/property/${r.property_id}`)}
+                        className="font-semibold text-sm text-primary hover:underline text-left"
+                      >
+                        {r.property?.title || 'View listing'}
+                      </button>
+                      {r.property?.location_text && (
+                        <p className="text-xs text-foreground/50">{r.property.location_text}</p>
+                      )}
+                      <p className="text-sm mt-2"><span className="font-medium">Reason:</span> {r.reason}</p>
+                      {r.details && <p className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{r.details}</p>}
+                      <p className="text-xs text-foreground/45 mt-2">
+                        Reported by {r.reporter_name || 'a user'}{r.reporter_email ? ` · ${r.reporter_email}` : ''}
+                      </p>
+                    </div>
+                    {r.status === 'pending' && (
+                      <div className="flex gap-2 shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => handleResolveReport(r.id, 'dismissed')}>Dismiss</Button>
+                        <Button size="sm" onClick={() => handleResolveReport(r.id, 'resolved')}>Mark Resolved</Button>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* ── Payouts Tab ── */}

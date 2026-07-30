@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { propertyAPI, inspectionAPI, reviewAPI, rentAPI } from '../lib/api';
+import { propertyAPI, inspectionAPI, reviewAPI, rentAPI, reportAPI } from '../lib/api';
 import { openFlutterwaveCheckout } from '../lib/flutterwave';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { 
   MapPin, Phone, User, Lock, Calendar as CalendarIcon, ArrowLeft,
   Home, Building, ChevronLeft, ChevronRight, ExternalLink, Heart, Share2,
-  Check, CheckCircle2, Eye, GitCompare, Star, Send,
+  Check, CheckCircle2, Eye, GitCompare, Star, Send, Flag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -78,6 +79,37 @@ export function PropertyDetails() {
   const [hoverRating, setHoverRating] = useState(0);
   
   const [showInspectionDialog, setShowInspectionDialog] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+
+  const REPORT_REASONS = [
+    'This looks like a scam',
+    'Property is already rented / unavailable',
+    'Misleading photos or description',
+    'Agent unresponsive or unprofessional',
+    'Inappropriate content',
+    'Other',
+  ];
+
+  const handleSubmitReport = async () => {
+    if (!isAuthenticated) { toast.error('Please login to report a listing'); navigate('/login'); return; }
+    if (!reportReason) { toast.error('Please select a reason'); return; }
+
+    setSubmittingReport(true);
+    try {
+      await reportAPI.submit({ property_id: id, reason: reportReason, details: reportDetails.trim() }, user);
+      toast.success('Thanks — our team will review this listing.');
+      setShowReportDialog(false);
+      setReportReason('');
+      setReportDetails('');
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit report');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
   const [inspectionDate, setInspectionDate] = useState(null);
   const [inspectionEmail, setInspectionEmail] = useState('');
   const [inspectionPhone, setInspectionPhone] = useState('');
@@ -298,6 +330,11 @@ export function PropertyDetails() {
           <Button variant="outline" size="icon" onClick={handleFavourite}
             className={`h-9 w-9 shrink-0 rounded-full ${isFavourited ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}>
             <Heart className={`w-4 h-4 ${isFavourited ? 'fill-red-500 text-red-500' : ''}`} />
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setShowReportDialog(true)}
+            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:border-destructive"
+            data-testid="report-listing-btn" title="Report this listing">
+            <Flag className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -617,6 +654,55 @@ export function PropertyDetails() {
             <Button variant="outline" onClick={() => setShowInspectionDialog(false)}>Cancel</Button>
             <Button onClick={handleRequestInspection} disabled={requestingInspection} className="min-w-0 gap-2" data-testid="confirm-inspection-btn">
               {requestingInspection ? 'Processing...' : <><ExternalLink className="h-4 w-4 shrink-0" /><span className="truncate">Pay & Schedule</span></>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showReportDialog} onOpenChange={(open) => { setShowReportDialog(open); if (!open) { setReportReason(''); setReportDetails(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report this listing</DialogTitle>
+            <DialogDescription>
+              Let us know what's wrong. Our team reviews every report and will take action if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason *</label>
+              <div className="grid gap-2">
+                {REPORT_REASONS.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setReportReason(r)}
+                    className={`text-left text-sm px-3 py-2 rounded-lg border transition-colors ${reportReason === r ? 'border-primary bg-primary/5 text-primary font-medium' : 'border-border hover:border-primary/40'}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Additional details (optional)</label>
+              <Textarea
+                value={reportDetails}
+                onChange={(e) => setReportDetails(e.target.value)}
+                placeholder="Anything else that would help us look into this..."
+                rows={3}
+                data-testid="report-details-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReportDialog(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleSubmitReport}
+              disabled={submittingReport || !reportReason}
+              data-testid="submit-report-btn"
+            >
+              {submittingReport ? 'Submitting...' : 'Submit Report'}
             </Button>
           </DialogFooter>
         </DialogContent>
