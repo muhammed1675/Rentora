@@ -103,23 +103,6 @@ function emailWelcome(name: string) {
   `);
 }
 
-function emailContactUnlocked(name: string, title: string, location: string, price: number, contactName: string, contactPhone: string, remaining: number) {
-  return baseTemplate(`
-    <span class="badge badge-blue">Contact Unlocked ${icon.unlock}</span>
-    <h2>You've unlocked a property contact!</h2>
-    <p>Hi ${name}, here are the owner contact details. Keep this safe.</p>
-    <div class="card">
-      <div class="card-row"><span class="label">${icon.home} Property</span><span class="value">${title}</span></div>
-      <div class="card-row"><span class="label">${icon.pin} Location</span><span class="value">${location}</span></div>
-      <div class="card-row"><span class="label">${icon.money} Price</span><span class="value">₦${price.toLocaleString()}/year</span></div>
-      <div class="card-row"><span class="label">${icon.user} Contact Name</span><span class="value">${contactName}</span></div>
-      <div class="card-row"><span class="label">${icon.phone} Phone</span><span class="value" style="font-size:18px;color:#2E86D8;font-weight:700;">${contactPhone}</span></div>
-    </div>
-    <p style="font-size:13px;color:#9ca3af;">Tokens remaining: ${remaining}</p>
-    <a href="https://www.rentora.com.ng/profile" class="btn">View My Unlocked Properties</a>
-  `);
-}
-
 function emailTokenReceipt(name: string, tokens: number, amount: number, newBalance: number, reference: string) {
   return baseTemplate(`
     <span class="badge">Payment Successful ${icon.check}</span>
@@ -367,10 +350,6 @@ serve(async (req) => {
       case "welcome":
         subject = "Welcome to Rentora";
         html = emailWelcome(data.name);
-        break;
-      case "contact_unlocked":
-        subject = `Contact Unlocked: ${data.property_title} — Rentora`;
-        html = emailContactUnlocked(data.name, data.property_title, data.property_location, data.property_price, data.contact_name, data.contact_phone, data.remaining_tokens);
         break;
       case "token_receipt":
         subject = `Receipt: ${data.tokens} Token${data.tokens > 1 ? 's' : ''} Added to Your Wallet`;

@@ -486,10 +486,12 @@ export const verificationAPI = {
   },
 
   review: async (requestId, status, adminId) => {
-    // Get the request first
+    // Get the request first — user_email/user_name are already stored on
+    // the request row itself (captured at submission time), so no extra
+    // join to `users` is needed to email/notify the applicant.
     const { data: request } = await supabase
       .from('agent_verification_requests')
-      .select('user_id')
+      .select('user_id, user_email, user_name')
       .eq('id', requestId)
       .single();
     
@@ -509,6 +511,37 @@ export const verificationAPI = {
         .from('users')
         .update({ role: 'agent' })
         .eq('id', request.user_id);
+    }
+
+    // Email + in-app notification to the applicant — best-effort, never
+    // allowed to affect the status change above (already succeeded).
+    if (request && (status === 'approved' || status === 'rejected')) {
+      const emailType = status === 'approved' ? 'verification_approved' : 'verification_rejected';
+      try {
+        if (request.user_email) {
+          const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+          const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+          await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+            body: JSON.stringify({
+              type: emailType,
+              to: request.user_email,
+              data: { name: request.user_name || 'there' },
+            }),
+          });
+        }
+      } catch (e) { console.warn(`${emailType} email failed:`, e); }
+
+      notifyUser(
+        request.user_id,
+        emailType,
+        status === 'approved' ? 'Agent verification approved!' : 'Agent verification update',
+        status === 'approved'
+          ? 'Your agent verification has been approved. You can now list properties.'
+          : 'Your agent verification request was not approved this time. Contact support for details.',
+        status === 'approved' ? '/agent' : '/become-agent'
+      );
     }
     
     return { data: { message: `Verification ${status}` } };
