@@ -1,4 +1,4 @@
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useNotifications } from '../lib/notifications';
@@ -20,7 +20,7 @@ function timeAgo(dateString) {
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(user?.id);
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
 
   if (!user) return null;
 
@@ -65,18 +65,26 @@ export function NotificationBell() {
           <ScrollArea className="max-h-80">
             <div className="flex flex-col">
               {notifications.map((n) => (
-                <button
+                <div
                   key={n.id}
-                  onClick={() => handleClick(n)}
-                  className={`flex flex-col gap-0.5 border-b border-black/5 px-4 py-3 text-left last:border-0 hover:bg-black/[0.02] ${!n.read_at ? 'bg-primary/[0.04]' : ''}`}
+                  className={`flex items-start gap-1 border-b border-black/5 px-4 py-3 last:border-0 hover:bg-black/[0.02] ${!n.read_at ? 'bg-primary/[0.04]' : ''}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-primary">{n.title}</span>
-                    {!n.read_at && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
-                  </div>
-                  <span className="text-xs leading-5 text-muted-foreground">{n.body}</span>
-                  <span className="mt-0.5 text-[11px] text-muted-foreground/70">{timeAgo(n.created_at)}</span>
-                </button>
+                  <button onClick={() => handleClick(n)} className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium text-primary">{n.title}</span>
+                      {!n.read_at && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
+                    </div>
+                    <span className="text-xs leading-5 text-muted-foreground">{n.body}</span>
+                    <span className="mt-0.5 text-[11px] text-muted-foreground/70">{timeAgo(n.created_at)}</span>
+                  </button>
+                  <button
+                    onClick={() => deleteNotification(n.id)}
+                    aria-label="Delete notification"
+                    className="flex-shrink-0 rounded-full p-1.5 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           </ScrollArea>

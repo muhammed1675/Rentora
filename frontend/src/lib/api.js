@@ -124,6 +124,15 @@ export const propertyAPI = {
       });
     
     if (error) throw error;
+
+    notifyUser(
+      user.id,
+      'property_listed',
+      'Listing submitted',
+      `Your property "${data.title || 'listing'}" has been submitted and is pending review.`,
+      '/agent'
+    );
+
     return { data: { property_id: propertyId } };
   },
 

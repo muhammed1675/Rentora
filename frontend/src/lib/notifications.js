@@ -84,6 +84,19 @@ export function useNotifications(userId) {
           setUnreadCount(prev => Math.max(0, prev - (payload.new.read_at && !payload.old.read_at ? 1 : 0)));
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'user_notifications' },
+        (payload) => {
+          const deletedId = payload.old?.id;
+          if (!deletedId) return;
+          setNotifications(prev => {
+            const removed = prev.find(n => n.id === deletedId);
+            if (removed && !removed.read_at) setUnreadCount(c => Math.max(0, c - 1));
+            return prev.filter(n => n.id !== deletedId);
+          });
+        }
+      )
       .subscribe();
     } catch (e) {
       // Realtime is a nice-to-have: never let it take the page down.
@@ -113,5 +126,47 @@ export function useNotifications(userId) {
     if (error) console.warn('markAllAsRead failed:', error.message);
   }, []);
 
-  return { notifications, unreadCount, loading, markAsRead, markAllAsRead, refresh: load };
+  // Delete a single notification. Optimistic: the row disappears instantly,
+  // and is restored if the delete fails server-side.
+  const deleteNotification = useCallback(async (notificationId) => {
+    let snapshot;
+    setNotifications(prev => {
+      snapshot = prev;
+      const removed = prev.find(n => n.id === notificationId);
+      if (removed && !removed.read_at) setUnreadCount(c => Math.max(0, c - 1));
+      return prev.filter(n => n.id !== notificationId);
+    });
+    const { error } = await supabase
+      .from('user_notifications')
+      .delete()
+      .eq('id', notificationId);
+    if (error) {
+      console.warn('deleteNotification failed:', error.message);
+      if (snapshot) {
+        setNotifications(snapshot);
+        setUnreadCount(snapshot.filter(n => !n.read_at).length);
+      }
+    }
+  }, []);
+
+  // Delete every notification for the current user.
+  const clearAll = useCallback(async () => {
+    if (!userId) return;
+    let snapshot;
+    setNotifications(prev => { snapshot = prev; return []; });
+    setUnreadCount(0);
+    const { error } = await supabase
+      .from('user_notifications')
+      .delete()
+      .eq('user_id', userId);
+    if (error) {
+      console.warn('clearAll failed:', error.message);
+      if (snapshot) {
+        setNotifications(snapshot);
+        setUnreadCount(snapshot.filter(n => !n.read_at).length);
+      }
+    }
+  }, [userId]);
+
+  return { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll, refresh: load };
 }

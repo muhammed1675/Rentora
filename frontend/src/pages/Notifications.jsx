@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useNotifications } from '../lib/notifications';
 
@@ -18,7 +18,8 @@ function timeAgo(dateString) {
 export default function Notifications() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications(user?.id);
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll } =
+    useNotifications(user?.id);
 
   const handleClick = (n) => {
     if (!n.read_at) markAsRead(n.id);
@@ -34,14 +35,24 @@ export default function Notifications() {
             {unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up"}
           </p>
         </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllAsRead}
-            className="flex items-center gap-1.5 rounded-full border border-primary/20 px-3.5 py-2 text-xs font-medium text-primary hover:bg-white"
-          >
-            <CheckCheck className="h-4 w-4" /> Mark all read
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllAsRead}
+              className="flex items-center gap-1.5 rounded-full border border-primary/20 px-3.5 py-2 text-xs font-medium text-primary hover:bg-white"
+            >
+              <CheckCheck className="h-4 w-4" /> Mark all read
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button
+              onClick={clearAll}
+              className="flex items-center gap-1.5 rounded-full border border-destructive/20 px-3.5 py-2 text-xs font-medium text-destructive hover:bg-white"
+            >
+              <Trash2 className="h-4 w-4" /> Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -56,18 +67,26 @@ export default function Notifications() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-black/5 bg-white">
           {notifications.map((n) => (
-            <button
+            <div
               key={n.id}
-              onClick={() => handleClick(n)}
-              className={`flex w-full flex-col gap-1 border-b border-black/5 px-5 py-4 text-left last:border-0 hover:bg-black/[0.02] ${!n.read_at ? 'bg-primary/[0.04]' : ''}`}
+              className={`group flex items-start gap-2 border-b border-black/5 px-5 py-4 last:border-0 hover:bg-black/[0.02] ${!n.read_at ? 'bg-primary/[0.04]' : ''}`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-sm font-medium text-primary">{n.title}</span>
-                {!n.read_at && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
-              </div>
-              <span className="text-sm leading-6 text-muted-foreground">{n.body}</span>
-              <span className="text-xs text-muted-foreground/70">{timeAgo(n.created_at)}</span>
-            </button>
+              <button onClick={() => handleClick(n)} className="flex min-w-0 flex-1 flex-col gap-1 text-left">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-sm font-medium text-primary">{n.title}</span>
+                  {!n.read_at && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
+                </div>
+                <span className="text-sm leading-6 text-muted-foreground">{n.body}</span>
+                <span className="text-xs text-muted-foreground/70">{timeAgo(n.created_at)}</span>
+              </button>
+              <button
+                onClick={() => deleteNotification(n.id)}
+                aria-label="Delete notification"
+                className="mt-0.5 flex-shrink-0 rounded-full p-2 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           ))}
         </div>
       )}
