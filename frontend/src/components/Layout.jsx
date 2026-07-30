@@ -8,7 +8,7 @@ import {
 } from './ui/dropdown-menu';
 import { ConsentBanner } from './ConsentBanner';
 import { MobileBottomNav } from './MobileBottomNav';
-import { NotificationBell } from './NotificationBell';
+import { NotificationBell, NotificationBellLink } from './NotificationBell';
 
 const publicNav = [
   { label: 'Browse', to: '/browse' },
@@ -81,12 +81,15 @@ export function Layout({ children }) {
             )}
           </div>
 
-          <button onClick={() => setOpen(!open)}
-            className="rounded-full p-2 text-primary md:hidden"
-            aria-label={open ? 'Close navigation' : 'Open navigation'}
-            aria-expanded={open}>
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-1 md:hidden">
+            {isAuthenticated && <NotificationBellLink />}
+            <button onClick={() => setOpen(!open)}
+              className="rounded-full p-2 text-primary"
+              aria-label={open ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={open}>
+              {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         {open && (
@@ -143,7 +146,6 @@ export function Layout({ children }) {
             <div className="flex flex-col gap-3 text-sm text-slate-700">
               <Link to="/browse" className="transition-colors hover:text-primary">Browse homes</Link>
               <Link to="/compare" className="transition-colors hover:text-primary">Compare</Link>
-              <Link to="/become-agent" className="transition-colors hover:text-primary">Become an agent</Link>
             </div>
           </div>
           <div>

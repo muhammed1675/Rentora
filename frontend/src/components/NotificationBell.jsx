@@ -94,3 +94,28 @@ export function NotificationBell() {
     </Popover>
   );
 }
+
+// Compact bell for the mobile header: taps straight through to the
+// notifications page instead of opening a popover.
+export function NotificationBellLink({ className = '' }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications(user?.id);
+
+  if (!user) return null;
+
+  return (
+    <button
+      onClick={() => navigate('/notifications')}
+      className={`relative rounded-full p-2 text-primary hover:bg-white ${className}`}
+      aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+    >
+      <Bell className="h-5 w-5" />
+      {unreadCount > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+    </button>
+  );
+}

@@ -6,7 +6,7 @@
 // notifyUser() is called at the exact same moments the app already sends
 // an email (e.g. property approved, rent released), so the same event
 // produces both an email AND a bell notification.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
 
 // Fire-and-forget, same non-blocking pattern as the email calls elsewhere
@@ -36,6 +36,13 @@ export function useNotifications(userId) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Every hook instance (bell + notifications page can be mounted at the same
+  // time, and StrictMode mounts effects twice) needs its OWN channel topic.
+  // Re-using one topic makes supabase-js hand back an already-subscribed
+  // channel, and calling .on('postgres_changes') on it throws
+  // "cannot add postgres_changes callbacks ... after subscribe()", which
+  // crashed the notifications page to a blank screen.
+  const instanceId = useRef(Math.random().toString(36).slice(2));
 
   const load = useCallback(async () => {
     if (!userId) { setNotifications([]); setUnreadCount(0); setLoading(false); return; }
@@ -57,9 +64,11 @@ export function useNotifications(userId) {
 
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`user_notifications:${userId}`)
-      .on(
+    let channel;
+    try {
+      channel = supabase
+        .channel(`user_notifications:${userId}:${instanceId.current}`)
+        .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${userId}` },
         (payload) => {
@@ -76,8 +85,14 @@ export function useNotifications(userId) {
         }
       )
       .subscribe();
+    } catch (e) {
+      // Realtime is a nice-to-have: never let it take the page down.
+      console.warn('notifications realtime unavailable:', e?.message || e);
+    }
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const markAsRead = useCallback(async (notificationId) => {
