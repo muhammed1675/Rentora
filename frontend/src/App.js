@@ -26,6 +26,7 @@ import { NotFound } from './pages/NotFound';
 import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
 import { AgentRequirements } from './pages/AgentRequirements';
+import Notifications from './pages/Notifications';
 
 // Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -91,6 +92,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['user']}>
             <Layout><BecomeAgent /></Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Layout><Notifications /></Layout>
           </ProtectedRoute>
         }
       />

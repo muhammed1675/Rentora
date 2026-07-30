@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { notifyUser } from './notifications';
 
 // Helper to generate payment reference
 const generateReference = (prefix) => {
@@ -180,6 +181,13 @@ export const propertyAPI = {
               }),
             });
           }
+          notifyUser(
+            property.uploaded_by_agent_id,
+            'property_approved',
+            'Your listing is now live',
+            `"${property.title}" has been approved and is now visible to students.`,
+            '/agent'
+          );
         }
       } catch (e) { console.warn('property_approved email failed:', e); }
     }
@@ -1266,6 +1274,15 @@ export const rentAPI = {
             },
           });
         }
+        if (row.agent_id) {
+          notifyUser(
+            row.agent_id,
+            'rent_payment_released',
+            'Funds released',
+            `Rent for ${row.property?.title || 'your property'} has been released to your balance.`,
+            '/agent'
+          );
+        }
         if (student?.email) {
           await sendMail({
             type: 'rent_payment_released_student',
@@ -1277,6 +1294,13 @@ export const rentAPI = {
             },
           });
         }
+        notifyUser(
+          row.user_id,
+          'rent_payment_released_student',
+          'Move-in confirmed',
+          `Your move-in for ${row.property?.title || 'the property'} is confirmed.`,
+          '/profile'
+        );
       }
     } catch (e) { console.warn('rent_payment_released email failed:', e); }
   },

@@ -8,6 +8,7 @@ import {
 } from './ui/dropdown-menu';
 import { ConsentBanner } from './ConsentBanner';
 import { MobileBottomNav } from './MobileBottomNav';
+import { NotificationBell } from './NotificationBell';
 
 const publicNav = [
   { label: 'Browse', to: '/browse' },
@@ -58,7 +59,9 @@ export function Layout({ children }) {
                 <Link to="/register" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90">Create account</Link>
               </>
             ) : (
-              <DropdownMenu>
+              <>
+                <NotificationBell />
+                <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-medium text-primary shadow-sm hover:bg-white/90">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{initials}</span>
                   <span className="max-w-[120px] truncate">{user?.full_name || 'Account'}</span>
@@ -74,6 +77,7 @@ export function Layout({ children }) {
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Log out</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             )}
           </div>
 
@@ -94,6 +98,7 @@ export function Layout({ children }) {
               ))}
               {isAuthenticated && (
                 <>
+                  <Link to="/notifications" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Notifications</Link>
                   <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
                   {isAgent && <Link to="/agent" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
                   {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}

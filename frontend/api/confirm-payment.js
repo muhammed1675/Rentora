@@ -299,6 +299,20 @@ async function callSupabaseSendEmail(payload) {
   }
 }
 
+// In-app notification insert — runs with the service_role client this file
+// already uses, so it bypasses RLS directly (no need for the
+// create_notification() RPC that client-side code uses). Never allowed to
+// throw and break payment confirmation over a notification failure.
+async function notify(supabase, userId, type, title, body, link = null) {
+  if (!userId) return;
+  try {
+    const { error } = await supabase.from('user_notifications').insert({ user_id: userId, type, title, body, link });
+    if (error) console.warn(`notify(${type}) failed (non-critical):`, error.message);
+  } catch (e) {
+    console.warn(`notify(${type}) failed (non-critical):`, e.message);
+  }
+}
+
 async function sendTokenReceiptEmail(supabase, tokenTx) {
   const { data: user } = await supabase.from('users').select('email, full_name').eq('id', tokenTx.user_id).maybeSingle();
   if (!user?.email) return;
@@ -307,6 +321,7 @@ async function sendTokenReceiptEmail(supabase, tokenTx) {
     to: user.email,
     data: { student_name: user.full_name || 'there', property_title: `${tokenTx.tokens_added} Rentora Tokens`, amount: tokenTx.amount, reference: tokenTx.reference },
   });
+  await notify(supabase, tokenTx.user_id, 'token_receipt', 'Tokens added', `${tokenTx.tokens_added} tokens have been added to your wallet.`, '/profile');
 }
 
 async function sendInspectionAgentNotify(supabase, inspTx, inspection) {
@@ -362,6 +377,7 @@ async function sendInspectionAgentNotify(supabase, inspTx, inspection) {
       reference: inspTx.reference,
     },
   });
+  await notify(supabase, agentId, 'inspection_agent_notify', 'New inspection booked', `${student?.full_name || 'A student'} booked an inspection for ${inspection?.property_title || 'a property'}.`, '/agent');
 }
 
 async function sendInspectionStudentReceipt(supabase, inspTx, inspection) {
@@ -380,6 +396,7 @@ async function sendInspectionStudentReceipt(supabase, inspTx, inspection) {
       amount: inspTx.amount,
     },
   });
+  await notify(supabase, inspTx.user_id, 'inspection_booked', 'Inspection confirmed', `Your inspection for ${inspection?.property_title || 'the property'} is booked.`, '/profile');
 }
 
 async function sendRentHeldEmail(supabase, rentTx) {
@@ -406,6 +423,10 @@ async function sendRentHeldEmail(supabase, rentTx) {
         student_phone: student?.phone || '',
       },
     });
+    // No notify() call here for the agent — the queue_rent_held_notification
+    // DB trigger (fires on the same status='held' transition, right when
+    // the row above gets updated) already creates this exact notification.
+    // Adding one here too would double it up in the agent's bell.
   }
   if (student?.email) {
     await callSupabaseSendEmail({
@@ -414,6 +435,7 @@ async function sendRentHeldEmail(supabase, rentTx) {
       data: { student_name: student.full_name || 'there', property_title: propertyTitle, amount: rentTx.total_amount, reference: rentTx.reference },
     });
   }
+  await notify(supabase, rentTx.user_id, 'rent_payment_receipt', 'Rent payment received', `Your rent payment for ${propertyTitle} was received.`, '/profile');
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,76 @@
+import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCheck } from 'lucide-react';
+import { useAuth } from '../lib/auth';
+import { useNotifications } from '../lib/notifications';
+
+function timeAgo(dateString) {
+  const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateString).toLocaleDateString();
+}
+
+export default function Notifications() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications(user?.id);
+
+  const handleClick = (n) => {
+    if (!n.read_at) markAsRead(n.id);
+    if (n.link) navigate(n.link);
+  };
+
+  return (
+    <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold text-primary">Notifications</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up"}
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <button
+            onClick={markAllAsRead}
+            className="flex items-center gap-1.5 rounded-full border border-primary/20 px-3.5 py-2 text-xs font-medium text-primary hover:bg-white"
+          >
+            <CheckCheck className="h-4 w-4" /> Mark all read
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+        </div>
+      ) : notifications.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-black/5 bg-white py-16 text-center">
+          <Bell className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">Nothing here yet — updates on your listings, payments, and bookings will show up in this list.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-black/5 bg-white">
+          {notifications.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => handleClick(n)}
+              className={`flex w-full flex-col gap-1 border-b border-black/5 px-5 py-4 text-left last:border-0 hover:bg-black/[0.02] ${!n.read_at ? 'bg-primary/[0.04]' : ''}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-sm font-medium text-primary">{n.title}</span>
+                {!n.read_at && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
+              </div>
+              <span className="text-sm leading-6 text-muted-foreground">{n.body}</span>
+              <span className="text-xs text-muted-foreground/70">{timeAgo(n.created_at)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

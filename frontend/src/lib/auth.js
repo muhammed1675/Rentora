@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase';
+import { enforceRateLimit, clearRateLimit } from './rateLimit';
+import { notifyUser } from './notifications';
 
 const AuthContext = createContext(null);
 
@@ -120,6 +122,10 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
     try {
+      // Rate limit BEFORE touching Supabase auth at all — throws if this
+      // email has had too many attempts recently (see lib/rateLimit.js).
+      await enforceRateLimit(email, 'login');
+
       let data, error;
 
       try {
@@ -190,6 +196,10 @@ export function AuthProvider({ children }) {
       setUser(profile);
       setSession(data.session);
 
+      // Successful login — clear this email's rate-limit counter so an
+      // earlier mistyped password doesn't keep counting against it.
+      clearRateLimit(email, 'login');
+
       // Send sign-in notification email (non-blocking)
       try {
         const ip = await fetch('https://api.ipify.org?format=json')
@@ -231,6 +241,13 @@ export function AuthProvider({ children }) {
   // ── Register ─────────────────────────────────────────────────
   const register = async (email, password, fullName, phone = '') => {
     try {
+      // Rate limit signups by IP rather than email — the email doesn't
+      // exist as an account yet, so IP is what actually stops one source
+      // from spamming out registrations.
+      const signupIdentifier = await fetch('https://api.ipify.org?format=json')
+        .then(r => r.json()).then(d => d.ip).catch(() => email.trim().toLowerCase());
+      await enforceRateLimit(signupIdentifier, 'signup');
+
       const { data, error } = await supabase.auth.signUp({
         email, password,
         options: { data: { full_name: fullName, phone } }
@@ -272,6 +289,8 @@ export function AuthProvider({ children }) {
       } catch (e) {
         console.warn('Welcome email failed (non-critical):', e.message);
       }
+
+      notifyUser(data.user.id, 'welcome', 'Welcome to Rentora!', 'Your account is ready — start browsing verified listings.', '/browse');
 
       return profile;
     } catch (err) {
@@ -358,6 +377,8 @@ export function AuthProvider({ children }) {
       } catch (e) {
         console.warn('Welcome email failed (non-critical):', e.message);
       }
+
+      notifyUser(profile.id, 'welcome', 'Welcome to Rentora!', 'Your account is ready — start browsing verified listings.', '/browse');
     }
 
     return profile;
