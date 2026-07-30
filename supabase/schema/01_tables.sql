@@ -257,7 +257,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     suspended boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     phone text,
-    avatar_url text
+    avatar_url text,
+    deleted_at timestamptz
 );
 
 -- ── wallets ──────────────────────────────

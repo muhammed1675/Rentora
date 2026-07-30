@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, refreshUser, isUser, changePassword } = useAuth();
+  const { user, isAuthenticated, refreshUser, isUser, changePassword, deleteAccount } = useAuth();
   
   const [inspections, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
@@ -73,6 +73,25 @@ export function Profile() {
       toast.error(err.message || 'Failed to remove picture');
     } finally {
       setAvatarUploading(false);
+    }
+  };
+
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      await deleteAccount();
+      toast.success('Your account has been deleted.');
+      navigate('/');
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete account. Please try again or contact support.');
+    } finally {
+      setDeletingAccount(false);
+      setShowDeleteAccount(false);
+      setDeleteConfirmText('');
     }
   };
 
@@ -630,6 +649,21 @@ export function Profile() {
               </Button>
             </div>
           </Card>
+
+          <Card className="p-6 mt-4 border-destructive/30">
+            <h3 className="font-semibold mb-1 text-destructive">Danger Zone</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Permanently delete your account. This can't be undone.
+            </p>
+            <Button
+              variant="outline"
+              className="border-destructive text-destructive hover:bg-destructive hover:text-white"
+              onClick={() => setShowDeleteAccount(true)}
+              data-testid="profile-delete-account-open"
+            >
+              Delete Account
+            </Button>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -658,6 +692,42 @@ export function Profile() {
             <Button variant="outline" onClick={() => setMoveInDialogPayment(null)}>Cancel</Button>
             <Button onClick={handleConfirmMoveIn} disabled={confirmingMoveIn || !moveInPhotoFile} data-testid="move-in-confirm-submit">
               {confirmingMoveIn ? 'Submitting...' : 'Report Move-In'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteAccount} onOpenChange={(open) => { setShowDeleteAccount(open); if (!open) setDeleteConfirmText(''); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete your account?</DialogTitle>
+            <DialogDescription>
+              This permanently removes your login and personal details from Rentora. This action can't be undone.
+              If you have any pending rent payments, active listings, or a wallet balance, you'll need to resolve
+              those first.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirm-text" className="text-sm">
+              Type <span className="font-semibold">DELETE</span> to confirm
+            </Label>
+            <Input
+              id="delete-confirm-text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              data-testid="delete-account-confirm-input"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteAccount(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
+              data-testid="delete-account-confirm-submit"
+            >
+              {deletingAccount ? 'Deleting...' : 'Permanently Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

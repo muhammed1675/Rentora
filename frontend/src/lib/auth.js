@@ -345,6 +345,35 @@ export function AuthProvider({ children }) {
     return profile;
   };
 
+  // ── Delete account ───────────────────────────────────────────
+  // Calls the delete-account edge function with the user's own access
+  // token. The function blocks deletion if money/obligations are still
+  // unresolved (see supabase/functions/delete-account for the checks).
+  const deleteAccount = async () => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const accessToken = currentSession?.access_token;
+    if (!accessToken) throw new Error('Your session has expired. Please log in again.');
+
+    const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || !result.success) {
+      throw new Error(result.message || 'Failed to delete account. Please try again or contact support.');
+    }
+
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    return true;
+  };
+
   // ── Logout ───────────────────────────────────────────────────
   const logout = async () => {
     await supabase.auth.signOut();
@@ -416,7 +445,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, session, loading,
       login, register, logout, refreshUser, requestPasswordReset, changePassword,
-      loginWithGoogle, completeOAuthSignIn, confirmPasswordResetWithCode,
+      loginWithGoogle, completeOAuthSignIn, confirmPasswordResetWithCode, deleteAccount,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',
       isAgent: user?.role === 'agent',

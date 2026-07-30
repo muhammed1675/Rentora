@@ -366,6 +366,13 @@ END;
 
 -- ── restrict_self_profile_edits ──────────────────────────────
 BEGIN
+  -- Trusted server-side calls (e.g. the delete-account edge function,
+  -- using the service_role key) are allowed to anonymize/suspend on
+  -- the user's own behalf during account deletion.
+  IF auth.role() = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
   IF public.is_admin() THEN
     RETURN NEW;
   END IF;
