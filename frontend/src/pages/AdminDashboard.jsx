@@ -253,7 +253,9 @@ export function AdminDashboard() {
       setDeleteConfirm({ open: false, property: null, deleting: false });
       fetchData();
     } catch (error) {
-      toast.error(error.message || 'Failed to delete property');
+      // Show user-friendly error messages
+      const errorMessage = error.message || 'Failed to delete property';
+      toast.error(errorMessage);
       setDeleteConfirm(prev => ({ ...prev, deleting: false }));
     }
   };

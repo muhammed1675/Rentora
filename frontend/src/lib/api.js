@@ -162,7 +162,21 @@ export const propertyAPI = {
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      // Check for foreign key constraint violations related to rent payments
+      if (error.message && error.message.includes('foreign key constraint') && error.message.includes('property_rent_payments')) {
+        const customError = new Error('This property has rent payment history and cannot be deleted. Please contact support if you need assistance.');
+        customError.code = 'RENT_PAYMENT_EXISTS';
+        throw customError;
+      }
+      // Generic foreign key constraint error
+      if (error.message && error.message.includes('foreign key constraint')) {
+        const customError = new Error('This property has associated records and cannot be deleted. Please contact support if you need assistance.');
+        customError.code = 'FK_CONSTRAINT_VIOLATION';
+        throw customError;
+      }
+      throw error;
+    }
     return { data: { message: 'Property deleted' } };
   },
 
