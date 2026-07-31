@@ -262,7 +262,7 @@ export function AgentDashboard() {
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    if (formData.images.length + files.length > 5) { toast.error('Maximum 5 images allowed'); return; }
+    if (formData.images.length + files.length > 3) { toast.error('Maximum 3 images allowed'); return; }
     setUploadingImage(true);
     try {
       const uploadedUrls = [];
@@ -1206,7 +1206,7 @@ export function AgentDashboard() {
             {/* ── Property Images ── */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Property Images</h3>
-              <Label className="text-muted-foreground text-xs font-normal">Max 5, up to 5MB each</Label>
+              <Label className="text-muted-foreground text-xs font-normal">Max 3 images, up to 5MB each</Label>
               <div onClick={() => !uploadingImage && fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed border-muted' : 'border-muted-foreground/25 hover:border-primary hover:bg-muted/30'}`}>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
@@ -1217,7 +1217,7 @@ export function AgentDashboard() {
                 )}
               </div>
               {formData.images.length > 0 && (
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {formData.images.map((img, index) => (
                     <div key={index} className="relative group aspect-square">
                       <img src={img} alt={`Property ${index + 1}`} className="w-full h-full rounded-lg object-cover cursor-pointer" onClick={() => openLightbox(formData.images, index)} loading="lazy" decoding="async" width="800" height="600" />
@@ -1228,7 +1228,7 @@ export function AgentDashboard() {
                       {index === 0 && <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1 rounded pointer-events-none">Cover</span>}
                     </div>
                   ))}
-                  {formData.images.length < 5 && (
+                  {formData.images.length < 3 && (
                     <div onClick={() => fileInputRef.current?.click()}
                       className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-muted/30 transition-colors">
                       <Plus className="w-6 h-6 text-muted-foreground" />

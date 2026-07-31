@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
@@ -208,6 +209,7 @@ export function AdminDashboard() {
   // Reviewing a student's move-in photo: admin previews it in a dialog,
   // then either confirms (releases funds to the agent) or dismisses.
   const [moveInPreview, setMoveInPreview] = useState(null); // the rentPayment row being previewed
+  const [selectedReport, setSelectedReport] = useState(null); // report opened in the detail dialog
   const [confirmingMoveIn, setConfirmingMoveIn] = useState(false);
 
   const handleAdminConfirmMoveIn = async (rentPaymentId) => {
@@ -425,7 +427,11 @@ export function AdminDashboard() {
   const firstName = (user?.full_name || 'Admin').split(' ')[0];
 
   return (
-    <div className="min-h-screen admin-surface lg:grid lg:grid-cols-[280px_1fr]" data-testid="admin-dashboard">
+    <div className="min-h-screen admin-surface" data-testid="admin-dashboard">
+      {/* Sidebar + mobile drawer are portalled to <body> so no ancestor
+          (sticky/blurred site header, transforms) can clip or hide them. */}
+      {createPortal(
+        <>
       {/* Mobile nav backdrop */}
       {mobileNavOpen && (
         <button
@@ -436,7 +442,7 @@ export function AdminDashboard() {
       )}
 
       {/* Sidebar — light card style with dark active pill */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r border-slate-200/70 flex flex-col transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[280px] h-[100dvh] bg-white border-r border-slate-200/70 flex flex-col shadow-xl lg:shadow-none transition-transform lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Brand */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4">
           <div className="flex items-center gap-2.5">
@@ -545,22 +551,25 @@ export function AdminDashboard() {
           </div>
         </div>
       </aside>
+        </>,
+        document.body
+      )}
 
       {/* Main */}
-      <main className="min-w-0">
+      <main className="min-w-0 lg:ml-[280px]">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 admin-topbar px-4 py-3 sm:px-8">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => setMobileNavOpen(true)} className="lg:hidden shrink-0 w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center">
               <Menu className="w-4 h-4" />
             </button>
-            <div className="min-w-0 hidden sm:block">
+            <div className="min-w-0">
               <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Section</p>
               <h2 className="text-sm font-semibold text-slate-800 truncate">{activeGroupLabel}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center relative">
+            <button onClick={() => goTo('messages')} aria-label="Open messages" className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center relative">
               <MessageSquare className="w-4 h-4 text-slate-500" />
               {messages.filter(m => m.status === 'unread').length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
@@ -1374,7 +1383,7 @@ export function AdminDashboard() {
           ) : (
             <div className="space-y-3">
               {reports.map((r) => (
-                <Card key={r.id} className="p-4 border-border/60">
+                <Card key={r.id} onClick={() => setSelectedReport(r)} className="p-4 border-border/60 cursor-pointer hover:border-primary/40 hover:shadow-sm transition">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1.5">
@@ -1386,7 +1395,7 @@ export function AdminDashboard() {
                         <span className="text-xs text-foreground/40">{new Date(r.created_at).toLocaleString()}</span>
                       </div>
                       <button
-                        onClick={() => navigate(`/property/${r.property_id}`)}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/property/${r.property_id}`); }}
                         className="font-semibold text-sm text-primary hover:underline text-left"
                       >
                         {r.property?.title || 'View listing'}
@@ -1395,15 +1404,15 @@ export function AdminDashboard() {
                         <p className="text-xs text-foreground/50">{r.property.location_text}</p>
                       )}
                       <p className="text-sm mt-2"><span className="font-medium">Reason:</span> {r.reason}</p>
-                      {r.details && <p className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{r.details}</p>}
+                      {r.details && <p className="text-sm text-foreground/70 mt-1 line-clamp-2">{r.details}</p>}
                       <p className="text-xs text-foreground/45 mt-2">
                         Reported by {r.reporter_name || 'a user'}{r.reporter_email ? ` · ${r.reporter_email}` : ''}
                       </p>
                     </div>
                     {r.status === 'pending' && (
                       <div className="flex gap-2 shrink-0">
-                        <Button size="sm" variant="outline" onClick={() => handleResolveReport(r.id, 'dismissed')}>Dismiss</Button>
-                        <Button size="sm" onClick={() => handleResolveReport(r.id, 'resolved')}>Mark Resolved</Button>
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleResolveReport(r.id, 'dismissed'); }}>Dismiss</Button>
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); handleResolveReport(r.id, 'resolved'); }}>Mark Resolved</Button>
                       </div>
                     )}
                   </div>
@@ -2283,6 +2292,78 @@ export function AdminDashboard() {
             <Button onClick={() => handleAdminConfirmMoveIn(moveInPreview.id)} disabled={confirmingMoveIn}>
               {confirmingMoveIn ? 'Confirming...' : 'Confirm Move-In & Release Funds'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Report Detail Dialog ── */}
+      <Dialog open={!!selectedReport} onOpenChange={(open) => { if (!open) setSelectedReport(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Listing Report</DialogTitle>
+            <DialogDescription>
+              {selectedReport ? new Date(selectedReport.created_at).toLocaleString() : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedReport && (
+            <div className="space-y-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge className={
+                  selectedReport.status === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100'
+                  : selectedReport.status === 'resolved' ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-100'
+                }>{selectedReport.status}</Badge>
+                <span className="text-xs text-muted-foreground">Reason: {selectedReport.reason}</span>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Reported listing</p>
+                <button
+                  onClick={() => { setSelectedReport(null); navigate(`/property/${selectedReport.property_id}`); }}
+                  className="font-semibold text-primary hover:underline text-left"
+                >
+                  {selectedReport.property?.title || 'View listing'}
+                </button>
+                {selectedReport.property?.location_text && (
+                  <p className="text-xs text-muted-foreground">{selectedReport.property.location_text}</p>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Message</p>
+                <div className="bg-muted/40 border rounded-lg p-3 min-h-[90px]">
+                  <p className="whitespace-pre-wrap leading-relaxed text-foreground/85">
+                    {selectedReport.details || 'No extra details were provided by the reporter.'}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Reporter</p>
+                <p>{selectedReport.reporter_name || 'A user'}</p>
+                {selectedReport.reporter_email && (
+                  <a href={`mailto:${selectedReport.reporter_email}?subject=${encodeURIComponent('Your Rentora listing report')}`} className="text-xs text-primary hover:underline break-all">
+                    {selectedReport.reporter_email}
+                  </a>
+                )}
+              </div>
+
+              {selectedReport.admin_note && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Admin note</p>
+                  <p className="text-foreground/80 whitespace-pre-wrap">{selectedReport.admin_note}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSelectedReport(null)}>Close</Button>
+            {selectedReport?.status === 'pending' && (
+              <>
+                <Button variant="outline" onClick={() => { handleResolveReport(selectedReport.id, 'dismissed'); setSelectedReport(null); }}>Dismiss</Button>
+                <Button onClick={() => { handleResolveReport(selectedReport.id, 'resolved'); setSelectedReport(null); }}>Mark Resolved</Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

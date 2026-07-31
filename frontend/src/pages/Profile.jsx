@@ -48,7 +48,7 @@ export function Profile() {
     const previousAvatarUrl = user?.avatar_url;
     setAvatarUploading(true);
     try {
-      const { data } = await storageAPI.uploadImage(file, 'avatars');
+      const { data } = await storageAPI.uploadImage(file, 'avatars', { maxWidthOrHeight: 1000, maxSizeMB: 0.3 });
       await userAPI.updateProfile(user.id, { avatar_url: data.url });
       if (previousAvatarUrl) await storageAPI.deleteImage(previousAvatarUrl, 'avatars');
       await refreshUser();
@@ -179,7 +179,7 @@ export function Profile() {
     setConfirmingMoveIn(true);
     let uploadedUrl;
     try {
-      const uploadRes = await storageAPI.uploadImage(moveInPhotoFile, 'move-in-photos');
+      const uploadRes = await storageAPI.uploadImage(moveInPhotoFile, 'move-in-photos', { maxWidthOrHeight: 1000, maxSizeMB: 0.4 });
       uploadedUrl = uploadRes.data.url;
     } catch (e) {
       toast.error('Could not upload your photo: ' + (e.message || 'unknown error') + '. Please check your connection and try again.');

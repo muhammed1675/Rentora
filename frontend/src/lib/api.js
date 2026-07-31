@@ -148,11 +148,20 @@ export const propertyAPI = {
   },
 
   delete: async (id) => {
+    // Free the rows that reference this property first — Postgres FKs such as
+    // property_reports_property_id_fkey block a bare delete otherwise.
+    const dependents = ['property_reports', 'property_reviews', 'unlocks', 'inspections', 'property_rent_payments'];
+    for (const table of dependents) {
+      const { error: depError } = await supabase.from(table).delete().eq('property_id', id);
+      // A missing table / no-permission on an unrelated table shouldn't block the delete.
+      if (depError && !/does not exist|schema cache/i.test(depError.message || '')) throw depError;
+    }
+
     const { error } = await supabase
       .from('properties')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
     return { data: { message: 'Property deleted' } };
   },
@@ -724,9 +733,9 @@ export const paymentAPI = {
 // ============== STORAGE APIs ==============
 
 export const storageAPI = {
-  uploadImage: async (rawFile, bucket = 'property-images') => {
+  uploadImage: async (rawFile, bucket = 'property-images', compressOptions = null) => {
     // Compress client-side so oversized camera photos never hit storage.
-    const file = await compressImage(rawFile, { maxWidthOrHeight: 1600, maxSizeMB: 0.6 });
+    const file = await compressImage(rawFile, { maxWidthOrHeight: 1600, maxSizeMB: 0.5, ...(compressOptions || {}) });
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
 
@@ -746,7 +755,7 @@ export const storageAPI = {
   // Used by BecomeAgent.jsx — uploads to dedicated verification bucket
   uploadFile: async (rawFile, folder = 'verification') => {
     // ID cards / selfies still need to stay legible, so compress a bit gentler.
-    const file = await compressImage(rawFile, { maxWidthOrHeight: 1800, maxSizeMB: 0.8, initialQuality: 0.8 });
+    const file = await compressImage(rawFile, { maxWidthOrHeight: 1000, maxSizeMB: 0.4, initialQuality: 0.8 });
     const fileExt = file.name.split('.').pop();
     const fileName = `${folder}-${uuidv4()}.${fileExt}`;
     const bucket = 'verification';
