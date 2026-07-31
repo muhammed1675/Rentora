@@ -152,7 +152,9 @@ export function AuthProvider({ children }) {
             .maybeSingle();
 
           if (!existing) {
-            throw new Error('No account found with this email. Please register first.');
+            throw new Error('This email is not registered. Please create an account first.');
+          } else {
+            throw new Error('Incorrect password. Please try again.');
           }
         }
         throw new Error(parseAuthError(error));
