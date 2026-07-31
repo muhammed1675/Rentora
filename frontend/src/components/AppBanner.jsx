@@ -69,8 +69,7 @@ export function AppBanner() {
         <img
           src="/launchericon-72x72.png"
           alt="Rentora"
-          className="w-12 h-12 rounded-xl shrink-0 shadow-sm"
-        />
+          className="w-12 h-12 rounded-xl shrink-0 shadow-sm" loading="lazy" decoding="async" width="72" height="72" />
 
         {/* Text */}
         <div className="flex-1 min-w-0">

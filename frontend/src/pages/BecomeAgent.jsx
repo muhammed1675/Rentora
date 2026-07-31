@@ -202,7 +202,7 @@ export function BecomeAgent() {
                 onChange={(e) => handleImageSelect(e, setIdCardFile, setIdCardPreview)} />
               {idCardPreview ? (
                 <div className="relative group">
-                  <img src={idCardPreview} alt="ID Card" className="w-full max-h-44 object-contain rounded-lg border bg-muted/30" />
+                  <img src={idCardPreview} alt="ID Card" className="w-full max-h-44 object-contain rounded-lg border bg-muted/30" loading="lazy" decoding="async" width="800" height="600" />
                   <button type="button" onClick={() => { setIdCardFile(null); setIdCardPreview(null); if (idCardRef.current) idCardRef.current.value = ''; }}
                     className="absolute top-2 right-2 w-7 h-7 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
                     <X className="w-4 h-4" />
@@ -229,7 +229,7 @@ export function BecomeAgent() {
                 onChange={(e) => handleImageSelect(e, setSelfieFile, setSelfiePreview)} />
               {selfiePreview ? (
                 <div className="relative group">
-                  <img src={selfiePreview} alt="Selfie" className="w-full max-h-44 object-contain rounded-lg border bg-muted/30" />
+                  <img src={selfiePreview} alt="Selfie" className="w-full max-h-44 object-contain rounded-lg border bg-muted/30" loading="lazy" decoding="async" width="800" height="600" />
                   <button type="button" onClick={() => { setSelfieFile(null); setSelfiePreview(null); if (selfieRef.current) selfieRef.current.value = ''; }}
                     className="absolute top-2 right-2 w-7 h-7 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
                     <X className="w-4 h-4" />

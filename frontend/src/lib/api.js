@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { notifyUser } from './notifications';
+import { compressImage } from './imageCompression';
 
 // Helper to generate payment reference
 const generateReference = (prefix) => {
@@ -723,13 +724,15 @@ export const paymentAPI = {
 // ============== STORAGE APIs ==============
 
 export const storageAPI = {
-  uploadImage: async (file, bucket = 'property-images') => {
+  uploadImage: async (rawFile, bucket = 'property-images') => {
+    // Compress client-side so oversized camera photos never hit storage.
+    const file = await compressImage(rawFile, { maxWidthOrHeight: 1600, maxSizeMB: 0.6 });
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
-    
+
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file);
+      .upload(fileName, file, { contentType: file.type, cacheControl: '31536000' });
     
     if (error) throw error;
     
@@ -741,14 +744,16 @@ export const storageAPI = {
   },
 
   // Used by BecomeAgent.jsx — uploads to dedicated verification bucket
-  uploadFile: async (file, folder = 'verification') => {
+  uploadFile: async (rawFile, folder = 'verification') => {
+    // ID cards / selfies still need to stay legible, so compress a bit gentler.
+    const file = await compressImage(rawFile, { maxWidthOrHeight: 1800, maxSizeMB: 0.8, initialQuality: 0.8 });
     const fileExt = file.name.split('.').pop();
     const fileName = `${folder}-${uuidv4()}.${fileExt}`;
     const bucket = 'verification';
 
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file);
+      .upload(fileName, file, { contentType: file.type, cacheControl: '31536000' });
 
     if (error) throw error;
 

@@ -827,7 +827,7 @@ export function AdminDashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
                     {u.avatar_url ? (
-                      <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" />
+                      <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
                     ) : (
                       <User className="w-5 h-5 text-primary" />
                     )}
@@ -864,7 +864,7 @@ export function AdminDashboard() {
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
                           {u.avatar_url ? (
-                            <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" />
+                            <img src={u.avatar_url} alt={u.full_name} className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
                           ) : (
                             <User className="w-4 h-4 text-primary" />
                           )}
@@ -1121,7 +1121,7 @@ export function AdminDashboard() {
                               <div>
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">ID Card</p>
                                 <a href={v.id_card_url} target="_blank" rel="noreferrer">
-                                  <img src={v.id_card_url} alt="ID Card" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                                  <img src={v.id_card_url} alt="ID Card" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" loading="lazy" decoding="async" width="800" height="600" />
                                 </a>
                               </div>
                             )}
@@ -1129,7 +1129,7 @@ export function AdminDashboard() {
                               <div>
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Selfie with ID</p>
                                 <a href={v.selfie_url} target="_blank" rel="noreferrer">
-                                  <img src={v.selfie_url} alt="Selfie" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                                  <img src={v.selfie_url} alt="Selfie" className="w-full h-32 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" loading="lazy" decoding="async" width="800" height="600" />
                                 </a>
                               </div>
                             )}
@@ -1175,7 +1175,7 @@ export function AdminDashboard() {
                     return (
                     <Card key={p.id} className="overflow-hidden border-yellow-200">
                       <div className="flex">
-                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-24 sm:w-32 object-cover flex-shrink-0" style={{ minHeight: '100px' }} />
+                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-24 sm:w-32 object-cover flex-shrink-0" style={{ minHeight: '100px' }} loading="lazy" decoding="async" width="800" height="600" />
                         <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '100px' }}>
                           <div>
                             <h4 className="font-semibold text-sm line-clamp-1">{p.title}</h4>
@@ -1210,7 +1210,7 @@ export function AdminDashboard() {
               {properties.map((p) => (
                 <Card key={p.id} className="overflow-hidden">
                   <div className="flex">
-                    <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-24 object-cover flex-shrink-0" style={{ minHeight: '96px' }} />
+                    <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-24 object-cover flex-shrink-0" style={{ minHeight: '96px' }} loading="lazy" decoding="async" width="800" height="600" />
                     <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '96px' }}>
                       <div>
                         <div className="flex items-start justify-between gap-1">
@@ -1235,7 +1235,7 @@ export function AdminDashboard() {
                 <TableHeader><TableRow><TableHead>Property</TableHead><TableHead>Type</TableHead><TableHead>Price</TableHead><TableHead>Agent</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                 <TableBody>{properties.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell><div className="flex items-center gap-3"><img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-12 h-12 rounded object-cover shrink-0" /><div className="min-w-0"><p className="font-medium text-sm truncate max-w-[140px]">{p.title}</p><p className="text-xs text-muted-foreground truncate max-w-[140px]">{p.location}</p></div></div></TableCell>
+                    <TableCell><div className="flex items-center gap-3"><img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-12 h-12 rounded object-cover shrink-0" loading="lazy" decoding="async" width="800" height="600" /><div className="min-w-0"><p className="font-medium text-sm truncate max-w-[140px]">{p.title}</p><p className="text-xs text-muted-foreground truncate max-w-[140px]">{p.location}</p></div></div></TableCell>
                     <TableCell className="capitalize text-sm">{p.property_type}</TableCell>
                     <TableCell className="text-sm whitespace-nowrap">{formatPrice(p.price)}</TableCell>
                     <TableCell className="text-sm">{p.uploaded_by_agent_name}</TableCell>
@@ -1608,7 +1608,7 @@ export function AdminDashboard() {
                     <div className="flex items-center gap-3 min-w-0">
                       {payment.move_in_photo_url && (
                         <button onClick={() => setMoveInPreview(payment)} className="shrink-0">
-                          <img src={payment.move_in_photo_url} alt="Move-in" className="w-14 h-14 rounded object-cover border hover:opacity-80" />
+                          <img src={payment.move_in_photo_url} alt="Move-in" className="w-14 h-14 rounded object-cover border hover:opacity-80" loading="lazy" decoding="async" width="800" height="600" />
                         </button>
                       )}
                       <div className="min-w-0">
@@ -1670,7 +1670,7 @@ export function AdminDashboard() {
                     <TableCell>
                       {payment.move_in_photo_url ? (
                         <a href={payment.move_in_photo_url} target="_blank" rel="noopener noreferrer">
-                          <img src={payment.move_in_photo_url} alt="Move-in" className="w-10 h-10 rounded object-cover border hover:opacity-80" />
+                          <img src={payment.move_in_photo_url} alt="Move-in" className="w-10 h-10 rounded object-cover border hover:opacity-80" loading="lazy" decoding="async" width="800" height="600" />
                         </a>
                       ) : (
                         <span className="text-xs text-muted-foreground italic">None</span>
@@ -1775,7 +1775,7 @@ export function AdminDashboard() {
                         <p className="text-xs text-muted-foreground mb-1">ID Card</p>
                         <a href={selectedAgentData.verification.id_card_url} target="_blank" rel="noreferrer">
                           <img src={selectedAgentData.verification.id_card_url} alt="ID Card"
-                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" loading="lazy" decoding="async" width="800" height="600" />
                         </a>
                       </div>
                     )}
@@ -1784,7 +1784,7 @@ export function AdminDashboard() {
                         <p className="text-xs text-muted-foreground mb-1">Selfie with ID</p>
                         <a href={selectedAgentData.verification.selfie_url} target="_blank" rel="noreferrer">
                           <img src={selectedAgentData.verification.selfie_url} alt="Selfie"
-                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" />
+                            className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer" loading="lazy" decoding="async" width="800" height="600" />
                         </a>
                       </div>
                     )}
@@ -1870,8 +1870,7 @@ export function AdminDashboard() {
                               <img
                                 src={selectedAgentData.verification.id_card_url}
                                 alt="ID Card"
-                                className="w-full max-h-40 object-contain rounded-lg border bg-muted/20 cursor-pointer hover:opacity-90 transition-opacity"
-                              />
+                                className="w-full max-h-40 object-contain rounded-lg border bg-muted/20 cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" decoding="async" width="800" height="600" />
                               <p className="text-xs text-primary mt-1 text-center">Click to open full size ↗</p>
                             </a>
                           </div>
@@ -1987,7 +1986,7 @@ export function AdminDashboard() {
                   <div className="space-y-2">
                     {properties.filter(p => p.uploaded_by_agent_id === selectedAgentData.id).map(p => (
                       <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
-                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-10 h-10 rounded object-cover shrink-0" loading="lazy" decoding="async" width="800" height="600" />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{p.title}</p>
                           <p className="text-xs text-muted-foreground">{formatPrice(p.price)}/yr</p>
@@ -2063,8 +2062,8 @@ export function AdminDashboard() {
                   );
                 })()}
               </div>
-              <div><p className="text-xs font-medium text-muted-foreground mb-2">ID Card</p><img src={selectedVerification.id_card_url} alt="ID Card" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" /></div>
-              <div><p className="text-xs font-medium text-muted-foreground mb-2">Selfie with ID</p><img src={selectedVerification.selfie_url} alt="Selfie" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" /></div>
+              <div><p className="text-xs font-medium text-muted-foreground mb-2">ID Card</p><img src={selectedVerification.id_card_url} alt="ID Card" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" loading="lazy" decoding="async" width="800" height="600" /></div>
+              <div><p className="text-xs font-medium text-muted-foreground mb-2">Selfie with ID</p><img src={selectedVerification.selfie_url} alt="Selfie" className="w-full max-h-52 object-contain rounded-lg border bg-muted/20" loading="lazy" decoding="async" width="800" height="600" /></div>
               {selectedVerification.agreement_url ? (
                 <div><p className="text-xs font-medium text-muted-foreground mb-2">Signed Agreement</p>
                   <a href={selectedVerification.agreement_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors">
@@ -2112,7 +2111,7 @@ export function AdminDashboard() {
                   {previewProperty.images.slice(0, 6).map((img, i) => (
                     <a key={i} href={img} target="_blank" rel="noreferrer">
                       <img src={img} alt={`Photo ${i + 1}`}
-                        className={`w-full object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer ${i === 0 ? 'col-span-3 max-h-52' : 'max-h-28'}`} />
+                        className={`w-full object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer ${i === 0 ? 'col-span-3 max-h-52' : 'max-h-28'}`} loading="lazy" decoding="async" width="800" height="600" />
                     </a>
                   ))}
                 </div>
@@ -2244,7 +2243,7 @@ export function AdminDashboard() {
           <DialogHeader><DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-5 h-5" /> Delete Property</DialogTitle><DialogDescription>This action cannot be undone.</DialogDescription></DialogHeader>
           {deleteConfirm.property && (
             <div className="flex items-center gap-4 py-2">
-              <img src={deleteConfirm.property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'} alt="" className="w-20 h-16 rounded-lg object-cover flex-shrink-0" />
+              <img src={deleteConfirm.property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-20 h-16 rounded-lg object-cover flex-shrink-0" loading="lazy" decoding="async" width="800" height="600" />
               <div><p className="font-semibold">{deleteConfirm.property.title}</p><p className="text-sm text-muted-foreground">{deleteConfirm.property.location}</p><p className="text-sm text-muted-foreground">By: {deleteConfirm.property.uploaded_by_agent_name}</p></div>
             </div>
           )}
@@ -2268,7 +2267,7 @@ export function AdminDashboard() {
           {moveInPreview && (
             <div className="space-y-3">
               {moveInPreview.move_in_photo_url ? (
-                <img src={moveInPreview.move_in_photo_url} alt="Move-in" className="w-full max-h-80 object-contain rounded-lg border bg-muted/30" />
+                <img src={moveInPreview.move_in_photo_url} alt="Move-in" className="w-full max-h-80 object-contain rounded-lg border bg-muted/30" loading="lazy" decoding="async" width="800" height="600" />
               ) : (
                 <p className="text-sm text-muted-foreground italic">No photo was uploaded with this report.</p>
               )}

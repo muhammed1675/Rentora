@@ -95,10 +95,9 @@ export function Compare() {
                   {/* Image */}
                   <div className="relative aspect-video bg-muted overflow-hidden">
                     <img
-                      src={item.image || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+                      src={item.image || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
                       alt={item.title}
-                      className="w-full h-full object-cover"
-                    />
+                      className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
                     <Badge className="absolute top-3 left-3 gap-1 text-xs">
                       <TypeIcon className="w-3 h-3" />
                       {item.property_type}

@@ -59,7 +59,7 @@ function Lightbox({ images, startIndex, onClose }) {
           <ChevronLeft className="w-6 h-6" />
         </button>
       )}
-      <img src={images[current]} alt={`Property image ${current + 1}`} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+      <img src={images[current]} alt={`Property image ${current + 1}`} className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} loading="lazy" decoding="async" width="1200" height="800" />
       {images.length > 1 && (
         <button onClick={(e) => { e.stopPropagation(); next(); }} className="absolute right-4 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors">
           <ChevronRight className="w-6 h-6" />
@@ -70,7 +70,7 @@ function Lightbox({ images, startIndex, onClose }) {
           {images.map((img, i) => (
             <button key={i} onClick={(e) => { e.stopPropagation(); setCurrent(i); }}
               className={`w-12 h-12 rounded-md overflow-hidden border-2 transition-all ${i === current ? 'border-white scale-110' : 'border-white/30 opacity-60 hover:opacity-100'}`}>
-              <img src={img} alt="" className="w-full h-full object-cover" />
+              <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
             </button>
           ))}
         </div>
@@ -536,7 +536,7 @@ export function AgentDashboard() {
                     <div className="relative group flex-shrink-0 w-28 sm:w-32" style={{ minHeight: '110px' }}>
                       {property.images?.[0] ? (
                         <>
-                          <img src={property.images[0]} alt="" className="absolute inset-0 w-full h-full object-cover cursor-pointer" onClick={() => openLightbox(property.images, 0)} />
+                          <img src={property.images[0]} alt="" className="absolute inset-0 w-full h-full object-cover cursor-pointer" onClick={() => openLightbox(property.images, 0)} loading="lazy" decoding="async" width="800" height="600" />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-end justify-center pb-2 transition-all cursor-pointer" onClick={() => openLightbox(property.images, 0)}>
                             <span className="text-white text-xs font-medium bg-black/60 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                               <Expand className="w-3 h-3" /> View
@@ -1220,7 +1220,7 @@ export function AgentDashboard() {
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {formData.images.map((img, index) => (
                     <div key={index} className="relative group aspect-square">
-                      <img src={img} alt={`Property ${index + 1}`} className="w-full h-full rounded-lg object-cover cursor-pointer" onClick={() => openLightbox(formData.images, index)} />
+                      <img src={img} alt={`Property ${index + 1}`} className="w-full h-full rounded-lg object-cover cursor-pointer" onClick={() => openLightbox(formData.images, index)} loading="lazy" decoding="async" width="800" height="600" />
                       <button type="button" onClick={() => handleRemoveImage(index)}
                         className="absolute top-1 right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
                         <XCircle className="w-3.5 h-3.5" />

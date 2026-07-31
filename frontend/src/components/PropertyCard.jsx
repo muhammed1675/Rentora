@@ -19,11 +19,10 @@ export function PropertyCard({ property }) {
       <div className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-[hsl(60_8%_90%)]">
         <Link to={`/property/${property.id}`} aria-label={`View ${property.title}`}>
           <img
-            src={property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+            src={property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
             alt={property.title}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-            loading="lazy"
-          />
+            loading="lazy" decoding="async" width="800" height="600" />
         </Link>
         <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm">
           {typeLabel}

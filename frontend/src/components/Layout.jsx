@@ -35,8 +35,7 @@ export function Layout({ children }) {
             <img 
               src="/rentora-logo.svg" 
               alt="Rentora Logo" 
-              className="h-8 w-auto object-contain bg-transparent" 
-            />
+              className="h-8 w-auto object-contain bg-transparent" loading="eager" decoding="async" width="64" height="64" />
             Rentora
           </Link>
 
@@ -133,8 +132,7 @@ export function Layout({ children }) {
               <img 
                 src="/rentora-logo.svg" 
                 alt="Rentora Logo" 
-                className="h-8 w-auto object-contain bg-transparent" 
-              />
+                className="h-8 w-auto object-contain bg-transparent" loading="eager" decoding="async" width="64" height="64" />
               Rentora
             </div>
             <p className="max-w-sm text-sm leading-6 text-slate-600">

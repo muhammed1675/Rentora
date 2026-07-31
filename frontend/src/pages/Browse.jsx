@@ -41,7 +41,7 @@ function RecentCard({ item, isFav, onToggleFav }) {
     <div onClick={() => navigate(`/property/${item.id}`)} className="shrink-0 w-48 rounded-xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-md transition-shadow group">
       <div className="relative h-28 bg-muted overflow-hidden">
         {item.image
-          ? <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          ? <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" width="800" height="600" />
           : <div className="w-full h-full flex items-center justify-center bg-muted"><TypeIcon className="w-8 h-8 text-muted-foreground/40" /></div>
         }
         <button onClick={(e) => { e.stopPropagation(); onToggleFav(item.id); }}

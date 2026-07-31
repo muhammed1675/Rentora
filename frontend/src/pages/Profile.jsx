@@ -280,7 +280,7 @@ export function Profile() {
               <label className="block cursor-pointer group" data-testid="profile-avatar-label">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
                   {user?.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
+                    <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
                   ) : (
                     <User className="w-8 h-8 text-primary" />
                   )}
@@ -367,10 +367,9 @@ export function Profile() {
                 <Card key={rp.id} className="p-4">
                   <div className="flex flex-col sm:flex-row gap-4">
                     <img
-                      src={rp.property?.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
+                      src={rp.property?.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
                       alt=""
-                      className="w-24 h-24 rounded-lg object-cover"
-                    />
+                      className="w-24 h-24 rounded-lg object-cover" loading="lazy" decoding="async" width="800" height="600" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold">{rp.property?.title || 'Property'}</h3>
@@ -685,7 +684,7 @@ export function Profile() {
               data-testid="move-in-photo-input"
             />
             {moveInPhotoPreview && (
-              <img src={moveInPhotoPreview} alt="Move-in preview" className="w-full max-h-64 object-cover rounded-lg border" />
+              <img src={moveInPhotoPreview} alt="Move-in preview" className="w-full max-h-64 object-cover rounded-lg border" loading="lazy" decoding="async" width="800" height="600" />
             )}
           </div>
           <DialogFooter>

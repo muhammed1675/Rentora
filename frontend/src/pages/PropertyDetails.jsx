@@ -343,8 +343,8 @@ export function PropertyDetails() {
         <div className="min-w-0 space-y-5 sm:space-y-6">
           {/* Image Gallery */}
           <div className="relative aspect-video w-full max-w-full overflow-hidden rounded-xl group">
-            <img src={property.images?.[currentImageIndex] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
-              alt={property.title} className="w-full h-full object-cover" />
+            <img src={property.images?.[currentImageIndex] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
+              alt={property.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
             {property.images?.length > 1 && (
               <>
                 <Button variant="secondary" size="icon" onClick={prevImage}
@@ -380,7 +380,7 @@ export function PropertyDetails() {
               {property.images.map((img, index) => (
                 <button key={index} onClick={() => setCurrentImageIndex(index)}
                   className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${index === currentImageIndex ? 'border-primary' : 'border-transparent opacity-60'}`}>
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
                 </button>
               ))}
             </div>
@@ -433,8 +433,8 @@ export function PropertyDetails() {
                   <div key={sim.id} onClick={() => navigate(`/property/${sim.id}`)}
                     className="flex min-w-0 cursor-pointer gap-3 rounded-xl border border-border bg-card p-3 transition-shadow hover:shadow-md group">
                     <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0 bg-muted">
-                      <img src={sim.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg'}
-                        alt={sim.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={sim.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
+                        alt={sim.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" width="800" height="600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm line-clamp-1">{sim.title}</p>

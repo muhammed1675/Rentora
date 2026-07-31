@@ -134,8 +134,7 @@ export function Login() {
           <img 
             src="/rentora-logo.svg" 
             alt="Rentora Logo" 
-            className="h-10 w-auto object-contain bg-transparent" 
-          />
+            className="h-10 w-auto object-contain bg-transparent" loading="eager" decoding="async" width="64" height="64" />
         </div>
 
         <div className="text-center mb-8">

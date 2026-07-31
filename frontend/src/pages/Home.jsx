@@ -1,13 +1,17 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import gsap from 'gsap';
+import { SplitText } from 'gsap/SplitText';
 import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck, Lock, CheckCircle2, Zap, Star, Users, Home as HomeIcon } from 'lucide-react';
 import { AppBanner } from '../components/AppBanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 
-const heroImg = 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg';
-const hostelImg = 'https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg';
-const apartmentImg = 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg';
-const interiorImg = 'https://images.pexels.com/photos/1571453/pexels-photo-1571453.jpeg';
+gsap.registerPlugin(SplitText);
+
+const heroImg = 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=1200';
+const hostelImg = 'https://images.pexels.com/photos/1571468/pexels-photo-1571468.jpeg?auto=compress&cs=tinysrgb&w=800';
+const apartmentImg = 'https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=800';
+const interiorImg = 'https://images.pexels.com/photos/1571453/pexels-photo-1571453.jpeg?auto=compress&cs=tinysrgb&w=800';
 
 const steps = [
   { icon: BadgeCheck, title: 'Browse verified homes', copy: 'Explore real listings around LAUTECH at no cost.' },
@@ -18,6 +22,50 @@ const steps = [
 
 export function Home() {
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const headingRef = useRef(null);
+  const subtextRef = useRef(null);
+  const ctaRef = useRef(null);
+
+  // Apple-style staggered reveal: heading words, then subtext lines, then CTA.
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let ctx;
+    let splits = [];
+
+    const run = () => {
+      ctx = gsap.context(() => {
+        if (prefersReduced) {
+          gsap.set([headingRef.current, subtextRef.current, ctaRef.current], { opacity: 1, y: 0 });
+          return;
+        }
+
+        const headingSplit = new SplitText(headingRef.current, { type: 'words', wordsClass: 'hero-word' });
+        const subtextSplit = new SplitText(subtextRef.current, { type: 'lines', linesClass: 'hero-line' });
+        splits = [headingSplit, subtextSplit];
+
+        gsap.set([headingRef.current, subtextRef.current, ctaRef.current], { opacity: 1 });
+
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.from(headingSplit.words, { y: 30, opacity: 0, duration: 0.9, stagger: 0.055 })
+          .from(subtextSplit.lines, { y: 24, opacity: 0, duration: 0.8, stagger: 0.09 }, '-=0.55')
+          .from(ctaRef.current, { y: 20, opacity: 0, duration: 0.7 }, '-=0.5');
+      });
+    };
+
+    // Wait for fonts so line/word splitting measures correctly.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(run).catch(run);
+    } else {
+      run();
+    }
+
+    return () => {
+      splits.forEach(split => split.revert());
+      splits = [];
+      if (ctx) ctx.revert();
+    };
+  }, []);
 
   useEffect(() => {
     if (!localStorage.getItem('rentora_welcome_seen')) {
@@ -39,23 +87,26 @@ export function Home() {
       <section className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 md:pb-24 md:pt-12">
         <div className="relative min-h-[560px] overflow-hidden rounded-[28px] bg-[hsl(60_8%_90%)] md:min-h-[680px]">
           <img src={heroImg} alt="Modern student residence in Ogbomosho"
-               className="absolute inset-0 h-full w-full object-cover object-center" />
+               className="absolute inset-0 h-full w-full object-cover object-center"
+               fetchpriority="high" decoding="async" width="1200" height="800" />
           <div className="absolute inset-0 bg-[hsl(210_53%_13%)]/15" />
           <div className="relative z-10 flex min-h-[560px] max-w-xl flex-col justify-between p-6 sm:p-10 md:min-h-[680px] md:p-14">
             <div className="w-fit rounded-full bg-white/90 px-4 py-2 text-xs font-semibold text-primary backdrop-blur">
               Verified homes for LAUTECH students
             </div>
             <div className="rounded-[24px] bg-background/95 p-6 shadow-2xl shadow-black/10 backdrop-blur sm:p-8">
-              <h1 className="font-heading text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-foreground sm:text-5xl md:text-6xl">
+              <h1 ref={headingRef} style={{ opacity: 0 }} className="font-heading text-4xl font-semibold leading-[1.02] tracking-[-0.045em] text-foreground sm:text-5xl md:text-6xl">
                 A better way to find your place.
               </h1>
-              <p className="mt-5 max-w-md text-base leading-7 text-muted-foreground">
+              <p ref={subtextRef} style={{ opacity: 0 }} className="mt-5 max-w-md text-base leading-7 text-muted-foreground">
                 Browse verified student homes, meet trusted agents, and pay rent with protection built in.
               </p>
-              <Link to="/browse"
-                className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90">
-                Browse listings <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div ref={ctaRef} style={{ opacity: 0 }} className="mt-7">
+                <Link to="/browse"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90">
+                  Browse listings <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -87,7 +138,7 @@ export function Home() {
             <Link key={type.label}
                   to={`/browse${type.query ? `?property_type=${type.query}` : ''}`}
                   className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-[hsl(60_8%_88%)]">
-              <img src={type.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
+              <img src={type.image} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" loading="lazy" decoding="async" width="800" height="600" />
               <div className="absolute inset-0 bg-black/25" />
               <div className="absolute inset-x-0 bottom-0 p-6 text-white">
                 <h3 className="text-2xl font-semibold">{type.label}</h3>
@@ -153,7 +204,7 @@ export function Home() {
       {/* How it works */}
       <section className="bg-white py-20 md:py-28">
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[1.05fr_.95fr] lg:items-center">
-          <img src={interiorImg} alt="Bright student apartment interior" className="aspect-[4/3] w-full rounded-[24px] object-cover" />
+          <img src={interiorImg} alt="Bright student apartment interior" className="aspect-[4/3] w-full rounded-[24px] object-cover" loading="lazy" decoding="async" width="800" height="600" />
           <div className="lg:pl-10">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Rent with clarity</p>
             <h2 className="mt-3 max-w-lg text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Protection from search to move-in.</h2>
