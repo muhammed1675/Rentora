@@ -84,7 +84,7 @@ export function Home() {
       <AppBanner />
 
       {/* Hero */}
-      <section className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 md:pb-24 md:pt-12">
+      <section data-no-motion className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 md:pb-24 md:pt-12">
         <div className="relative min-h-[560px] overflow-hidden rounded-[28px] bg-[hsl(60_8%_90%)] md:min-h-[680px]">
           <img src={heroImg} alt="Modern student residence in Ogbomosho"
                className="absolute inset-0 h-full w-full object-cover object-center"

@@ -8,6 +8,7 @@ import {
 } from './ui/dropdown-menu';
 import { ConsentBanner } from './ConsentBanner';
 import { MobileBottomNav } from './MobileBottomNav';
+import { PageMotion } from '../lib/motion';
 import { NotificationBell, NotificationBellLink } from './NotificationBell';
 
 const publicNav = [
@@ -121,7 +122,9 @@ export function Layout({ children }) {
         )}
       </header>
 
-      <main className="flex-1 pb-24 md:pb-0">{children}</main>
+      <main className="flex-1 pb-24 md:pb-0">
+        <PageMotion>{children}</PageMotion>
+      </main>
       <MobileBottomNav />
 
 <footer className="w-full border-t border-slate-200 bg-white py-20 md:py-28 text-slate-900">
