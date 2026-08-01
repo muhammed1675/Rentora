@@ -140,27 +140,18 @@ export function AuthProvider({ children }) {
         const msg = (error.message || '').toLowerCase();
         // Supabase deliberately returns the same generic error for "wrong
         // password" and "no such account" (to prevent email enumeration
-        // via the login form itself). We resolve which one actually
-        // happened below, so users know to register instead of retrying
-        // a password forever.
+        // via the login form itself). We check the public users table
+        // separately — it's already world-readable — to tell users which
+        // one actually happened, so they know to register instead of
+        // retrying a password forever.
         if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
-          // Supabase's auth endpoint won't say which one it was (by design,
-          // to prevent enumeration). We ask a SECURITY DEFINER function
-          // instead — it bypasses RLS on public.users, so it always gives
-          // a real answer instead of silently returning "no rows" if the
-          // table's read policy is ever missing or tightened.
-          const { data: exists, error: existsError } = await supabase
-            .rpc('email_exists', { p_email: email.trim() });
+          const { data: existing } = await supabase
+            .from('users')
+            .select('id')
+            .ilike('email', email.trim())
+            .maybeSingle();
 
-          if (existsError) {
-            // Couldn't determine which one it was — don't guess. Guessing
-            // wrong here is exactly the bug we're fixing (misreporting
-            // "not registered" for a simple wrong password).
-            console.warn('email_exists check failed:', existsError.message);
-            throw new Error('Incorrect email or password. Please try again.');
-          }
-
-          if (!exists) {
+          if (!existing) {
             throw new Error('This email is not registered. Please create an account first.');
           } else {
             throw new Error('Incorrect password. Please try again.');

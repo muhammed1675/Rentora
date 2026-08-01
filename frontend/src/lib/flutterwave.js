@@ -34,7 +34,7 @@ function mapChannel(channel) {
 export async function openFlutterwaveCheckout({
   reference, amount, email, name, phone, narration,
   channels, defaultChannel,
-  onSuccess, onFailed, onClose,
+  onSuccess, onFailed, onClose, onPending,
 }) {
   await loadScript();
 
@@ -70,19 +70,56 @@ export async function openFlutterwaveCheckout({
       description: narration || 'Rentora',
     },
     callback: async (data) => {
-      // The browser callback is NEVER trusted on its own — /api/confirm-payment
-      // re-verifies the charge with Flutterwave using the secret key before
-      // anything is marked paid.
-      try {
-        await paymentAPI.confirmPayment(reference);
-      } catch (err) {
-        console.error('Failed to confirm payment in DB:', err);
-      }
       try { window.FlutterwaveCheckout.close?.(); } catch (_) {}
-      if (data?.status === 'successful' || data?.status === 'completed') {
+
+      // Flutterwave's own client-side widget reporting "successful" only
+      // means the CHARGE went through — it says nothing about whether our
+      // database actually got updated. That update happens in
+      // /api/confirm-payment, which independently re-verifies the charge
+      // server-side before marking anything paid/held. Previously this
+      // function fired onSuccess based on `data.status` alone, completely
+      // ignoring whether that confirm-payment call succeeded or threw —
+      // so a user could see "Payment Successful" while the database row
+      // was still sitting at 'pending' forever (nothing ever retried the
+      // confirmation, and the failure was silently swallowed).
+      if (!(data?.status === 'successful' || data?.status === 'completed')) {
+        if (onFailed) onFailed(data);
+        return;
+      }
+
+      // The charge succeeded — now make sure our side actually recorded
+      // it. Retry a few times: there can be a brief lag between the
+      // widget reporting success and Flutterwave's own systems being
+      // ready to answer the server-side verify call confirm-payment makes.
+      const MAX_ATTEMPTS = 4;
+      const DELAYS_MS = [0, 1500, 3000, 5000];
+      let confirmed = false;
+      let lastErr = null;
+
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        if (DELAYS_MS[attempt]) await new Promise((r) => setTimeout(r, DELAYS_MS[attempt]));
+        try {
+          await paymentAPI.confirmPayment(reference);
+          confirmed = true;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.error(`confirmPayment attempt ${attempt + 1}/${MAX_ATTEMPTS} failed:`, err.message);
+        }
+      }
+
+      if (confirmed) {
         if (onSuccess) onSuccess(data?.flw_ref || data?.transaction_id || reference);
-      } else if (onFailed) {
-        onFailed(data);
+      } else {
+        // The customer WAS charged — this is not a failed payment, just an
+        // unconfirmed one. Never tell the user the payment failed here (that
+        // reads as "try again", risking a double charge). Prefer a distinct
+        // onPending callback so the caller can show an accurate message; the
+        // Flutterwave webhook (server-to-server, independent of this browser
+        // tab) will still confirm it shortly even if the user navigates away.
+        console.error('Payment charged but confirm-payment never succeeded:', lastErr?.message, reference);
+        if (onPending) onPending(reference);
+        else if (onFailed) onFailed(data);
       }
     },
     onclose: () => {

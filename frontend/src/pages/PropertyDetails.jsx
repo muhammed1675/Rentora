@@ -242,6 +242,10 @@ export function PropertyDetails() {
           toast.error('Payment was not successful. Please try again.');
           setRequestingInspection(false);
         },
+        onPending: () => {
+          toast.message('Payment received — confirming with Flutterwave now. Check your profile in a minute for your inspection details.');
+          setRequestingInspection(false);
+        },
         onClose: () => {
           setRequestingInspection(false);
         },
@@ -273,11 +277,20 @@ export function PropertyDetails() {
         name: user?.full_name || user?.email,
         narration: `Rent (held by Rentora) — ${property?.title}`,
         onSuccess: async (kref) => {
-          try { await rentAPI.markHeld(res.data.reference, kref); } catch (_) {}
+          // Note: openFlutterwaveCheckout already called and confirmed
+          // /api/confirm-payment itself before invoking this — calling
+          // rentAPI.markHeld() again here was a redundant second request
+          // to the same endpoint, and wrapping it in an empty catch meant
+          // any failure there was invisible either way. Nothing left to
+          // do here except reflect the confirmed state.
           toast.success('Rent held by Rentora. Confirm move-in from your profile to release funds.');
           setPayingRent(false);
         },
         onFailed: () => { toast.error('Payment failed. Please try again.'); setPayingRent(false); },
+        onPending: () => {
+          toast.message('Payment received — confirming with Flutterwave now. Check your profile in a minute; it will update automatically once confirmed.');
+          setPayingRent(false);
+        },
         onClose: () => setPayingRent(false),
       });
     } catch (e) {

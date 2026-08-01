@@ -59,6 +59,10 @@ export function BuyTokens() {
           toast.error('Payment was not successful. Please try again.');
           setLoading(false);
         },
+        onPending: () => {
+          toast.message('Payment received — confirming with Flutterwave now. Your wallet will update automatically once confirmed.');
+          setLoading(false);
+        },
         onClose: () => {
           setLoading(false);
         },
