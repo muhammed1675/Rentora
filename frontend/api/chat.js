@@ -20,10 +20,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Dynamic import avoids the ESM/CommonJS conflict that happens when
-    // this file is compiled to CommonJS by Vercel's build but the 'ai'
-    // package only ships an ESM build.
+    // Dynamic imports avoid the ESM/CommonJS conflict that happens when
+    // this file is compiled to CommonJS by Vercel's build but these
+    // packages only ship ESM builds.
     const { generateText } = await import('ai');
+    const { google } = await import('@ai-sdk/google');
 
     const { messages } = req.body;
 
@@ -31,20 +32,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Messages are required' });
     }
 
-    // Use the AI Gateway with default provider (OpenAI GPT-4)
+    // Talk to Google's Gemini API directly using the free-tier key
+    // (GOOGLE_GENERATIVE_AI_API_KEY set in Vercel's environment variables)
     const response = await generateText({
-      model: 'openai/gpt-4-turbo',
+      model: google('gemini-2.5-flash'),
       system: systemPrompt,
       messages: messages,
       temperature: 0.7,
-      max_tokens: 500,
+      maxOutputTokens: 500,
     });
 
     return res.status(200).json({
       content: response.text,
       usage: {
-        inputTokens: response.usage.promptTokens,
-        outputTokens: response.usage.completionTokens,
+        inputTokens: response.usage.inputTokens,
+        outputTokens: response.usage.outputTokens,
       },
     });
   } catch (error) {
