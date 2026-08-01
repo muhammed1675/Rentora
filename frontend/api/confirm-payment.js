@@ -171,14 +171,23 @@ async function handlePayment(req, res) {
       // function the instant res.status(200).json(...) is sent, which was
       // killing this email mid-flight before it ever reached Resend. Same
       // fix as the rent-held email below.
-      const tokenEmailResult = await sendTokenReceiptEmail(supabase, tokenTx).then(
-        () => ({ status: 'fulfilled' }),
-        (e) => ({ status: 'rejected', reason: e }),
-      );
-      if (tokenEmailResult.status === 'rejected') {
-        console.error(`[token receipt email] FAILED for reference=${reference}:`, tokenEmailResult.reason?.message || tokenEmailResult.reason);
-      } else {
-        console.log(`[token receipt email] OK for reference=${reference}`);
+      // 
+      // Catch email errors so they don't break the webhook: the payment has
+      // already been marked "completed" and tokens added to wallet, so the
+      // core transaction is complete. Email failures should be logged but not
+      // reported to Flutterwave (which would trigger infinite retries).
+      try {
+        const tokenEmailResult = await sendTokenReceiptEmail(supabase, tokenTx).then(
+          () => ({ status: 'fulfilled' }),
+          (e) => ({ status: 'rejected', reason: e }),
+        );
+        if (tokenEmailResult.status === 'rejected') {
+          console.error(`[token receipt email] FAILED for reference=${reference}:`, tokenEmailResult.reason?.message || tokenEmailResult.reason);
+        } else {
+          console.log(`[token receipt email] OK for reference=${reference}`);
+        }
+      } catch (emailErr) {
+        console.error(`[token receipt email] exception for reference=${reference}:`, emailErr?.message || emailErr);
       }
 
       return res.status(200).json({ ok: true, type: 'token_purchase', amount: tokenTx.amount, tokens: tokenTx.tokens_added });
@@ -214,6 +223,11 @@ async function handlePayment(req, res) {
       // and rent-held emails: Vercel can freeze/terminate the function the
       // instant res.status(200).json(...) is sent, which was killing this
       // background IIFE mid-flight before the emails ever reached Resend.
+      // 
+      // Catch email errors so they don't break the webhook: the payment has
+      // already been marked "completed" and inspection marked "assigned", so
+      // the core transaction is complete. Email failures should be logged but
+      // not reported to Flutterwave (which would trigger infinite retries).
       try {
         const emailResults = await Promise.allSettled([
           sendInspectionAgentNotify(supabase, inspTx, inspection),
@@ -228,7 +242,7 @@ async function handlePayment(req, res) {
           }
         });
       } catch (emailErr) {
-        console.error(`[inspection email] send failed for reference=${reference}:`, emailErr);
+        console.error(`[inspection email] exception for reference=${reference}:`, emailErr?.message || emailErr);
       }
 
       return res.status(200).json({ ok: true, type: 'inspection', amount: inspTx.amount, agent_name: inspection?.agent_name, property_title: inspection?.property_title });
@@ -256,19 +270,31 @@ async function handlePayment(req, res) {
       // in-flight request to send-email before it reached Resend. That's why
       // the agent's "Rent Paid — Held" email wasn't arriving even though the
       // payment itself was correctly marked "held".
-      const heldEmailResult = await sendRentHeldEmail(supabase, rentTx).then(
-        () => ({ status: 'fulfilled' }),
-        (e) => ({ status: 'rejected', reason: e }),
-      );
-      if (heldEmailResult.status === 'rejected') {
-        console.error(`[rent held email] FAILED for reference=${reference}:`, heldEmailResult.reason?.message || heldEmailResult.reason);
-      } else {
-        console.log(`[rent held email] OK for reference=${reference}`);
+      // 
+      // Catch email errors so they don't break the webhook: the payment has
+      // already been marked "held" in the database, so the core transaction
+      // is complete. Email failures should be logged but not reported to
+      // Flutterwave (which would trigger infinite retries).
+      try {
+        const heldEmailResult = await sendRentHeldEmail(supabase, rentTx).then(
+          () => ({ status: 'fulfilled' }),
+          (e) => ({ status: 'rejected', reason: e }),
+        );
+        if (heldEmailResult.status === 'rejected') {
+          console.error(`[rent held email] FAILED for reference=${reference}:`, heldEmailResult.reason?.message || heldEmailResult.reason);
+        } else {
+          console.log(`[rent held email] OK for reference=${reference}`);
+        }
+      } catch (emailErr) {
+        console.error(`[rent held email] exception for reference=${reference}:`, emailErr?.message || emailErr);
       }
 
       return res.status(200).json({ ok: true, type: 'rent', amount: rentTx.total_amount, agent_fee: rentTx.agent_fee });
     }
   } catch (err) {
+    // Payment confirmation failed — don't return 200.
+    // Return 500 so Flutterwave retries: a payment stuck as "pending" is
+    // better than one silently marked "paid" when we never checked it.
     console.error('confirm-payment: unexpected error', err);
     return res.status(500).json({ error: 'Failed to confirm payment', detail: String(err?.message || err) });
   }
