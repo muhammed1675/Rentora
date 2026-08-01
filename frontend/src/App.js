@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { Toaster } from "./components/ui/sonner";
 import Layout from "./components/Layout";
-import SupportChatbot from "./components/SupportChatbot";
 import { initializeAnalytics, trackPageView } from "./lib/analytics";
 
 // Pages
@@ -155,7 +154,6 @@ function App() {
       <BrowserRouter>
         <AppRoutes />
         <Toaster position="top-center" expand toastOptions={{ style: { maxWidth: '92vw' } }} />
-        <SupportChatbot />
       </BrowserRouter>
     </AuthProvider>
   );
