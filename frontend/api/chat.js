@@ -1,5 +1,3 @@
-import { generateText } from 'ai';
-
 const systemPrompt = `You are a helpful customer support assistant for Rentora, a student housing platform in Nigeria. 
 Your role is to guide visitors and answer questions about:
 - How to find and book properties on Rentora
@@ -22,6 +20,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Dynamic import avoids the ESM/CommonJS conflict that happens when
+    // this file is compiled to CommonJS by Vercel's build but the 'ai'
+    // package only ships an ESM build.
+    const { generateText } = await import('ai');
+
     const { messages } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
