@@ -88,7 +88,7 @@ export default function SupportChatbot() {
       {isOpen && !isMinimized && (
         <div className="mb-4 w-96 h-[500px] bg-white rounded-lg shadow-2xl border border-gray-200 flex flex-col animate-in slide-in-from-bottom-4">
           {/* Header */}
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+          <div className="bg-[#0062ad] text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
               <MessageCircle size={20} />
               <h3 className="font-semibold">Rentora Support</h3>
@@ -96,14 +96,14 @@ export default function SupportChatbot() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsMinimized(true)}
-                className="hover:bg-orange-700 p-1 rounded transition-colors"
+                className="hover:bg-[#004d88] p-1 rounded transition-colors"
                 aria-label="Minimize chat"
               >
                 <Minimize2 size={18} />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="hover:bg-orange-700 p-1 rounded transition-colors"
+                className="hover:bg-[#004d88] p-1 rounded transition-colors"
                 aria-label="Close chat"
               >
                 <X size={18} />
@@ -121,7 +121,7 @@ export default function SupportChatbot() {
                 <div
                   className={`max-w-xs px-4 py-2 rounded-lg ${
                     msg.sender === 'user'
-                      ? 'bg-orange-500 text-white rounded-br-none'
+                      ? 'bg-[#0062ad] text-white rounded-br-none'
                       : 'bg-gray-200 text-gray-900 rounded-bl-none'
                   }`}
                 >
@@ -163,13 +163,13 @@ export default function SupportChatbot() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Type your question..."
-                className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0062ad]"
                 disabled={isLoading}
               />
               <button
                 type="submit"
                 disabled={isLoading || !inputValue.trim()}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded transition-colors flex items-center gap-1"
+                className="bg-[#0062ad] hover:bg-[#004d88] disabled:bg-gray-400 text-white px-4 py-2 rounded transition-colors flex items-center gap-1"
                 aria-label="Send message"
               >
                 <Send size={16} />
@@ -199,7 +199,7 @@ export default function SupportChatbot() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all flex items-center justify-center"
+          className="w-14 h-14 bg-[#0062ad] text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all flex items-center justify-center"
           aria-label="Open support chat"
         >
           <MessageCircle size={24} />
