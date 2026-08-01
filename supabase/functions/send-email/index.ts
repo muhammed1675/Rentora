@@ -317,6 +317,25 @@ function emailAdminPaymentAlert(d: any) {
   `);
 }
 
+// Generic admin alert for any site event that isn't a payment (new listing
+// submitted, new agent verification request, new withdrawal request, a
+// property report, a contact form message, a student reporting move-in,
+// etc). One shared template instead of one per event type — callers pass
+// whatever rows are relevant via `breakdown`.
+function emailAdminActivityAlert(d: any) {
+  const rows = (d.breakdown || [])
+    .map((r: any[]) => `<div class="card-row"><span class="label">${r[0]}</span><span class="value">${r[1]}</span></div>`)
+    .join("");
+  return baseTemplate(`
+    <span class="eyebrow">Admin notification</span>
+    <div class="badge badge-blue">${d.event_label || "New activity"}</div>
+    <h2>${d.title || "Something happened on Rentora"}</h2>
+    ${d.summary ? `<p>${d.summary}</p>` : ""}
+    ${rows ? `<div class="card">${rows}</div>` : ""}
+    <a href="${d.action_url || "https://www.rentora.com.ng/admin"}" class="btn">Open Admin Dashboard</a>
+  `);
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -399,6 +418,11 @@ serve(async (req) => {
         const label = data.outcome === "success" ? "Payment received" : data.outcome === "duplicate" ? "Duplicate payment callback" : "Payment FAILED";
         subject = `[Rentora Admin] ${label}: ${data.payment_type || "payment"} — ${data.reference}`;
         html = emailAdminPaymentAlert(data);
+        break;
+      }
+      case "admin_activity_alert": {
+        subject = `[Rentora Admin] ${data.title || "New activity"}`;
+        html = emailAdminActivityAlert(data);
         break;
       }
       default:

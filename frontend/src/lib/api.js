@@ -14,6 +14,49 @@ const generateReference = (prefix) => {
 const withLocationName = (row) => row ? { ...row, location: row.locations?.name || null } : row;
 const withLocationNames = (rows) => (rows || []).map(withLocationName);
 
+// Emails every admin (users.role = 'admin') about a significant site event —
+// a new listing submitted, a new agent verification request, a withdrawal
+// request, a property report, a contact message, a student reporting
+// move-in, and so on. Uses the generic 'admin_activity_alert' template in
+// the send-email edge function (see supabase/functions/send-email) so new
+// event types don't each need their own template.
+//
+// Best-effort only: never allowed to throw or block the calling flow — a
+// failed admin email should never stop a listing from being submitted, a
+// report from being filed, etc.
+const notifyAdmins = async ({ title, eventLabel, summary, breakdown, actionUrl }) => {
+  try {
+    const { data: admins, error } = await supabase.from('users').select('email, full_name').eq('role', 'admin');
+    if (error || !admins?.length) return;
+
+    const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+    const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+
+    await Promise.allSettled(
+      admins.filter((a) => a.email).map((admin) =>
+        fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({
+            type: 'admin_activity_alert',
+            to: admin.email,
+            data: {
+              title,
+              event_label: eventLabel,
+              summary,
+              breakdown: breakdown || [],
+              action_url: actionUrl,
+              admin_name: admin.full_name || 'Admin',
+            },
+          }),
+        })
+      )
+    );
+  } catch (e) {
+    console.warn(`notifyAdmins(${title}) failed:`, e.message);
+  }
+};
+
 // ============== LOCATION APIs ==============
 
 export const locationAPI = {
@@ -133,6 +176,19 @@ export const propertyAPI = {
       `Your property "${data.title || 'listing'}" has been submitted and is pending review.`,
       '/agent'
     );
+
+    notifyAdmins({
+      title: `New listing awaiting review: ${data.title || 'Untitled property'}`,
+      eventLabel: 'New listing',
+      summary: `${user.full_name || 'An agent'} submitted a new property listing that needs approval before it goes live.`,
+      breakdown: [
+        ['Property', data.title || '—'],
+        ['Price', data.price ? `NGN ${Number(data.price).toLocaleString('en-NG')}` : '—'],
+        ['Agent', user.full_name || '—'],
+        ['Agent email', user.email || '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
 
     return { data: { property_id: propertyId } };
   },
@@ -481,7 +537,19 @@ export const verificationAPI = {
         account_name: data.account_name || null,
         status: 'pending'
       });
-    
+
+    notifyAdmins({
+      title: `New agent verification request from ${user.full_name || user.email}`,
+      eventLabel: 'Agent verification',
+      summary: `${user.full_name || 'A user'} applied to become a verified agent and is waiting for review.`,
+      breakdown: [
+        ['Applicant', user.full_name || '—'],
+        ['Email', user.email || '—'],
+        ['Address', data.address || '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
+
     return { data: { message: 'Verification request submitted', request_id: requestId } };
   },
 
@@ -857,6 +925,20 @@ export const reportAPI = {
         details: details || null,
       });
     if (error) throw new Error(error.message || 'Failed to submit report');
+
+    notifyAdmins({
+      title: `New property report: ${reason}`,
+      eventLabel: 'Property report',
+      summary: `${user.full_name || 'A user'} reported a property listing.`,
+      breakdown: [
+        ['Reporter', user.full_name || '—'],
+        ['Reporter email', user.email || '—'],
+        ['Reason', reason || '—'],
+        ['Details', details || '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
+
     return { data: { ok: true } };
   },
 
@@ -900,6 +982,20 @@ export const contactAPI = {
         status: 'unread',
       });
     if (error) throw error;
+
+    notifyAdmins({
+      title: `New contact message: ${data.subject || 'No subject'}`,
+      eventLabel: 'Contact message',
+      summary: `${data.name || 'Someone'} sent a message through the contact form.`,
+      breakdown: [
+        ['From', data.name || '—'],
+        ['Email', data.email || '—'],
+        ['Subject', data.subject || '—'],
+        ['Message', data.message || '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
+
     return { data: { message: 'Message submitted' } };
   },
 
@@ -1051,6 +1147,24 @@ export const withdrawalAPI = {
         requested_at: new Date().toISOString(),
       });
     if (insertRes.error) throw new Error(insertRes.error.message);
+
+    notifyAdmins({
+      title: `New withdrawal request from ${agentName || agentEmail}`,
+      eventLabel: 'Withdrawal request',
+      summary: `${agentName || 'An agent'} requested a payout. It needs to be processed and marked paid once sent.`,
+      breakdown: [
+        ['Agent', agentName || '—'],
+        ['Agent email', agentEmail || '—'],
+        ['Amount requested', `NGN ${Number(amount).toLocaleString('en-NG')}`],
+        ['Fee (1.3%)', `NGN ${fee.toLocaleString('en-NG')}`],
+        ['Net payout', `NGN ${net.toLocaleString('en-NG')}`],
+        ['Bank', bankName || '—'],
+        ['Account number', accountNumber || '—'],
+        ['Account name', accountName || '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
+
     return { data: { ok: true, fee, net } };
   },
 
@@ -1280,12 +1394,27 @@ export const rentAPI = {
       .eq('id', rentPaymentId)
       .eq('user_id', userId)
       .eq('status', 'held')
-      .select('id');
+      .select('id, reference, rent_amount, property:properties(title), student:users!property_rent_payments_user_id_fkey(full_name, email)');
     if (error) throw error;
 
     // No row matched — already reported (slow double-click / retry), or not
     // actually held. Don't treat this as a failure either way.
     if (!updatedRows || updatedRows.length === 0) return;
+
+    const row = updatedRows[0];
+    notifyAdmins({
+      title: `Move-in reported: ${row.property?.title || 'a property'}`,
+      eventLabel: 'Move-in review needed',
+      summary: `${row.student?.full_name || 'A student'} reported moving in and uploaded proof. Review the photo and release funds to the agent once confirmed.`,
+      breakdown: [
+        ['Property', row.property?.title || '—'],
+        ['Student', row.student?.full_name || '—'],
+        ['Student email', row.student?.email || '—'],
+        ['Reference', row.reference || '—'],
+        ['Rent amount', row.rent_amount ? `NGN ${Number(row.rent_amount).toLocaleString('en-NG')}` : '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
   },
 
   // Admin previews the move-in photo and confirms it's genuine → THIS is
