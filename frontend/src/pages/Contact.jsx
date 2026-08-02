@@ -112,7 +112,14 @@ export function Contact() {
               <div>
                 <p className="font-semibold text-sm">Email Us</p>
                 <p className="text-xs text-foreground/55 mt-1">We reply within 24 hours</p>
-                <p className="text-sm text-primary mt-1 font-medium">support@rentora.com.ng</p>
+                <div className="mt-1">
+                  <p className="text-xs text-foreground/55">Customer support, account/property issues</p>
+                  <p className="text-sm text-primary font-medium">support@rentora.com.ng</p>
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs text-foreground/55">Partnerships, media, general business</p>
+                  <p className="text-sm text-primary font-medium">hello@rentora.com.ng</p>
+                </div>
               </div>
             </div>
           </Card>
@@ -126,6 +133,7 @@ export function Contact() {
                 <p className="font-semibold text-sm">Call Us</p>
                 <p className="text-xs text-foreground/55 mt-1">Mon – Fri, 9am – 5pm</p>
                 <p className="text-sm text-primary mt-1 font-medium">+234 913 113 3832</p>
+                <p className="text-sm text-primary mt-1 font-medium">+234 908 561 8894</p>
               </div>
             </div>
           </Card>
