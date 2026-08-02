@@ -22,8 +22,10 @@ Rentora/
 │   │   ├── 05_indexes.sql
 │   │   └── 06_storage.sql
 │   └── functions/            # Edge Functions (Deno)
+│       ├── _shared/          # email-config.ts — centralized sender/reply-to config
 │       ├── resolve-bank/     # Verifies bank accounts via Flutterwave
-│       └── send-email/       # Transactional email via Resend
+│       ├── send-email/       # Transactional email via Resend
+│       └── delete-account/   # Account deletion + confirmation email
 ├── legal-documents/          # CAC certificate, TIN, and other Nigerian registration docs
 ├── .gitignore
 ├── README.md
@@ -94,13 +96,32 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
    supabase link --project-ref YOUR-PROJECT-REF
    supabase functions deploy resolve-bank
    supabase functions deploy send-email
-   supabase secrets set FLW_SECRET_KEY=sk_live_xxx RESEND_API_KEY=re_xxx FROM_EMAIL=no-reply@yourdomain.com
+   supabase functions deploy delete-account
+   supabase secrets set FLW_SECRET_KEY=sk_live_xxx RESEND_API_KEY=re_xxx \
+     EMAIL_ADDR_SUPPORT=support@yourdomain.com \
+     EMAIL_ADDR_BILLING=billing@yourdomain.com \
+     EMAIL_ADDR_NOREPLY=noreply@yourdomain.com
    ```
+   All three `EMAIL_ADDR_*` secrets are read by `supabase/functions/_shared/email-config.ts`,
+   which every email-sending function imports — this is the single place
+   that decides which address an email comes from. See that file's comments
+   for the full type → sender mapping (financial receipts/escrow → billing@,
+   everything else automated → noreply@, admin replies to the contact form →
+   support@ via `frontend/api/send-reply.js`, unrelated to these secrets).
 6. Configure **Authentication → URL Configuration**:
    - Site URL: `https://yourdomain.com`
    - Redirect URLs: add both `https://yourdomain.com/**` and `http://localhost:3000/**`
 7. Enable any OAuth providers you use (Google, etc.) under Authentication → Providers.
-8. (Optional) Customise email templates under Authentication → Email Templates.
+8. Configure **Authentication → Emails → SMTP Settings**: enable Custom SMTP
+   (Supabase's default mailer is rate-limited and only delivers to team-member
+   addresses — unusable in production). Recommended: point it at Resend's SMTP
+   relay (`smtp.resend.com`, port 465, user `resend`, password = a Resend API
+   key) so auth emails ride the same verified domain as everything else.
+   Sender email: `noreply@yourdomain.com`. Sender name: `Rentora`. Note:
+   Supabase's Auth SMTP has no per-template Reply-To field, so built-in auth
+   emails (signup confirmation, password reset, magic link) can't be routed
+   to support@ the way the custom emails below can.
+9. (Optional) Customise email templates under Authentication → Email Templates.
 
 ---
 

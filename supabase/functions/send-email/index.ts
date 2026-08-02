@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { senderFor, replyToFor } from "../_shared/email-config.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FROM = "Rentora <support@rentora.com.ng>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -336,14 +336,20 @@ function emailAdminActivityAlert(d: any) {
   `);
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string, subject: string, html: string, emailType: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+    body: JSON.stringify({
+      from: senderFor(emailType),
+      to: [to],
+      reply_to: replyToFor(emailType),
+      subject,
+      html,
+    }),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -429,8 +435,8 @@ serve(async (req) => {
         throw new Error(`Unknown email type: ${type}`);
     }
 
-    await sendEmail(to, subject, html);
-    console.log(`Email sent successfully to ${to}`);
+    await sendEmail(to, subject, html, type);
+    console.log(`Email sent successfully to ${to} (type=${type}, from=${senderFor(type)})`);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

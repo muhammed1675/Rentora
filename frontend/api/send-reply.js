@@ -1,10 +1,16 @@
 // frontend/api/send-reply.js — Vercel Edge Function
 // Sends admin replies to contact messages via Resend
 
+import { senderForReply } from './_email-config.js';
+
 export const config = { runtime: 'edge' };
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Rentora Support <support@rentora.com.ng>';
+// Admin replies to contact-form messages are always a human conversation,
+// so this always comes from support@ (no subject-based routing in Phase 1).
+// See _email-config.js — set EMAIL_ADDR_SUPPORT in Vercel to change the
+// address without touching this file.
+const FROM_EMAIL = senderForReply();
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -65,6 +71,7 @@ export default async function handler(req) {
       body: JSON.stringify({
         from: FROM_EMAIL,
         to: [to],
+        reply_to: process.env.EMAIL_ADDR_SUPPORT || 'support@rentora.com.ng',
         subject: `Re: ${subject}`,
         html,
       }),

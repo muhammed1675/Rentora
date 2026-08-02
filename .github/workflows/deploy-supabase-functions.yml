@@ -1,0 +1,41 @@
+name: Deploy Supabase Edge Functions
+
+# Runs automatically whenever anything under supabase/functions changes on
+# main — pushing the updated project to GitHub is the only step needed.
+# No local Supabase CLI, Docker, or PC setup required; this runs entirely
+# on GitHub's runners using two repo secrets (see README note below).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/**"
+  workflow_dispatch: {}   # lets you re-run manually from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Deploys every function under supabase/functions in one call,
+      # including the shared _shared/email-config.ts import used by
+      # send-email and delete-account.
+      - name: Deploy all Edge Functions
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+# ── One-time setup (do this once, in your browser, before the first push) ──
+# GitHub → this repo → Settings → Secrets and variables → Actions → New repository secret
+#   SUPABASE_ACCESS_TOKEN  — Supabase Dashboard → your avatar (top-right) → Access Tokens → Generate new token
+#   SUPABASE_PROJECT_ID    — Supabase Dashboard → Project Settings → General → Reference ID
+#
+# Function-level env vars (RESEND_API_KEY, EMAIL_ADDR_SUPPORT, EMAIL_ADDR_BILLING,
+# EMAIL_ADDR_NOREPLY, FLW_SECRET_KEY) are NOT set here — those go in Supabase
+# Dashboard → Project Settings → Edge Functions → Secrets, a one-time browser step,
+# no CLI needed.

@@ -2,11 +2,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { senderFor, replyToFor } from "../_shared/email-config.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const FROM = "Rentora <support@rentora.com.ng>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,8 +31,9 @@ async function sendAccountDeletedEmail(to: string, name: string) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: FROM,
+        from: senderFor("account_deleted"),
         to: [to],
+        reply_to: replyToFor("account_deleted"),
         subject: "Your Rentora account has been deleted",
         html: `
           <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#153E75;">
