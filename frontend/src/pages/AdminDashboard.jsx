@@ -2160,8 +2160,8 @@ export function AdminDashboard() {
                 </div>
               )}
               {/* Pricing & Fees — everything the agent entered */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pricing &amp; Fees</p>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Pricing &amp; Fees</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="p-2 rounded-lg bg-muted/40">
                     <p className="text-xs text-muted-foreground">Rent (yearly)</p>
@@ -2171,7 +2171,7 @@ export function AdminDashboard() {
                     <p className="text-xs text-muted-foreground">Inspection Fee</p>
                     <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
                   </div>
-                    <div className="p-3 rounded-lg border border-blue-200">
+                  <div className="p-3 rounded-lg border border-blue-200">
                     <p className="text-xs text-muted-foreground">Recurring Payment</p>
                     <p className="font-semibold">{formatPrice(previewProperty.recurring_payment)}</p>
                   </div>
@@ -2185,9 +2185,10 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
+              
               {/* Contact info the agent provided for this listing */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Listing Contact</p>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Listing Contact</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="p-2 rounded-lg bg-muted/40">
                     <p className="text-xs text-muted-foreground">Contact Name</p>
@@ -2199,6 +2200,7 @@ export function AdminDashboard() {
                   </div>
                 </div>
               </div>
+              
               {/* Property Owner — visible to admin at every stage, including before approval */}
               <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                 <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Property Owner</p>
@@ -2217,6 +2219,7 @@ export function AdminDashboard() {
                   <p className="text-sm text-red-600 font-medium">Missing — this listing cannot accept a rent payment until the agent adds owner details.</p>
                 )}
               </div>
+              
               {/* Status & availability at a glance */}
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="capitalize">Status: {previewProperty.status}</Badge>
