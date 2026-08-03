@@ -102,7 +102,7 @@ export function AgentDashboard() {
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   const [locations, setLocations] = useState([]);
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location_id: '', address: '',
+    title: '', description: '', price: '', caution_fee: '', recurring_payment: '', inspection_fee: '3000', location_id: '', address: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
     owner_full_name: '', owner_phone: '',
     google_maps_link: '', amenities: [],
@@ -287,7 +287,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', inspection_fee: '3000', location_id: '', address: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
+    setFormData({ title: '', description: '', price: '', caution_fee: '', recurring_payment: '', inspection_fee: '3000', location_id: '', address: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
     setEditingProperty(null);
   };
 
@@ -297,6 +297,7 @@ export function AgentDashboard() {
       setFormData({
         title: property.title, description: property.description, price: property.price.toString(),
         caution_fee: property.caution_fee ? property.caution_fee.toString() : '',
+        recurring_payment: property.recurring_payment ? property.recurring_payment.toString() : '',
         inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
         location_id: property.location_id ? String(property.location_id) : '', address: property.address || '', property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
@@ -338,7 +339,7 @@ export function AgentDashboard() {
         if (!proceed) return;
       }
 
-      const data = { ...formData, location_id: locationIdVal, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, inspection_fee: inspectionFeeVal, images: formData.images };
+      const data = { ...formData, location_id: locationIdVal, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, recurring_payment: formData.recurring_payment ? parseInt(formData.recurring_payment) : null, inspection_fee: inspectionFeeVal, images: formData.images };
       if (editingProperty) {
         // Any edit to an existing listing's details must go back through admin
         // approval — status: 'pending' is enough to pull it out of "approved"
@@ -1153,6 +1154,11 @@ export function AgentDashboard() {
                   </div>
                 </div>
                 <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
+                <div className="space-y-2">
+                  <Label>Recurring Payment (₦/year)<span className="text-xs text-muted-foreground font-normal ml-1">optional</span></Label>
+                  <Input type="number" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" />
+                  <p className="text-xs text-muted-foreground">Shown to students as what they'll pay after their first payment (e.g. next year's rent). Not collected by Rentora.</p>
+                </div>
               </div>
             </div>
 

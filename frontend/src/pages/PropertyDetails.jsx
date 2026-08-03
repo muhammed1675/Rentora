@@ -540,6 +540,22 @@ export function PropertyDetails() {
             <p className="text-sm text-muted-foreground">Annual Rent</p>
             <p className="text-3xl sm:text-4xl font-bold text-primary mt-1 break-words">{formatPrice(property.price)}</p>
             <p className="text-sm text-muted-foreground">/year</p>
+
+            {property?.recurring_payment > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg border border-border/60 p-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Starting From</p>
+                  <p className="mt-0.5 truncate text-lg font-bold">{formatPrice(property.price)}</p>
+                </div>
+                <div className="min-w-0 border-l border-border/60 pl-3">
+                  <p className="text-xs text-muted-foreground">Recurring Payment</p>
+                  <p className="mt-0.5 truncate text-lg font-bold">
+                    {formatPrice(property.recurring_payment)}<span className="text-xs font-normal text-muted-foreground">/year</span>
+                  </p>
+                </div>
+              </div>
+            )}
+
             {(property.caution_fee || property.price) && (
               <div className="mt-4 pt-4 border-t border-border/60 space-y-2">
                 {property.caution_fee > 0 && (

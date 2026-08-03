@@ -178,7 +178,8 @@ CREATE TABLE IF NOT EXISTS public.properties (
     google_maps_link text,
     amenities text[]  DEFAULT '{}'::text[],
     location_id integer,
-    address text
+    address text,
+    recurring_payment numeric
 );
 
 -- ── property_rent_payments ──────────────────────────────
