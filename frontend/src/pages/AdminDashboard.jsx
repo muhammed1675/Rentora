@@ -2171,7 +2171,7 @@ export function AdminDashboard() {
                     <p className="text-xs text-muted-foreground">Inspection Fee</p>
                     <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
                   </div>
-                    <div className="p-2 rounded-lg bg-muted/40">
+                    <div className="p-3 rounded-lg border border-blue-200">
                     <p className="text-xs text-muted-foreground">Recurring Payment</p>
                     <p className="font-semibold">{formatPrice(previewProperty.recurring_payment)}</p>
                   </div>
