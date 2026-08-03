@@ -2206,11 +2206,11 @@ export function AdminDashboard() {
                 <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Property Owner</p>
                 {previewProperty.owner_full_name ? (
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
+                    <div p-3 rounded-lg border border-blue-200>
                       <p className="text-xs text-muted-foreground">Full Name</p>
                       <p className="font-semibold">{previewProperty.owner_full_name}</p>
                     </div>
-                    <div>
+                    <div p-3 rounded-lg border border-blue-200>
                       <p className="text-xs text-muted-foreground">Phone</p>
                       <p className="font-semibold">{previewProperty.owner_phone || '—'}</p>
                     </div>
