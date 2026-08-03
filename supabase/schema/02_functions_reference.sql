@@ -172,12 +172,19 @@ BEGIN
 END;
 
 -- ── handle_new_user ──────────────────────────────
+-- Fixed 2026-08-03: now also persists phone from signup metadata,
+-- so a fresh Supabase project set up from this file won't hit the
+-- "phone not saving" bug. Full runnable statement (not just a body,
+-- since SETUP.md has new buyers run this file directly):
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
 BEGIN
-    INSERT INTO public.users (id, email, full_name, role, suspended)
+    INSERT INTO public.users (id, email, full_name, phone, role, suspended)
     VALUES (
         NEW.id,
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+        NEW.raw_user_meta_data->>'phone',
         'user',
         false
     )
@@ -192,6 +199,7 @@ EXCEPTION WHEN OTHERS THEN
     -- Never let trigger errors block signup
     RETURN NEW;
 END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ── set_withdrawal_fee ──────────────────────────────
 BEGIN
@@ -444,4 +452,3 @@ SELECT
     )
   ORDER BY similarity_score DESC
   LIMIT 5;
-
