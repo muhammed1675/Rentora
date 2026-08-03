@@ -102,7 +102,7 @@ export function AgentDashboard() {
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   const [locations, setLocations] = useState([]);
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', caution_fee: '', recurring_payment: '', inspection_fee: '3000', location_id: '', address: '',
+    title: '', description: '', price: '', caution_fee: '', recurring_payment: '', inspection_fee: '', location_id: '', address: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
     owner_full_name: '', owner_phone: '',
     google_maps_link: '', amenities: [],
