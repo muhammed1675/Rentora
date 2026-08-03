@@ -2171,6 +2171,10 @@ export function AdminDashboard() {
                     <p className="text-xs text-muted-foreground">Inspection Fee</p>
                     <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
                   </div>
+                    <div className="p-2 rounded-lg bg-muted/40">
+                    <p className="text-xs text-muted-foreground">Recurring Payment</p>
+                    <p className="font-semibold">{formatPrice(previewProperty.recurring_payment)}</p>
+                  </div>
                   <div className="p-2 rounded-lg bg-muted/40">
                     <p className="text-xs text-muted-foreground">Caution Fee</p>
                     <p className="font-semibold">{previewProperty.caution_fee ? formatPrice(previewProperty.caution_fee) : '—'}</p>

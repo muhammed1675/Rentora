@@ -1155,7 +1155,7 @@ export function AgentDashboard() {
                 </div>
                 <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
                 <div className="space-y-2">
-                  <Label>Recurring Payment (₦/year)<span className="text-xs text-muted-foreground font-normal ml-1">optional</span></Label>
+                  <Label>Recurring Payment (₦/year)</Label>
                   <Input type="number" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" />
                   <p className="text-xs text-muted-foreground">Shown to students as what they'll pay after their first payment (e.g. next year's rent). Not collected by Rentora.</p>
                 </div>
