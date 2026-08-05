@@ -40,7 +40,7 @@ function formatSender(role: SenderRole): string {
 // ── Reply-To rules ──────────────────────────────────────────────────
 // Per the approved architecture:
 //   - Authentication / account emails            → Reply-To: support@
-//   - Property & inspection notifications         → Reply-To: support@
+//   - Property & viewing notifications         → Reply-To: support@
 //   - Financial transaction emails                → Reply-To: billing@
 //   - Internal admin alerts (any kind)             → Reply-To: support@
 //     (an admin replying to an internal alert about a withdrawal request,
@@ -57,7 +57,7 @@ const REPLY_TO_BY_ROLE: Record<SenderRole, string> = {
 // from. Only emails whose PRIMARY purpose is a financial transaction
 // (receipts, escrow hold/release, payment confirmations, future refunds/
 // invoices/withdrawals) are on `billing`. Everything else — including
-// inspection booking/confirmation/reminder emails, and ALL internal admin
+// viewing booking/confirmation/reminder emails, and ALL internal admin
 // alerts (including payment and withdrawal alerts, which are internal
 // system notifications, not customer-facing financial communications) —
 // stays on `noreply`. Admin replies to contact messages are handled
@@ -71,10 +71,10 @@ export const EMAIL_CATEGORY: Record<string, SenderRole> = {
   property_approved: "noreply",
   account_deleted: "noreply",
 
-  // Inspection notifications — booking, confirmation, reminders. Kept off
+  // Viewing notifications — booking, confirmation, reminders. Kept off
   // billing@ even though inspection_booked includes a fee-paid receipt
   // line, because the PRIMARY purpose of these emails is confirming the
-  // inspection, not a financial transaction.
+  // viewing, not a financial transaction.
   inspection_booked: "noreply",
   inspection_agent_notify: "noreply",
 

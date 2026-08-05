@@ -20,13 +20,18 @@ export function AuthCallback() {
 
     (async () => {
       try {
-        await completeOAuthSignIn();
+        const profile = await completeOAuthSignIn();
         toast.success('Welcome!');
-        navigate('/browse', { replace: true });
+        // Google sign-up still has to pass student verification: send them
+        // straight to the document + selfie upload page until approved.
+        const needsVerification =
+          profile?.role === 'user' && profile?.verification_status !== 'approved';
+        navigate(needsVerification ? '/verify-account' : '/browse', { replace: true });
       } catch (err) {
         setError(err.message || 'Failed to sign in with Google.');
       }
     })();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

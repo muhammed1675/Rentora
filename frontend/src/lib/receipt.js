@@ -1,5 +1,5 @@
 // Generates a simple, clean PNG receipt entirely client-side and triggers
-// a download. Used for token purchases, inspection payments, and rent
+// a download. Used for token purchases, viewing payments, and rent
 // payments wherever a "Download Receipt" button appears.
 
 const NAVY = '#1B3A6B';

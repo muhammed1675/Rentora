@@ -65,8 +65,9 @@ export function Register() {
       if (result?.requiresConfirmation) {
         setConfirmed(true);
       } else {
-        toast.success('Account created successfully!');
-        navigate('/browse');
+        toast.success('Account created! Next: verify you are a LAUTECH student.');
+        navigate('/verify-account');
+
       }
     } catch (error) {
       toast.error(error.message || 'Registration failed');

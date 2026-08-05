@@ -72,7 +72,7 @@ export function PaymentCallback() {
               <div className="text-left bg-muted rounded-lg p-4 my-4">
                 <p className="text-sm text-muted-foreground">Type</p>
                 <p className="font-medium capitalize mb-2">
-                  Inspection Fee
+                  Viewing Fee
                 </p>
                 <p className="text-sm text-muted-foreground">Amount</p>
                 <p className="font-medium mb-2">{formatPrice(paymentDetails.amount)}</p>

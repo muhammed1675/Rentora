@@ -19,7 +19,7 @@ export function AgentRequirements() {
       title: 'Property Verification',
       items: [
         'Proof of property ownership or authorized agency agreement',
-        'Property inspection approval from Rentora team',
+        'Property viewing approval from Rentora team',
         'Accurate property photos and descriptions',
       ],
     },
@@ -55,7 +55,7 @@ export function AgentRequirements() {
   const steps = [
     { title: 'Submit Application', desc: 'Fill out the agent application form with your details' },
     { title: 'Document Verification', desc: 'Upload required documents for identity and property verification' },
-    { title: 'Property Inspection', desc: 'Our team will schedule a property inspection' },
+    { title: 'Property Viewing', desc: 'Our team will schedule a property viewing' },
     { title: 'Approval & Onboarding', desc: 'Get approved and start listing properties within 3-5 days' },
   ];
 

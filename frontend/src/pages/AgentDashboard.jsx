@@ -91,10 +91,10 @@ export function AgentDashboard() {
   const { user, isAuthenticated, isAgent, isAdmin } = useAuth();
   const fileInputRef = useRef(null);
 
-  // Properties & inspections
+  // Properties & viewings
   const [properties, setProperties] = useState([]);
   const [rentPaymentsByProperty, setRentPaymentsByProperty] = useState({});
-  const [inspections, setInspections] = useState([]);
+  const [viewings, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPropertyDialog, setShowPropertyDialog] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
@@ -362,16 +362,16 @@ export function AgentDashboard() {
 
   const handleMarkCompleted = async (inspectionId) => {
     try {
-      // Just marks that the physical inspection took place. Agent payout
+      // Just marks that the physical viewing took place. Agent payout
       // already happened via the DB trigger when payment_status turned
       // 'completed' (see credit_agent_balance() in supabase_migration_v2.sql) —
       // this used to ALSO manually credit a hardcoded ₦2,100 here, which
-      // double-paid the agent on every completed inspection. Removed.
+      // double-paid the agent on every completed viewing. Removed.
       await inspectionAPI.update(inspectionId, { status: 'completed' });
       toast.success('Inspection marked as completed');
       fetchData();
     } catch (error) {
-      toast.error('Failed to update inspection');
+      toast.error('Failed to update viewing');
     }
   };
 
@@ -456,7 +456,7 @@ export function AgentDashboard() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Agent Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Manage your properties and inspections</p>
+          <p className="text-muted-foreground mt-1 text-sm">Manage your properties and viewings</p>
         </div>
         <Button
           onClick={() => {
@@ -487,7 +487,7 @@ export function AgentDashboard() {
         <Card className="p-4"><p className="text-2xl font-bold">{properties.length}</p><p className="text-sm text-muted-foreground">Total Properties</p></Card>
         <Card className="p-4"><p className="text-2xl font-bold text-green-600">{properties.filter(p => p.status === 'approved').length}</p><p className="text-sm text-muted-foreground">Approved</p></Card>
         <Card className="p-4"><p className="text-2xl font-bold text-yellow-600">{properties.filter(p => p.status === 'pending').length}</p><p className="text-sm text-muted-foreground">Pending</p></Card>
-        <Card className="p-4"><p className="text-2xl font-bold">{inspections.length}</p><p className="text-sm text-muted-foreground">Inspections</p></Card>
+        <Card className="p-4"><p className="text-2xl font-bold">{viewings.length}</p><p className="text-sm text-muted-foreground">Viewing Requests</p></Card>
       </div>
 
       {/* Tabs */}
@@ -504,7 +504,7 @@ export function AgentDashboard() {
       >
         <TabsList className="mb-5 w-full grid grid-cols-5">
           <TabsTrigger value="properties" className="gap-1.5 text-xs sm:text-sm"><Building2 className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">My </span><span className="hidden sm:inline">Properties</span></TabsTrigger>
-          <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned Inspections</span></TabsTrigger>
+          <TabsTrigger value="inspections" className="gap-1.5 text-xs sm:text-sm"><Calendar className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Assigned Viewing Requests</span></TabsTrigger>
           <TabsTrigger value="rent-payments" className="gap-1.5 text-xs sm:text-sm"><Lock className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Rent </span><span className="hidden sm:inline">Payments</span></TabsTrigger>
           <TabsTrigger value="bank" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Bank Details</span></TabsTrigger>
           <TabsTrigger value="earnings" className="gap-1.5 text-xs sm:text-sm"><Wallet className="w-4 h-4 shrink-0" /><span className="hidden sm:inline">Earnings</span></TabsTrigger>
@@ -614,41 +614,41 @@ export function AgentDashboard() {
           )}
         </TabsContent>
 
-        {/* ── Inspections Tab ── */}
+        {/* ── Viewing Requests Tab ── */}
         <TabsContent value="inspections">
-          {inspections.length > 0 ? (
+          {viewings.length > 0 ? (
             <div className="space-y-3">
-              {inspections.map((inspection) => (
-                <Card key={inspection.id} className="p-4">
+              {viewings.map((viewing) => (
+                <Card key={viewing.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold line-clamp-1">{inspection.property_title}</h3>
-                      <p className="text-sm text-muted-foreground mt-0.5">Tenant: {inspection.user_name}</p>
-                      <p className="text-sm text-muted-foreground">Date: {inspection.inspection_date}</p>
-                      {inspection.payment_status === 'completed' && inspection.user_phone && (
-                        <a href={`tel:${inspection.user_phone}`}
+                      <h3 className="font-semibold line-clamp-1">{viewing.property_title}</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">Tenant: {viewing.user_name}</p>
+                      <p className="text-sm text-muted-foreground">Date: {viewing.inspection_date}</p>
+                      {viewing.payment_status === 'completed' && viewing.user_phone && (
+                        <a href={`tel:${viewing.user_phone}`}
                           className="inline-flex items-center gap-1.5 mt-2 text-primary font-semibold text-sm hover:underline">
-                          <Phone className="w-3.5 h-3.5" /> {inspection.user_phone}
+                          <Phone className="w-3.5 h-3.5" /> {viewing.user_phone}
                         </a>
                       )}
-                      {inspection.payment_status === 'completed' && !inspection.user_phone && (
+                      {viewing.payment_status === 'completed' && !viewing.user_phone && (
                         <p className="text-xs text-muted-foreground mt-1">User phone not available</p>
                       )}
-                      {inspection.payment_status !== 'completed' && (
+                      {viewing.payment_status !== 'completed' && (
                         <p className="text-xs text-yellow-600 mt-1">⏳ Awaiting payment</p>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
-                      <Badge className={getStatusBadge(inspection.status)}>{inspection.status}</Badge>
-                      {inspection.payment_status === 'completed' && inspection.user_phone && (
-                        <a href={`tel:${inspection.user_phone}`}>
+                      <Badge className={getStatusBadge(viewing.status)}>{viewing.status}</Badge>
+                      {viewing.payment_status === 'completed' && viewing.user_phone && (
+                        <a href={`tel:${viewing.user_phone}`}>
                           <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
                             <Phone className="w-3 h-3" /> Call User
                           </Button>
                         </a>
                       )}
-                      {inspection.status !== 'completed' && inspection.payment_status === 'completed' && (
-                        <Button size="sm" onClick={() => handleMarkCompleted(inspection.id)} className="gap-1.5 h-7 text-xs">
+                      {viewing.status !== 'completed' && viewing.payment_status === 'completed' && (
+                        <Button size="sm" onClick={() => handleMarkCompleted(viewing.id)} className="gap-1.5 h-7 text-xs">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Done
                         </Button>
                       )}
@@ -660,8 +660,8 @@ export function AgentDashboard() {
           ) : (
             <Card className="p-10 text-center">
               <Calendar className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-              <h3 className="font-semibold">No Inspections Assigned</h3>
-              <p className="text-sm text-muted-foreground mt-1">Inspections assigned to you will appear here</p>
+              <h3 className="font-semibold">No Viewing Requests Assigned</h3>
+              <p className="text-sm text-muted-foreground mt-1">Viewing Requests assigned to you will appear here</p>
             </Card>
           )}
         </TabsContent>
@@ -676,7 +676,7 @@ export function AgentDashboard() {
                 </div>
                 <div>
                   <h3 className="font-semibold">Payout Bank Account</h3>
-                  <p className="text-xs text-muted-foreground">Used to receive inspection fee payouts</p>
+                  <p className="text-xs text-muted-foreground">Used to receive viewing fee payouts</p>
                 </div>
               </div>
               {!editingBank && !pendingBankDetails && (
@@ -735,7 +735,7 @@ export function AgentDashboard() {
                 <div className="text-center py-8">
                   <CreditCard className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="font-medium text-sm">No bank details on file</p>
-                  <p className="text-xs text-muted-foreground mt-1 mb-4">Add your bank account to receive inspection payouts</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">Add your bank account to receive viewing payouts</p>
                   <Button size="sm" onClick={() => { setBankForm({ bank_code: '', bank_name: '', account_number: '', account_name: '' }); setEditingBank(true); }} className="gap-1.5">
                     <Plus className="w-4 h-4" /> Add Bank Account
                   </Button>
@@ -848,7 +848,7 @@ export function AgentDashboard() {
           <Card className="p-4 sm:p-6 mb-6">
             <h3 className="font-semibold mb-4">Earnings History</h3>
             {earningsHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No earnings yet — completed inspections and released rent agent fees will show up here</p>
+              <p className="text-sm text-muted-foreground text-center py-8">No earnings yet — completed viewings and released rent agent fees will show up here</p>
             ) : (
               <div className="space-y-3">
                 {earningsHistory.map((e) => (
@@ -1153,7 +1153,9 @@ export function AgentDashboard() {
                     {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.10)) : '₦0'} <span className="ml-1">(10% of rent, auto-calculated)</span>
                   </div>
                 </div>
-                <div className="space-y-2"><Label>Inspection Fee (₦) *<span className="text-xs text-muted-foreground font-normal ml-1">min ₦1,000</span></Label><Input type="number" min="1000" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="3000" /></div>
+                {/* Viewing fee field removed — property viewings are now free. The
+                    inspection_fee column is kept in the database with its default
+                    so historical records stay intact. */}
                 <div className="space-y-2">
                   <Label>Recurring Payment (₦/year)</Label>
                   <Input type="number" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" />

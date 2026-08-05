@@ -10,15 +10,15 @@ export const sections = [
     content: [
       {
         title: '1. About Rentora',
-        body: `Rentora is a student-focused property listing, inspection facilitation, and rent payment platform operating in Ogbomosho, Nigeria. Rentora connects property seekers with verified property agents.\n\nRentora does NOT:\n• Own properties listed on the platform\n• Act as a landlord\n• Guarantee rental approval\n• Guarantee property availability at all times\n\nRentora DOES facilitate rent payments between renters and agents, holding funds in escrow as described in Section 5 below. Rentora operates strictly as a digital intermediary and escrow holder — it does not own or manage any listed property.`
+        body: `Rentora is a student-focused property listing, viewing facilitation, and rent payment platform operating in Ogbomosho, Nigeria. Rentora connects property seekers with verified property agents.\n\nRentora does NOT:\n• Own properties listed on the platform\n• Act as a landlord\n• Guarantee rental approval\n• Guarantee property availability at all times\n\nRentora DOES facilitate rent payments between renters and agents, holding funds in escrow as described in Section 5 below. Rentora operates strictly as a digital intermediary and escrow holder — it does not own or manage any listed property.`
       },
       {
         title: '2. User Accounts',
         body: `To access certain features, users must create an account.\n\nBy registering, you agree to:\n• Provide accurate and truthful information\n• Keep login credentials secure\n• Accept responsibility for all activities under your account\n\nRentora reserves the right to suspend accounts involved in fraudulent, abusive, or illegal behavior.`
       },
       {
-        title: '3. Inspection Bookings',
-        body: `Each listing has its own inspection fee, set by the agent (minimum ₦1,000).\n\nImportant Conditions:\n• Payment confirms inspection scheduling\n• If the assigned agent fails to attend, a refund may be issued\n• If the user fails to attend, the inspection is considered completed\n• Rentora is not responsible for rental negotiations or final rental agreements`
+        title: '3. Viewing Bookings',
+        body: `Each listing has its own viewing fee, set by the agent (minimum ₦1,000).\n\nImportant Conditions:\n• Payment confirms viewing scheduling\n• If the assigned agent fails to attend, a refund may be issued\n• If the user fails to attend, the viewing is considered completed\n• Rentora is not responsible for rental negotiations or final rental agreements`
       },
       {
         title: '4. Rent Payments & Escrow',
@@ -55,7 +55,7 @@ export const sections = [
       },
       {
         title: '2. How We Use Information',
-        body: `Your information is used to:\n• Create and manage accounts\n• Process rent and inspection payments\n• Facilitate inspection bookings\n• Prevent fraud\n• Improve platform performance`
+        body: `Your information is used to:\n• Create and manage accounts\n• Process rent and viewing payments\n• Facilitate viewing bookings\n• Prevent fraud\n• Improve platform performance`
       },
       {
         title: '3. Payment Information',
@@ -63,7 +63,7 @@ export const sections = [
       },
       {
         title: '4. Data Sharing',
-        body: `Rentora does not sell user data.\n\nInformation may be shared:\n• With assigned agents for inspection purposes\n• When required by law\n• To prevent fraud or abuse`
+        body: `Rentora does not sell user data.\n\nInformation may be shared:\n• With assigned agents for viewing purposes\n• When required by law\n• To prevent fraud or abuse`
       },
       {
         title: '5. Data Security',
@@ -83,8 +83,8 @@ export const sections = [
     bg: 'bg-green-50',
     content: [
       {
-        title: '1. Inspection Fees',
-        body: `Refund may be issued if:\n• The agent fails to attend a confirmed inspection\n• The property is confirmed unavailable at booking time\n\nRefund will NOT be issued if:\n• User fails to attend inspection\n• User changes mind after booking\n• Inspection has been completed\n\nRefund processing time: 3–7 business days.`
+        title: '1. Viewing Fees',
+        body: `Refund may be issued if:\n• The agent fails to attend a confirmed viewing\n• The property is confirmed unavailable at booking time\n\nRefund will NOT be issued if:\n• User fails to attend viewing\n• User changes mind after booking\n• Viewing has been completed\n\nRefund processing time: 3–7 business days.`
       },
       {
         title: '2. Rent Payments',

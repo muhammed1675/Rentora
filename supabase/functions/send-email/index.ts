@@ -97,7 +97,7 @@ function emailWelcome(name: string) {
     <div class="card">
       <div class="card-row"><span class="label">${icon.search} Browse</span><span class="value">Find verified properties</span></div>
       <div class="card-row"><span class="label">${icon.coin} Tokens</span><span class="value">Buy tokens to unlock contacts</span></div>
-      <div class="card-row"><span class="label">${icon.calendar} Inspect</span><span class="value">Book physical inspections</span></div>
+      <div class="card-row"><span class="label">${icon.calendar} Inspect</span><span class="value">Book physical viewings</span></div>
     </div>
     <a href="https://www.rentora.com.ng/browse" class="btn">Browse Properties</a>
   `);
@@ -120,16 +120,16 @@ function emailTokenReceipt(name: string, tokens: number, amount: number, newBala
 
 function emailInspectionBooked(name: string, propertyTitle: string, inspectionDate: string, reference: string, amount: number) {
   return baseTemplate(`
-    <span class="badge">Inspection Confirmed ${icon.check}</span>
-    <h2>Inspection Booking Confirmed</h2>
-    <p>Hi ${name}, your inspection has been booked and payment received. An agent will be in touch before the inspection date.</p>
+    <span class="badge">Viewing Confirmed ${icon.check}</span>
+    <h2>Viewing Booking Confirmed</h2>
+    <p>Hi ${name}, your viewing has been booked and payment received. An agent will be in touch before the viewing date.</p>
     <div class="card">
       <div class="card-row"><span class="label">Property</span><span class="value">${propertyTitle}</span></div>
       <div class="card-row"><span class="label">Date</span><span class="value">${inspectionDate}</span></div>
       <div class="card-row"><span class="label">Fee Paid</span><span class="value">₦${amount.toLocaleString()}</span></div>
       <div class="card-row"><span class="label">Reference</span><span class="value" style="font-size:12px">${reference}</span></div>
     </div>
-    <a href="https://www.rentora.com.ng/profile" class="btn">View My Inspections</a>
+    <a href="https://www.rentora.com.ng/profile" class="btn">View My Viewing Requests</a>
   `);
 }
 
@@ -141,7 +141,7 @@ function emailVerificationApproved(name: string) {
     <div class="card">
       <div class="card-row"><span class="label">Status</span><span class="value">${icon.check} Verified Agent</span></div>
       <div class="card-row"><span class="label">Can List Properties</span><span class="value">Yes</span></div>
-      <div class="card-row"><span class="label">Can Conduct Inspections</span><span class="value">Yes</span></div>
+      <div class="card-row"><span class="label">Can Conduct Viewing Requests</span><span class="value">Yes</span></div>
     </div>
     <a href="https://www.rentora.com.ng/agent" class="btn">Go to Agent Dashboard</a>
   `);
@@ -159,6 +159,33 @@ function emailVerificationRejected(name: string) {
     <p>You are welcome to reapply with clearer documents.</p>
     <a href="https://www.rentora.com.ng/become-agent" class="btn" style="background:#5b6b7d">Reapply</a>
     <a href="mailto:support@rentora.com.ng" class="btn">Contact Support</a>
+  `);
+}
+
+function emailStudentVerificationApproved(name: string) {
+  return baseTemplate(`
+    <span class="badge">Verified Student ${icon.check}</span>
+    <h2>Welcome aboard, ${name}!</h2>
+    <p>Your school document and selfie have been reviewed and approved. You're now a Verified LAUTECH Student on Rentora.</p>
+    <div class="card">
+      <div class="card-row"><span class="label">Status</span><span class="value">${icon.check} Verified Student</span></div>
+      <div class="card-row"><span class="label">Can Book Viewing Requests</span><span class="value">Yes</span></div>
+    </div>
+    <a href="https://www.rentora.com.ng/browse" class="btn">Browse Properties</a>
+  `);
+}
+
+function emailStudentVerificationRejected(name: string, reason: string) {
+  return baseTemplate(`
+    <span class="badge badge-red">Verification Unsuccessful</span>
+    <h2>Hi ${name},</h2>
+    <p>We were unable to approve your student verification at this time.</p>
+    <div class="card">
+      <div class="card-row"><span class="label">${icon.document} Reason</span><span class="value">${reason || 'Documents unclear or incomplete'}</span></div>
+    </div>
+    <p>You can resubmit your school document and selfie at any time.</p>
+    <a href="https://www.rentora.com.ng/verify-account" class="btn">Resubmit Documents</a>
+    <a href="mailto:support@rentora.com.ng" class="btn" style="background:#5b6b7d">Contact Support</a>
   `);
 }
 
@@ -180,9 +207,9 @@ function emailSignIn(name: string, ip: string, location: string, time: string, d
 
 function emailInspectionAgentNotify(agentName: string, userName: string, userEmail: string, userPhone: string, propertyTitle: string, inspectionDate: string, reference: string) {
   return baseTemplate(`
-    <span class="badge badge-blue">New Inspection Booking ${icon.calendar}</span>
-    <h2>Hi ${agentName}, you have a new inspection!</h2>
-    <p>A user has booked and paid for an inspection on one of your properties. Please reach out to them before the inspection date.</p>
+    <span class="badge badge-blue">New Viewing Booking ${icon.calendar}</span>
+    <h2>Hi ${agentName}, you have a new viewing!</h2>
+    <p>A user has booked and paid for an viewing on one of your properties. Please reach out to them before the viewing date.</p>
     <div class="card">
       <div class="card-row"><span class="label">${icon.home} Property</span><span class="value">${propertyTitle}</span></div>
       <div class="card-row"><span class="label">${icon.calendar} Date</span><span class="value">${inspectionDate}</span></div>
@@ -191,7 +218,7 @@ function emailInspectionAgentNotify(agentName: string, userName: string, userEma
       ${userPhone ? `<div class="card-row"><span class="label">${icon.phone} Student Phone</span><span class="value">${userPhone}</span></div>` : ""}
       <div class="card-row"><span class="label">${icon.tag} Reference</span><span class="value" style="font-size:12px">${reference}</span></div>
     </div>
-    <p>Please contact the student to confirm arrangements for the inspection.</p>
+    <p>Please contact the student to confirm arrangements for the viewing.</p>
     ${userPhone
       ? `<a href="tel:${userPhone}" class="btn">Call student</a>`
       : `<a href="mailto:${userEmail}" class="btn">Email student</a>`}
@@ -282,7 +309,7 @@ function emailPropertyApproved(agentName: string, propertyTitle: string) {
     <div class="card">
       <div class="card-row"><span class="label">${icon.home} Property</span><span class="value">${propertyTitle}</span></div>
     </div>
-    <p>You'll be notified as soon as a student books an inspection or pays rent on this listing.</p>
+    <p>You'll be notified as soon as a student books an viewing or pays rent on this listing.</p>
     <a href="https://www.rentora.com.ng/agent?tab=rent-payments" class="btn">View on Agent Dashboard</a>
   `);
 }
@@ -385,7 +412,7 @@ serve(async (req) => {
         html = emailInspectionBooked(data.name, data.property_title, data.inspection_date, data.reference, data.amount);
         break;
       case "inspection_agent_notify":
-        subject = `New Inspection Booking: ${data.property_title}`;
+        subject = `New Viewing Booking: ${data.property_title}`;
         html = emailInspectionAgentNotify(data.agent_name, data.user_name, data.user_email, data.user_phone, data.property_title, data.inspection_date, data.reference);
         break;
       case "rent_payment_held":
@@ -415,6 +442,14 @@ serve(async (req) => {
       case "verification_rejected":
         subject = "Rentora Agent Verification Update";
         html = emailVerificationRejected(data.name);
+        break;
+      case "student_verification_approved":
+        subject = "You're Verified! Welcome to Rentora";
+        html = emailStudentVerificationApproved(data.name);
+        break;
+      case "student_verification_rejected":
+        subject = "Rentora Student Verification Update";
+        html = emailStudentVerificationRejected(data.name, data.reason);
         break;
       case "sign_in":
         subject = "New Sign-In to Your Rentora Account";

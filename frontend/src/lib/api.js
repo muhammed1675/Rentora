@@ -316,7 +316,10 @@ export const propertyAPI = {
   },
 };
 
-// ============== INSPECTION APIs ==============
+// ============== VIEWING REQUEST APIs ==============
+// (Property viewings — formerly "inspections". Table names are unchanged
+// so historical data and the old fee columns stay intact; viewings are
+// now free, so no payment record is created.)
 
 export const inspectionAPI = {
   request: async (data, user) => {
@@ -327,64 +330,68 @@ export const inspectionAPI = {
       .eq('id', data.property_id)
       .eq('status', 'approved')
       .single();
-    
+
     if (propError || !property) {
       throw new Error('Property not found');
     }
     if (property.availability === 'unavailable') {
-      throw new Error('This property has already been taken and is no longer accepting inspection bookings.');
+      throw new Error('This property has already been taken and is no longer accepting viewing requests.');
     }
-    
-    const reference = generateReference('INSP');
+
+    const reference = generateReference('VIEW');
     const inspectionId = uuidv4();
-    
-    // Create inspection
-    await supabase
+
+    // Create the viewing request — free, so it is confirmed immediately.
+    const { error: insertError } = await supabase
       .from('inspections')
       .insert({
         id: inspectionId,
         user_id: user.id,
         user_name: user.full_name,
         user_email: user.email,
+        user_email_override: data.email || null,
+        user_phone: data.phone_number || null,
         property_id: data.property_id,
         property_title: property.title,
         agent_id: property.uploaded_by_agent_id,
         agent_name: property.uploaded_by_agent_name,
         inspection_date: data.inspection_date,
-        status: 'pending',
-        payment_status: 'pending',
+        status: 'confirmed',
+        payment_status: 'not_required',
         payment_reference: reference
       });
-    
-    // Dynamic inspection fee set by the agent (min 1000, default 3000)
-    const inspectionAmount = Number(property.inspection_fee) > 0
-      ? Number(property.inspection_fee)
-      : 3000;
 
-    // Create inspection transaction
-    await supabase
-      .from('inspection_transactions')
-      .insert({
-        id: uuidv4(),
-        inspection_id: inspectionId,
-        user_id: user.id,
-        reference,
-        amount: inspectionAmount,
-        status: 'pending'
-      });
-    
+    if (insertError) {
+      // RLS blocks unverified students from creating viewing requests.
+      if (insertError.code === '42501' || /row-level security/i.test(insertError.message || '')) {
+        throw new Error('Your student account must be verified before you can request a viewing.');
+      }
+      throw insertError;
+    }
+
+    // Tell the agent about the new (free) viewing request.
+    if (property.uploaded_by_agent_id) {
+      notifyUser(
+        property.uploaded_by_agent_id,
+        'viewing_requested',
+        'New viewing request',
+        `${user.full_name || 'A student'} requested a viewing of "${property.title}" on ${data.inspection_date}.`,
+        '/agent'
+      );
+    }
+
     return {
       data: {
         inspection_id: inspectionId,
         reference,
-        amount: inspectionAmount,
-        payment_type: 'inspection',
         agent_id: property.uploaded_by_agent_id,
         agent_name: property.uploaded_by_agent_name,
         property_title: property.title,
+        inspection_date: data.inspection_date,
       }
     };
   },
+
 
   getMyInspections: async (userId) => {
     const { data, error } = await supabase
@@ -419,31 +426,31 @@ export const inspectionAPI = {
   },
 
   getAgentContact: async (inspectionId) => {
-    const { data: inspection, error } = await supabase
+    const { data: viewing, error } = await supabase
       .from('inspections')
       .select('agent_id, agent_name, property_title, inspection_date')
       .eq('id', inspectionId)
       .single();
 
-    if (error || !inspection) throw new Error('Inspection not found');
+    if (error || !viewing) throw new Error('Inspection not found');
 
     // Agent phone comes from users.phone — the number they registered with
     let agentPhone = null;
-    if (inspection.agent_id) {
+    if (viewing.agent_id) {
       const { data: agentUser } = await supabase
         .from('users')
         .select('phone')
-        .eq('id', inspection.agent_id)
+        .eq('id', viewing.agent_id)
         .single();
       agentPhone = agentUser?.phone || null;
     }
 
     return {
       data: {
-        agent_name: inspection.agent_name,
+        agent_name: viewing.agent_name,
         agent_phone: agentPhone,
-        property_title: inspection.property_title,
-        inspection_date: inspection.inspection_date,
+        property_title: viewing.property_title,
+        inspection_date: viewing.inspection_date,
       }
     };
   },
@@ -455,9 +462,176 @@ export const inspectionAPI = {
       .eq('id', id);
     
     if (error) throw error;
-    return { data: { message: 'Inspection updated' } };
+    return { data: { message: 'Viewing request updated' } };
   }
 };
+
+// Preferred name going forward — same object, clearer wording.
+export const viewingAPI = inspectionAPI;
+
+// ============== STUDENT VERIFICATION APIs ==============
+// School document (student ID card or admission letter) + selfie.
+// Every student must be approved before they can use Rentora.
+
+export const studentVerificationAPI = {
+  submit: async ({ document_type, document_url, selfie_url, matric_number }, user) => {
+    if (!document_url || !selfie_url) {
+      throw new Error('Both your school document and a selfie are required.');
+    }
+
+    const { data: existing } = await supabase
+      .from('student_verification_requests')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'approved'])
+      .maybeSingle();
+
+    if (existing?.status === 'pending') {
+      throw new Error('Your documents are already under review.');
+    }
+    if (existing?.status === 'approved') {
+      throw new Error('Your account is already verified.');
+    }
+
+    const requestId = uuidv4();
+    const { error } = await supabase
+      .from('student_verification_requests')
+      .insert({
+        id: requestId,
+        user_id: user.id,
+        user_name: user.full_name,
+        user_email: user.email,
+        document_type: document_type || 'student_id',
+        document_url,
+        selfie_url,
+        matric_number: matric_number || null,
+        status: 'pending',
+      });
+
+    if (error) throw error;
+
+    await supabase.from('users').update({ verification_status: 'pending' }).eq('id', user.id);
+
+    notifyAdmins({
+      title: `New student verification from ${user.full_name || user.email}`,
+      eventLabel: 'Student verification',
+      summary: `${user.full_name || 'A student'} submitted their school document and selfie for review.`,
+      breakdown: [
+        ['Student', user.full_name || '—'],
+        ['Email', user.email || '—'],
+        ['Document', document_type === 'admission_letter' ? 'Admission letter' : 'Student ID card'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
+
+    return { data: { message: 'Verification submitted', request_id: requestId } };
+  },
+
+  getMyRequest: async (userId) => {
+    const { data, error } = await supabase
+      .from('student_verification_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return { data };
+  },
+
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('student_verification_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return { data };
+  },
+
+  // Signed URL for the private `verification` bucket so admins can preview
+  // documents (images and PDFs) without making the bucket public.
+  getSignedDocumentUrl: async (publicUrl) => {
+    if (!publicUrl) return null;
+    const marker = '/verification/';
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return publicUrl;
+    const path = publicUrl.substring(idx + marker.length).split('?')[0];
+    const { data, error } = await supabase.storage
+      .from('verification')
+      .createSignedUrl(decodeURIComponent(path), 60 * 10);
+    if (error) return publicUrl;
+    return data?.signedUrl || publicUrl;
+  },
+
+  review: async (requestId, status, adminId, adminNote = '') => {
+    if (status === 'rejected' && !adminNote.trim()) {
+      throw new Error('A reason is required when rejecting a student.');
+    }
+
+    const { data: request } = await supabase
+      .from('student_verification_requests')
+      .select('user_id, user_email, user_name, selfie_url')
+      .eq('id', requestId)
+      .single();
+
+    if (!request) throw new Error('Verification request not found');
+
+    await supabase
+      .from('student_verification_requests')
+      .update({
+        status,
+        admin_note: adminNote || null,
+        reviewed_by_admin_id: adminId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', requestId);
+
+    // Approving releases the student into the app and promotes the selfie
+    // to their profile picture.
+    const userUpdate = { verification_status: status };
+    if (status === 'approved' && request.selfie_url) {
+      userUpdate.avatar_url = request.selfie_url;
+    }
+    await supabase.from('users').update(userUpdate).eq('id', request.user_id);
+
+    const emailType = status === 'approved'
+      ? 'student_verification_approved'
+      : 'student_verification_rejected';
+
+    try {
+      if (request.user_email) {
+        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          body: JSON.stringify({
+            type: emailType,
+            to: request.user_email,
+            data: { name: request.user_name || 'there', reason: adminNote || '' },
+          }),
+        });
+      }
+    } catch (e) { console.warn(`${emailType} email failed:`, e); }
+
+    notifyUser(
+      request.user_id,
+      emailType,
+      status === 'approved' ? 'Student verification approved!' : 'Student verification update',
+      status === 'approved'
+        ? 'You are now a Verified LAUTECH Student. Welcome to Rentora.'
+        : `Your verification was not approved: ${adminNote}`,
+      status === 'approved' ? '/browse' : '/verify-account'
+    );
+
+    return { data: { message: `Verification ${status}` } };
+  }
+};
+
+
 
 // ============== TRANSACTION APIs ==============
 
@@ -471,7 +645,7 @@ export const transactionAPI = {
     
     const { data: inspTxs } = await supabase
       .from('inspection_transactions')
-      .select('*, inspection:inspections(property_id)')
+      .select('*, viewing:inspections(property_id)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -746,7 +920,7 @@ export const adminAPI = {
     ]);
 
     const tokenRevenue = tokenTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-    // Inspection fees are NOT Rentora revenue anymore — agents keep 100% of
+    // Viewing fees are NOT Rentora revenue anymore — agents keep 100% of
     // them. Kept as its own figure purely as a volume/activity metric.
     const inspectionFeesProcessed = inspTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
@@ -780,7 +954,7 @@ export const adminAPI = {
         rent_service_fee_revenue: rentServiceFeeRevenue,
         withdrawal_fee_revenue: withdrawalFeeRevenue,
         // Rentora's actual revenue: token sales + rent service fee +
-        // withdrawal fee. Inspection fees are excluded — 100% goes to agents.
+        // withdrawal fee. Viewing fees are excluded — 100% goes to agents.
         total_revenue: tokenRevenue + rentServiceFeeRevenue + withdrawalFeeRevenue,
         total_escrow_held: totalEscrowHeld,
         total_rent_payments: rentRows.length,
@@ -798,7 +972,7 @@ export const paymentAPI = {
   // instead of writing to the database directly. That endpoint independently
   // verifies the charge with Flutterwave using the secret key before marking
   // anything paid — this function no longer trusts the browser's own word
-  // that a payment succeeded. Works for token purchases, inspections, and
+  // that a payment succeeded. Works for token purchases, viewings, and
   // rent (the endpoint auto-detects which one based on the reference).
   confirmPayment: async (reference) => {
     const res = await fetch('/api/confirm-payment', {
@@ -834,12 +1008,18 @@ export const storageAPI = {
     return { data: { url: publicUrl, path: data.path } };
   },
 
-  // Used by BecomeAgent.jsx — uploads to dedicated verification bucket
+  // Used by BecomeAgent.jsx and the student verification page — uploads to
+  // the private `verification` bucket. PDFs are uploaded as-is; only images
+  // are compressed.
   uploadFile: async (rawFile, folder = 'verification') => {
+    const isPdf = rawFile.type === 'application/pdf' || /\.pdf$/i.test(rawFile.name || '');
     // ID cards / selfies still need to stay legible, so compress a bit gentler.
-    const file = await compressImage(rawFile, { maxWidthOrHeight: 1000, maxSizeMB: 0.4, initialQuality: 0.8 });
-    const fileExt = file.name.split('.').pop();
+    const file = isPdf
+      ? rawFile
+      : await compressImage(rawFile, { maxWidthOrHeight: 1000, maxSizeMB: 0.4, initialQuality: 0.8 });
+    const fileExt = (file.name.split('.').pop() || 'jpg');
     const fileName = `${folder}-${uuidv4()}.${fileExt}`;
+
     const bucket = 'verification';
 
     const { data, error } = await supabase.storage
@@ -1054,16 +1234,16 @@ export const balanceAPI = {
   },
 
   // A real, itemized earnings history for the agent — combines completed
-  // inspection fees (100% to agent) and released rent agent fees into one
+  // viewing fees (100% to agent) and released rent agent fees into one
   // sorted list, since agent_balances only stores a running total, not a
   // per-transaction ledger.
   getEarningsHistory: async (agentId) => {
     const [inspectionRes, rentRes] = await Promise.all([
       supabase
         .from('inspection_transactions')
-        .select('id, amount, created_at, inspection:inspections!inner(agent_id, property:properties(title))')
+        .select('id, amount, created_at, viewing:inspections!inner(agent_id, property:properties(title))')
         .eq('status', 'completed')
-        .eq('inspection.agent_id', agentId),
+        .eq('viewing.agent_id', agentId),
       supabase
         .from('property_rent_payments')
         .select('id, rent_amount, agent_fee, caution_fee, released_at, property:properties(title)')

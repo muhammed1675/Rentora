@@ -210,12 +210,14 @@ export function PropertyDetails() {
   };
 
   const handleRequestInspection = async () => {
-    if (!inspectionDate || inspectionDate === '') { toast.error('Please select an inspection date'); return; }
+    if (!inspectionDate || inspectionDate === '') { toast.error('Please select a viewing date'); return; }
     if (!inspectionEmail || !inspectionPhone) { toast.error('Please fill in all fields'); return; }
 
     setRequestingInspection(true);
     try {
-      const response = await inspectionAPI.request({
+      // Viewings are free — the request is confirmed straight away and the
+      // agent is notified. No payment step.
+      await inspectionAPI.request({
         property_id: id,
         inspection_date: inspectionDate,
         email: inspectionEmail,
@@ -223,39 +225,14 @@ export function PropertyDetails() {
       }, user);
 
       setShowInspectionDialog(false);
-
-      await openFlutterwaveCheckout({
-        reference: response.data.reference,
-        amount: response.data.amount,
-        email: inspectionEmail,
-        name: user?.full_name || user?.email,
-        narration: `Inspection — ${property?.title}`,
-        onSuccess: async () => {
-          toast.success('Inspection booked! Our agent will contact you shortly.');
-          setRequestingInspection(false);
-          // Note: the agent + student inspection emails are already sent by
-          // paymentAPI.confirmPayment() (called automatically inside
-          // openFlutterwaveCheckout's onSuccess in flutterwave.js) — do not send a
-          // second notification here, that was causing duplicate emails.
-        },
-        onFailed: () => {
-          toast.error('Payment was not successful. Please try again.');
-          setRequestingInspection(false);
-        },
-        onPending: () => {
-          toast.message('Payment received — confirming with Flutterwave now. Check your profile in a minute for your inspection details.');
-          setRequestingInspection(false);
-        },
-        onClose: () => {
-          setRequestingInspection(false);
-        },
-      });
-
+      toast.success('Viewing request sent! Our agent will contact you shortly.');
     } catch (error) {
-      toast.error(error.message || 'Failed to request inspection');
+      toast.error(error.message || 'Failed to send your viewing request');
+    } finally {
       setRequestingInspection(false);
     }
   };
+
 
   const [payingRent, setPayingRent] = useState(false);
   const [serviceFeePct, setServiceFeePct] = useState(5);
@@ -623,18 +600,18 @@ export function PropertyDetails() {
                 {payingRent ? 'Processing...' : (<><ExternalLink className="h-4 w-4 shrink-0" /><span className="truncate">Pay Rent Securely</span></>)}
               </Button>
             </div>
-            <h3 className="font-semibold mb-2">Request Inspection</h3>
+            <h3 className="font-semibold mb-2">Request a Viewing</h3>
             {property?.availability === 'unavailable' ? (
-              <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting inspection bookings.</p>
+              <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting viewing requests.</p>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground mb-4">Schedule a physical visit with our verified agent for {formatPrice(Number(property?.inspection_fee) || 3000)}</p>
+                <p className="text-sm text-muted-foreground mb-4">Schedule a free physical visit with our verified agent.</p>
                 <Button variant="outline" onClick={() => {
-                  if (!isAuthenticated) { toast.error('Please login to request inspection'); navigate('/login'); return; }
+                  if (!isAuthenticated) { toast.error('Please login to request a viewing'); navigate('/login'); return; }
                   setInspectionEmail(user?.email || '');
                   setShowInspectionDialog(true);
-                }} className="w-full min-w-0 gap-2" data-testid="request-inspection-btn">
-                  <CalendarIcon className="h-4 w-4 shrink-0" /><span className="truncate">Schedule Inspection</span>
+                }} className="w-full min-w-0 gap-2" data-testid="request-viewing-btn">
+                  <CalendarIcon className="h-4 w-4 shrink-0" /><span className="truncate">Request Viewing</span>
                 </Button>
               </>
             )}
@@ -644,12 +621,12 @@ export function PropertyDetails() {
         </div>
       </div>
 
-      {/* Inspection Dialog */}
+      {/* Viewing Request Dialog */}
       <Dialog open={showInspectionDialog} onOpenChange={setShowInspectionDialog}>
         <DialogContent className="max-w-[calc(100vw-1.5rem)] overflow-hidden sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Request Property Inspection</DialogTitle>
-            <DialogDescription className="break-words">Schedule a physical inspection with our verified agent. Payment of {formatPrice(Number(property?.inspection_fee) || 3000)} is required.</DialogDescription>
+            <DialogTitle>Request a Property Viewing</DialogTitle>
+            <DialogDescription className="break-words">Schedule a free physical viewing with our verified agent. No payment is required.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -674,18 +651,19 @@ export function PropertyDetails() {
             </div>
             <Card className="p-4 bg-muted/50">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                <span className="font-medium">Inspection Fee</span>
-                <span className="shrink-0 text-right text-lg font-bold text-primary sm:text-xl">{formatPrice(Number(property?.inspection_fee) || 3000)}</span>
+                <span className="font-medium">Viewing fee</span>
+                <span className="shrink-0 text-right text-lg font-bold text-primary sm:text-xl">Free</span>
               </div>
             </Card>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInspectionDialog(false)}>Cancel</Button>
-            <Button onClick={handleRequestInspection} disabled={requestingInspection} className="min-w-0 gap-2" data-testid="confirm-inspection-btn">
-              {requestingInspection ? 'Processing...' : <><ExternalLink className="h-4 w-4 shrink-0" /><span className="truncate">Pay & Schedule</span></>}
+            <Button onClick={handleRequestInspection} disabled={requestingInspection} className="min-w-0 gap-2" data-testid="confirm-viewing-btn">
+              {requestingInspection ? 'Sending...' : <><CalendarIcon className="h-4 w-4 shrink-0" /><span className="truncate">Send Viewing Request</span></>}
             </Button>
           </DialogFooter>
         </DialogContent>
+
       </Dialog>
 
       <Dialog open={showReportDialog} onOpenChange={(open) => { setShowReportDialog(open); if (!open) { setReportReason(''); setReportDetails(''); } }}>

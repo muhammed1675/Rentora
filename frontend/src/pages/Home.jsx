@@ -15,7 +15,7 @@ const interiorImg = 'https://images.pexels.com/photos/1571453/pexels-photo-15714
 
 const steps = [
   { icon: BadgeCheck, title: 'Browse verified homes', copy: 'Explore real listings around LAUTECH at no cost.' },
-  { icon: KeyRound, title: 'Book an inspection', copy: 'Contact the agent directly or book a paid inspection.' },
+  { icon: KeyRound, title: 'Book an viewing', copy: 'Contact the agent directly or book a paid viewing.' },
   { icon: HandCoins, title: 'Pay securely', copy: 'See every fee upfront before making your rent payment.' },
   { icon: ShieldCheck, title: 'Protected by escrow', copy: 'Rent is held until you confirm you have moved in.' },
 ];

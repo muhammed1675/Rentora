@@ -341,7 +341,7 @@ export function BecomeAgent() {
         </Card>
 
         <p className="text-center text-sm text-foreground/55 mt-4">
-          Once approved, you'll be able to list properties and manage inspections.
+          Once approved, you'll be able to list properties and manage viewings.
         </p>
       </div>
     </div>

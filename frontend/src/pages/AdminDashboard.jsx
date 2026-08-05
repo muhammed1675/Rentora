@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -18,7 +18,7 @@ import {
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
-  Menu, X, ChevronRight, CalendarCheck, Flag
+  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,8 +30,16 @@ export function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [agents, setAgents] = useState([]);
   const [verifications, setVerifications] = useState([]);
+  const [studentVerifications, setStudentVerifications] = useState([]);
+  const [studentVerifStatusFilter, setStudentVerifStatusFilter] = useState('pending');
+  const [studentVerifSearch, setStudentVerifSearch] = useState('');
+  const [studentDocPreview, setStudentDocPreview] = useState(null); // { url, kind: 'image'|'pdf', title }
+  const [studentDocPreviewLoading, setStudentDocPreviewLoading] = useState(false);
+  const [studentRejectTarget, setStudentRejectTarget] = useState(null); // request being rejected
+  const [studentRejectReason, setStudentRejectReason] = useState('');
+  const [studentReviewBusy, setStudentReviewBusy] = useState(false);
   const [properties, setProperties] = useState([]);
-  const [inspections, setInspections] = useState([]);
+  const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ inspection_transactions: [] });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -68,8 +76,8 @@ export function AdminDashboard() {
     setLoading(true);
     await maintenanceAPI.expireStalePending().catch(() => {});
     try {
-      const [statsRes, usersRes, verificationsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, rentPaymentsRes, reportsRes] = await Promise.all([
-        adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(),
+      const [statsRes, usersRes, verificationsRes, studentVerifsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, rentPaymentsRes, reportsRes] = await Promise.all([
+        adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(), studentVerificationAPI.getAll(),
         propertyAPI.getAllAdmin(), inspectionAPI.getAll(), transactionAPI.getAll(),
         contactAPI.getAll(), withdrawalAPI.getAll(), balanceAPI.getAllBalances(),
         rentAPI.getAllForAdmin(), reportAPI.getAll(),
@@ -84,6 +92,7 @@ export function AdminDashboard() {
         user_phone: allUsers.find(u => u.id === v.user_id)?.phone || null,
       }));
       setVerifications(enrichedVerifs);
+      setStudentVerifications(studentVerifsRes.data || []);
       setProperties(propertiesRes.data);
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
@@ -164,6 +173,47 @@ export function AdminDashboard() {
       setSelectedVerification(null);
       fetchData();
     } catch { toast.error('Failed to review'); }
+  };
+
+  // ── Student verification ─────────────────────────────
+  const handlePreviewStudentDoc = async (url, title) => {
+    if (!url) return;
+    setStudentDocPreviewLoading(true);
+    try {
+      const signedUrl = await studentVerificationAPI.getSignedDocumentUrl(url);
+      const kind = /\.pdf(\?|$)/i.test(url) ? 'pdf' : 'image';
+      setStudentDocPreview({ url: signedUrl, kind, title });
+    } catch {
+      toast.error('Could not load document preview');
+    } finally {
+      setStudentDocPreviewLoading(false);
+    }
+  };
+
+  const handleApproveStudent = async (request) => {
+    setStudentReviewBusy(true);
+    try {
+      await studentVerificationAPI.review(request.id, 'approved', user.id);
+      toast.success(`${request.user_name || 'Student'} verified ✓`);
+      fetchData();
+    } catch (e) {
+      toast.error(e.message || 'Failed to approve');
+    } finally { setStudentReviewBusy(false); }
+  };
+
+  const handleRejectStudent = async () => {
+    if (!studentRejectTarget) return;
+    if (!studentRejectReason.trim()) { toast.error('A rejection reason is required'); return; }
+    setStudentReviewBusy(true);
+    try {
+      await studentVerificationAPI.review(studentRejectTarget.id, 'rejected', user.id, studentRejectReason.trim());
+      toast.success('Verification rejected — student notified');
+      setStudentRejectTarget(null);
+      setStudentRejectReason('');
+      fetchData();
+    } catch (e) {
+      toast.error(e.message || 'Failed to reject');
+    } finally { setStudentReviewBusy(false); }
   };
 
   const handleBankRequest = async (requestId, action, note = '') => {
@@ -338,7 +388,7 @@ export function AdminDashboard() {
     properties.filter(p => p.uploaded_by_agent_id === agentId).length;
 
   const getAgentInspectionCount = (agentId) =>
-    inspections.filter(i => i.agent_id === agentId).length;
+    viewings.filter(i => i.agent_id === agentId).length;
 
   const formatPrice = (price) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
 
@@ -378,7 +428,8 @@ export function AdminDashboard() {
       items: [
         { id: 'users', label: 'Users', icon: Users, count: users.length },
         { id: 'agents', label: 'Agents', icon: UserCog, count: agents.length },
-        { id: 'verification', label: 'Verification', icon: Shield, count: stats?.pending_verifications, urgent: true },
+        { id: 'verification', label: 'Agent Verification', icon: Shield, count: stats?.pending_verifications, urgent: true },
+        { id: 'student-verification', label: 'Student ID', icon: GraduationCap, count: studentVerifications.filter(v => v.status === 'pending').length, urgent: true },
       ],
     },
     { id: 'properties', label: 'Listings', icon: Building2, count: stats?.pending_properties, urgent: true },
@@ -669,14 +720,14 @@ export function AdminDashboard() {
                   <p className="text-[11px] text-slate-500 mt-1.5">{stats?.approved_properties || 0} live</p>
                 </div>
 
-                {/* KPI: Inspections */}
+                {/* KPI: Viewing Requests */}
                 <div className="admin-card p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
                       <CalendarCheck className="w-4 h-4 text-violet-600" />
                     </div>
                   </div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Inspections</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing Requests</p>
                   <p className="text-2xl font-bold text-slate-900 mt-1">{stats?.total_inspections || 0}</p>
                   <p className="text-[11px] text-slate-500 mt-1.5">{stats?.completed_inspections || 0} completed</p>
                 </div>
@@ -736,7 +787,7 @@ export function AdminDashboard() {
                     <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
                       <div className="flex items-center gap-2 mb-2">
                         <Receipt className="w-4 h-4 text-slate-400" />
-                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Inspection Fees</p>
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Viewing Fees</p>
                       </div>
                       <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.inspection_fees_processed || 0)}</p>
                       <p className="text-[10px] text-slate-400 mt-1">100% goes to agents (not Rentora revenue)</p>
@@ -801,12 +852,12 @@ export function AdminDashboard() {
               {/* Bottom activity summary */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="admin-card p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Inspection Tx</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing Tx</p>
                   <p className="text-lg font-bold text-slate-900 mt-1">{transactions.inspection_transactions.length}</p>
                   <p className="text-[10px] text-emerald-600 mt-0.5">{transactions.inspection_transactions.filter(t => t.status === 'completed').length} completed</p>
                 </div>
                 <div className="admin-card p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pending Inspections</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pending Viewing Requests</p>
                   <p className="text-lg font-bold text-slate-900 mt-1">{stats?.pending_inspections || 0}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5">awaiting completion</p>
                 </div>
@@ -988,7 +1039,7 @@ export function AdminDashboard() {
                       </div>
                       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                         <span>{getAgentPropertyCount(a.id)} properties</span>
-                        <span>{getAgentInspectionCount(a.id)} inspections</span>
+                        <span>{getAgentInspectionCount(a.id)} viewings</span>
                         {verification?.bank_name && <span className="text-green-600 font-medium">✓ Bank linked</span>}
                       </div>
                     </Card>
@@ -1006,7 +1057,7 @@ export function AdminDashboard() {
                       <TableHead>Account Number</TableHead>
                       <TableHead>Account Name</TableHead>
                       <TableHead className="text-center">Properties</TableHead>
-                      <TableHead className="text-center">Inspections</TableHead>
+                      <TableHead className="text-center">Viewing Requests</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1174,6 +1225,132 @@ export function AdminDashboard() {
           </div>
         </TabsContent>
 
+        {/* ── Student Verification Hub ── */}
+        <TabsContent value="student-verification">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+              <Tabs value={studentVerifStatusFilter} onValueChange={setStudentVerifStatusFilter}>
+                <TabsList>
+                  <TabsTrigger value="pending">
+                    Pending {studentVerifications.filter(v => v.status === 'pending').length > 0 && `(${studentVerifications.filter(v => v.status === 'pending').length})`}
+                  </TabsTrigger>
+                  <TabsTrigger value="approved">Approved</TabsTrigger>
+                  <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search name, email, matric no..."
+                  value={studentVerifSearch}
+                  onChange={(e) => setStudentVerifSearch(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            {(() => {
+              const q = studentVerifSearch.trim().toLowerCase();
+              const filtered = studentVerifications
+                .filter(v => studentVerifStatusFilter === 'all' || v.status === studentVerifStatusFilter)
+                .filter(v => !q ||
+                  v.user_name?.toLowerCase().includes(q) ||
+                  v.user_email?.toLowerCase().includes(q) ||
+                  v.matric_number?.toLowerCase().includes(q)
+                );
+
+              if (filtered.length === 0) {
+                return (
+                  <Card className="p-12 text-center">
+                    <GraduationCap className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="font-semibold">No {studentVerifStatusFilter !== 'all' ? studentVerifStatusFilter : ''} requests</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {studentVerifStatusFilter === 'pending' ? 'All caught up!' : 'Nothing matches this filter yet.'}
+                    </p>
+                  </Card>
+                );
+              }
+
+              const statusBadge = (status) => {
+                if (status === 'approved') return <Badge className="bg-green-100 text-green-800 border-green-300 shrink-0">Approved</Badge>;
+                if (status === 'rejected') return <Badge className="bg-red-100 text-red-800 border-red-300 shrink-0">Rejected</Badge>;
+                return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 shrink-0">Pending</Badge>;
+              };
+
+              return (
+                <div className="space-y-4">
+                  {filtered.map((v) => (
+                    <Card key={v.id} className={`overflow-hidden ${v.status === 'pending' ? 'border-yellow-200' : v.status === 'approved' ? 'border-green-200' : 'border-red-200'}`}>
+                      <div className={`flex items-center justify-between gap-3 px-5 py-4 border-b ${v.status === 'pending' ? 'bg-yellow-50/60 border-yellow-200' : v.status === 'approved' ? 'bg-green-50/60 border-green-200' : 'bg-red-50/60 border-red-200'}`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                            <GraduationCap className="w-5 h-5 text-foreground/70" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm">{v.user_name || 'Unnamed student'}</p>
+                            <p className="text-xs text-muted-foreground truncate">{v.user_email}</p>
+                            {v.matric_number && <p className="text-xs text-muted-foreground">Matric: {v.matric_number}</p>}
+                          </div>
+                        </div>
+                        {statusBadge(v.status)}
+                      </div>
+
+                      <div className="p-5 space-y-4">
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span>Document: <span className="font-medium text-foreground/80">{v.document_type === 'admission_letter' ? 'Admission letter' : 'Student ID card'}</span></span>
+                          <span>Submitted: {new Date(v.created_at).toLocaleString()}</span>
+                          {v.reviewed_at && <span>Reviewed: {new Date(v.reviewed_at).toLocaleString()}</span>}
+                        </div>
+
+                        {v.status === 'rejected' && v.admin_note && (
+                          <div className="flex items-start gap-2 p-2.5 rounded-lg border border-red-200 bg-red-50 text-xs">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+                            <p className="text-red-700"><span className="font-semibold">Rejection reason:</span> {v.admin_note}</p>
+                          </div>
+                        )}
+
+                        {/* Document + selfie preview triggers */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <button type="button" onClick={() => handlePreviewStudentDoc(v.document_url, `${v.user_name || 'Student'} — School Document`)}
+                            className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left">
+                            {/\.pdf(\?|$)/i.test(v.document_url || '') ? <FileText className="w-5 h-5 text-primary shrink-0" /> : <FileImage className="w-5 h-5 text-primary shrink-0" />}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">School Document</p>
+                              <p className="text-xs text-muted-foreground">Click to preview</p>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => handlePreviewStudentDoc(v.selfie_url, `${v.user_name || 'Student'} — Selfie`)}
+                            className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left">
+                            <FileImage className="w-5 h-5 text-primary shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">Selfie</p>
+                              <p className="text-xs text-muted-foreground">Click to preview · becomes avatar on approval</p>
+                            </div>
+                          </button>
+                        </div>
+
+                        {v.status === 'pending' && (
+                          <div className="flex gap-2 pt-1">
+                            <Button className="flex-1 gap-1.5 bg-green-600 hover:bg-green-700 text-white" disabled={studentReviewBusy}
+                              onClick={() => handleApproveStudent(v)}>
+                              <CheckCircle2 className="w-4 h-4" /> Approve
+                            </Button>
+                            <Button variant="destructive" className="flex-1 gap-1.5" disabled={studentReviewBusy}
+                              onClick={() => { setStudentRejectTarget(v); setStudentRejectReason(''); }}>
+                              <XCircle className="w-4 h-4" /> Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </TabsContent>
+
         {/* ── Properties ── */}
         <TabsContent value="properties">
           <div className="space-y-4">
@@ -1259,10 +1436,10 @@ export function AdminDashboard() {
           </div>
         </TabsContent>
 
-        {/* ── Inspections ── */}
+        {/* ── Viewing Requests ── */}
         <TabsContent value="inspections">
           <div className="sm:hidden space-y-3">
-            {inspections.map((i) => (
+            {viewings.map((i) => (
               <Card key={i.id} className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -1282,7 +1459,7 @@ export function AdminDashboard() {
           <Card className="hidden sm:block overflow-x-auto">
             <Table>
               <TableHeader><TableRow><TableHead>Property</TableHead><TableHead>User</TableHead><TableHead>Agent</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead>Payment</TableHead></TableRow></TableHeader>
-              <TableBody>{inspections.map((i) => (
+              <TableBody>{viewings.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium text-sm">{i.property_title}</TableCell>
                   <TableCell className="text-sm">{i.user_name}</TableCell>
@@ -1300,12 +1477,12 @@ export function AdminDashboard() {
         <TabsContent value="transactions">
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3">
-              <Card className="p-4 bg-blue-50 border-blue-200"><p className="text-xs text-muted-foreground">Inspection Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p></Card>
-              <Card className="p-4 bg-green-50 border-green-200"><p className="text-xs text-green-700 font-medium">Completed Inspection Tx</p><p className="text-2xl font-bold mt-1 text-green-900">{transactions.inspection_transactions.filter(t => t.status === 'completed').length}</p><p className="text-xs text-green-600 font-medium mt-0.5">{formatPrice(transactions.inspection_transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (t.amount || 0), 0))}</p></Card>
+              <Card className="p-4 bg-blue-50 border-blue-200"><p className="text-xs text-muted-foreground">Viewing Transactions</p><p className="text-2xl font-bold mt-1">{transactions.inspection_transactions.length}</p></Card>
+              <Card className="p-4 bg-green-50 border-green-200"><p className="text-xs text-green-700 font-medium">Completed Viewing Tx</p><p className="text-2xl font-bold mt-1 text-green-900">{transactions.inspection_transactions.filter(t => t.status === 'completed').length}</p><p className="text-xs text-green-600 font-medium mt-0.5">{formatPrice(transactions.inspection_transactions.filter(t => t.status === 'completed').reduce((s, t) => s + (t.amount || 0), 0))}</p></Card>
             </div>
             <div>
-              <h3 className="font-semibold text-sm mb-3">Inspection Transactions</h3>
-              <div className="sm:hidden space-y-3">{transactions.inspection_transactions.map((tx) => (<Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-mono text-xs text-muted-foreground truncate">{tx.reference}</p><p className="text-sm font-bold text-primary mt-1">{formatPrice(tx.amount)}</p></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge className={`${getStatusBadge(tx.status)} text-xs`}>{tx.status}</Badge><p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p></div></div></Card>))}{transactions.inspection_transactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No inspection transactions yet</p>}</div>
+              <h3 className="font-semibold text-sm mb-3">Viewing Transactions</h3>
+              <div className="sm:hidden space-y-3">{transactions.inspection_transactions.map((tx) => (<Card key={tx.id} className="p-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="font-mono text-xs text-muted-foreground truncate">{tx.reference}</p><p className="text-sm font-bold text-primary mt-1">{formatPrice(tx.amount)}</p></div><div className="flex flex-col items-end gap-1 shrink-0"><Badge className={`${getStatusBadge(tx.status)} text-xs`}>{tx.status}</Badge><p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p></div></div></Card>))}{transactions.inspection_transactions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No viewing transactions yet</p>}</div>
               <Card className="hidden sm:block overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{transactions.inspection_transactions.map((tx) => (<TableRow key={tx.id}><TableCell className="font-mono text-sm">{tx.reference}</TableCell><TableCell>{formatPrice(tx.amount)}</TableCell><TableCell><Badge className={getStatusBadge(tx.status)}>{tx.status}</Badge></TableCell><TableCell className="text-sm text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</TableCell></TableRow>))}</TableBody></Table></Card>
             </div>
           </div>
@@ -1696,7 +1873,7 @@ export function AdminDashboard() {
 
         <TabsContent value="rentora-revenue">
           <div className="mb-4 p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-800">
-            This is Rentora's own money — what the platform actually earns, separate from anything owed to agents. Inspection fees are excluded since agents keep 100% of those.
+            This is Rentora's own money — what the platform actually earns, separate from anything owed to agents. Viewing fees are excluded since agents keep 100% of those.
           </div>
 
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
@@ -1728,7 +1905,7 @@ export function AdminDashboard() {
             <p className="text-sm font-medium mb-2">For reference — money that is NOT Rentora revenue</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="flex justify-between p-2 rounded bg-muted/50">
-                <span className="text-muted-foreground">Inspection fees processed (100% to agents)</span>
+                <span className="text-muted-foreground">Viewing fees processed (100% to agents)</span>
                 <span className="font-medium">{formatPrice(stats?.inspection_fees_processed || 0)}</span>
               </div>
               <div className="flex justify-between p-2 rounded bg-muted/50">
@@ -1818,7 +1995,7 @@ export function AdminDashboard() {
                 </Card>
                 <Card className="p-3 text-center">
                   <p className="text-2xl font-bold text-blue-600">{getAgentInspectionCount(selectedAgentData.id)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Inspections</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Viewing Requests</p>
                 </Card>
               </div>
 
@@ -2168,7 +2345,7 @@ export function AdminDashboard() {
                     <p className="font-semibold">{formatPrice(previewProperty.price)}</p>
                   </div>
                   <div className="p-3 rounded-lg border border-blue-200">
-                    <p className="text-xs text-muted-foreground">Inspection Fee</p>
+                    <p className="text-xs text-muted-foreground">Viewing Fee</p>
                     <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
                   </div>
                   <div className="p-3 rounded-lg border border-blue-200">
@@ -2265,7 +2442,7 @@ export function AdminDashboard() {
               <div><p className="font-semibold">{deleteConfirm.property.title}</p><p className="text-sm text-muted-foreground">{deleteConfirm.property.location}</p><p className="text-sm text-muted-foreground">By: {deleteConfirm.property.uploaded_by_agent_name}</p></div>
             </div>
           )}
-          <p className="text-sm text-muted-foreground">Are you sure you want to permanently delete this property? All associated unlocks and inspections will also be removed.</p>
+          <p className="text-sm text-muted-foreground">Are you sure you want to permanently delete this property? All associated unlocks and viewings will also be removed.</p>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, property: null, deleting: false })} disabled={deleteConfirm.deleting}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteProperty} disabled={deleteConfirm.deleting}>{deleteConfirm.deleting ? 'Deleting...' : 'Yes, Delete'}</Button>
@@ -2373,6 +2550,56 @@ export function AdminDashboard() {
                 <Button onClick={() => { handleResolveReport(selectedReport.id, 'resolved'); setSelectedReport(null); }}>Mark Resolved</Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Student document/selfie preview ── */}
+      <Dialog open={!!studentDocPreview || studentDocPreviewLoading} onOpenChange={(open) => { if (!open) setStudentDocPreview(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{studentDocPreview?.title || 'Loading preview...'}</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-[300px] flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden">
+            {studentDocPreviewLoading && <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />}
+            {!studentDocPreviewLoading && studentDocPreview?.kind === 'pdf' && (
+              <iframe src={studentDocPreview.url} title={studentDocPreview.title} className="w-full h-[70vh]" />
+            )}
+            {!studentDocPreviewLoading && studentDocPreview?.kind === 'image' && (
+              <img src={studentDocPreview.url} alt={studentDocPreview.title} className="max-w-full max-h-[70vh] object-contain" />
+            )}
+          </div>
+          {studentDocPreview && (
+            <a href={studentDocPreview.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+              Open in new tab
+            </a>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Student verification reject reason ── */}
+      <Dialog open={!!studentRejectTarget} onOpenChange={(open) => { if (!open) { setStudentRejectTarget(null); setStudentRejectReason(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject verification</DialogTitle>
+            <DialogDescription>
+              {studentRejectTarget?.user_name || 'This student'} will be notified by email and can resubmit their documents.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Reason (required, shown to the student)</label>
+            <Textarea
+              value={studentRejectReason}
+              onChange={(e) => setStudentRejectReason(e.target.value)}
+              placeholder="e.g. The ID card photo is blurry — please resubmit a clearer photo."
+              rows={4}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setStudentRejectTarget(null); setStudentRejectReason(''); }}>Cancel</Button>
+            <Button variant="destructive" disabled={studentReviewBusy || !studentRejectReason.trim()} onClick={handleRejectStudent}>
+              {studentReviewBusy ? 'Rejecting...' : 'Reject & Notify'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

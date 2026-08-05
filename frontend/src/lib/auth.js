@@ -491,6 +491,12 @@ export function AuthProvider({ children }) {
       isAdmin: user?.role === 'admin',
       isAgent: user?.role === 'agent',
       isUser: user?.role === 'user',
+      // Student verification (school document + selfie). Agents and admins
+      // use the separate agent verification flow, so they are never gated.
+      verificationStatus: user?.verification_status || 'none',
+      isVerifiedStudent: user?.role !== 'user' || user?.verification_status === 'approved',
+      needsVerification: !!user && user?.role === 'user' && user?.verification_status !== 'approved',
+
     }}>
       {children}
     </AuthContext.Provider>

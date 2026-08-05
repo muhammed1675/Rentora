@@ -31,7 +31,7 @@ export function Profile() {
   const navigate = useNavigate();
   const { user, isAuthenticated, refreshUser, isUser, changePassword, deleteAccount } = useAuth();
   
-  const [inspections, setInspections] = useState([]);
+  const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
   const [rentPayments, setRentPayments] = useState([]);
   const [verificationRequest, setVerificationRequest] = useState(null);
@@ -328,8 +328,8 @@ export function Profile() {
         {/* Quick Stats */}
         <Card className="p-6">
           <div className="text-center">
-            <p className="text-2xl font-bold">{inspections.length}</p>
-            <p className="text-xs text-muted-foreground">Inspections</p>
+            <p className="text-2xl font-bold">{viewings.length}</p>
+            <p className="text-xs text-muted-foreground">Viewing Requests</p>
           </div>
         </Card>
       </div>
@@ -341,9 +341,9 @@ export function Profile() {
             <HomeIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Rent &amp; Escrow</span>
           </TabsTrigger>
-          <TabsTrigger value="inspections" className="gap-2" data-testid="tab-inspections">
+          <TabsTrigger value="inspections" className="gap-2" data-testid="tab-viewings">
             <Calendar className="w-4 h-4" />
-            <span className="hidden sm:inline">Inspections</span>
+            <span className="hidden sm:inline">Viewing Requests</span>
           </TabsTrigger>
           <TabsTrigger value="transactions" className="gap-2" data-testid="tab-transactions">
             <Receipt className="w-4 h-4" />
@@ -469,7 +469,7 @@ export function Profile() {
           )}
         </TabsContent>
 
-        {/* Inspections */}
+        {/* Viewing Requests */}
         <TabsContent value="inspections">
           {loading ? (
             <div className="space-y-4">
@@ -479,26 +479,26 @@ export function Profile() {
                 </Card>
               ))}
             </div>
-          ) : inspections.length > 0 ? (
+          ) : viewings.length > 0 ? (
             <div className="space-y-4">
-              {inspections.map((inspection) => (
-                <Card key={inspection.id} className="p-4">
+              {viewings.map((viewing) => (
+                <Card key={viewing.id} className="p-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-semibold">{inspection.property_title}</h3>
+                      <h3 className="font-semibold">{viewing.property_title}</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Scheduled: {inspection.inspection_date}
+                        Scheduled: {viewing.inspection_date}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Agent: {inspection.agent_name || 'To be assigned'}
+                        Agent: {viewing.agent_name || 'To be assigned'}
                       </p>
                     </div>
                     <div className="text-right">
-                      <Badge className={getStatusBadge(inspection.status)}>
-                        {inspection.status}
+                      <Badge className={getStatusBadge(viewing.status)}>
+                        {viewing.status}
                       </Badge>
-                      <Badge className={`ml-2 ${getStatusBadge(inspection.payment_status)}`}>
-                        Payment: {inspection.payment_status}
+                      <Badge className={`ml-2 ${getStatusBadge(viewing.payment_status)}`}>
+                        Payment: {viewing.payment_status}
                       </Badge>
                     </div>
                   </div>
@@ -508,9 +508,9 @@ export function Profile() {
           ) : (
             <Card className="p-8 text-center">
               <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold">No Inspections</h3>
+              <h3 className="font-semibold">No Viewing Requests</h3>
               <p className="text-sm text-muted-foreground mt-2">
-                Request inspections from property detail pages
+                Request viewings from property detail pages
               </p>
             </Card>
           )}
@@ -520,14 +520,14 @@ export function Profile() {
         <TabsContent value="transactions">
           <div className="space-y-6">
             <div>
-              <h3 className="font-semibold mb-4">Inspection Payments</h3>
+              <h3 className="font-semibold mb-4">Viewing Payments</h3>
               {transactions.inspection_transactions.length > 0 ? (
                 <div className="space-y-3">
                   {transactions.inspection_transactions.map((tx) => (
                     <Card key={tx.id} className="p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="font-medium">Inspection Fee</p>
+                          <p className="font-medium">Viewing Fee</p>
                           <p className="text-sm text-muted-foreground">{tx.reference}</p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -552,7 +552,7 @@ export function Profile() {
                               status: tx.status,
                               rows: [{ label: 'Inspection Fee', value: formatPrice(tx.amount) }],
                               total: { label: 'Amount Paid', value: formatPrice(tx.amount) },
-                              filename: `rentora-inspection-receipt-${tx.reference || tx.id}.png`,
+                              filename: `rentora-viewing-receipt-${tx.reference || tx.id}.png`,
                             })}
                           >
                             <Download className="w-4 h-4" />
@@ -564,7 +564,7 @@ export function Profile() {
                 </div>
               ) : (
                 <Card className="p-4 text-center text-muted-foreground">
-                  No inspection payments yet
+                  No viewing payments yet
                 </Card>
               )}
             </div>
