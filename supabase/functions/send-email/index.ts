@@ -103,21 +103,6 @@ function emailWelcome(name: string) {
   `);
 }
 
-function emailTokenReceipt(name: string, tokens: number, amount: number, newBalance: number, reference: string) {
-  return baseTemplate(`
-    <span class="badge">Payment Successful ${icon.check}</span>
-    <h2>Token Purchase Receipt</h2>
-    <p>Hi ${name}, your token purchase was successful. Your wallet has been credited.</p>
-    <div class="card">
-      <div class="card-row"><span class="label">Tokens Purchased</span><span class="value">${tokens} token${tokens > 1 ? 's' : ''}</span></div>
-      <div class="card-row"><span class="label">Amount Paid</span><span class="value">₦${amount.toLocaleString()}</span></div>
-      <div class="card-row"><span class="label">New Balance</span><span class="value">${newBalance} token${newBalance !== 1 ? 's' : ''}</span></div>
-      <div class="card-row"><span class="label">Reference</span><span class="value" style="font-size:12px">${reference}</span></div>
-    </div>
-    <a href="https://www.rentora.com.ng/browse" class="btn">Browse Properties</a>
-  `);
-}
-
 function emailInspectionBooked(name: string, propertyTitle: string, inspectionDate: string, reference: string, amount: number) {
   return baseTemplate(`
     <span class="badge">Viewing Confirmed ${icon.check}</span>
@@ -402,10 +387,6 @@ serve(async (req) => {
       case "welcome":
         subject = "Welcome to Rentora";
         html = emailWelcome(data.name);
-        break;
-      case "token_receipt":
-        subject = `Receipt: ${data.tokens} Token${data.tokens > 1 ? 's' : ''} Added to Your Wallet`;
-        html = emailTokenReceipt(data.name, data.tokens, data.amount, data.new_balance, data.reference);
         break;
       case "inspection_booked":
         subject = "Inspection Booking Confirmed — Rentora";

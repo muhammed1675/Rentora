@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../lib/auth';
@@ -7,12 +7,85 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import { Upload, ShieldCheck, Clock, XCircle, Camera, FileText, Loader2 } from 'lucide-react';
+import { Upload, ShieldCheck, Clock, XCircle, Camera, FileText, Loader2, X, CheckCircle2 } from 'lucide-react';
 
 const DOC_TYPES = [
   { value: 'student_id', label: 'Student ID card' },
   { value: 'admission_letter', label: 'Admission letter' },
 ];
+
+// Shared drag-and-drop upload card. Handles drag state, click-to-browse,
+// and a preview once a file is chosen (thumbnail for images, filename for PDFs).
+function DropZone({ icon: Icon, title, description, accept, capture, file, onChange, previewShape = 'wide' }) {
+  const [dragActive, setDragActive] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFiles = (fileList) => {
+    const f = fileList?.[0];
+    if (f) onChange(f);
+  };
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+      onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragActive(false);
+        handleFiles(e.dataTransfer.files);
+      }}
+      className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+        dragActive ? 'border-primary bg-primary/5' : file ? 'border-green-300 bg-green-50/40' : 'border-muted-foreground/25'
+      }`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        capture={capture}
+        onChange={(e) => handleFiles(e.target.files)}
+        className="hidden"
+      />
+
+      {!file && (
+        <>
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Icon className="h-6 w-6 text-primary" />
+          </div>
+          <h3 className="font-semibold">{title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <Button type="button" variant="outline" className="mt-4 gap-2" onClick={() => inputRef.current?.click()}>
+            <Upload className="h-4 w-4" /> {capture ? 'Take Selfie' : 'Upload Document'}
+          </Button>
+          <p className="mt-2 text-xs text-muted-foreground">or drag and drop a file here</p>
+        </>
+      )}
+
+      {file && (
+        <div className="flex items-center gap-3">
+          {previewShape === 'round' && file.type.startsWith('image/') ? (
+            <img src={URL.createObjectURL(file)} alt="Selfie preview" className="h-16 w-16 shrink-0 rounded-full object-cover" />
+          ) : file.type.startsWith('image/') ? (
+            <img src={URL.createObjectURL(file)} alt="Document preview" className="h-16 w-16 shrink-0 rounded-lg object-cover border" />
+          ) : (
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border bg-muted">
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1 text-left">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-green-700">
+              <CheckCircle2 className="h-4 w-4 shrink-0" /> Ready
+            </p>
+            <p className="truncate text-xs text-muted-foreground">{file.name}</p>
+          </div>
+          <Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={() => { onChange(null); if (inputRef.current) inputRef.current.value = ''; }}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function VerifyAccount() {
   const { user, refreshUser, logout } = useAuth();
@@ -93,8 +166,9 @@ export default function VerifyAccount() {
         </div>
         <h1 className="text-2xl font-bold sm:text-3xl">Verify your student account</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Rentora is for verified LAUTECH students only. Upload your school document and a
-          selfie so we can confirm it is really you. Your selfie becomes your profile picture.
+          We verify every student to keep Rentora a safe, scam-free community. Upload your
+          school document and a selfie so we can confirm it's really you. Your selfie becomes
+          your profile picture.
         </p>
       </div>
 
@@ -157,41 +231,28 @@ export default function VerifyAccount() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <FileText className="h-4 w-4" /> School document (image or PDF)
-              </label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
-                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
-              />
-              {documentFile && <p className="text-xs text-muted-foreground truncate">{documentFile.name}</p>}
-            </div>
+            <DropZone
+              icon={FileText}
+              title="1. Upload School Document"
+              description={`Upload your ${documentType === 'admission_letter' ? 'Admission Letter' : 'School ID Card'}. Ensure the text is clear and not blurry.`}
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              file={documentFile}
+              onChange={setDocumentFile}
+            />
 
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <Camera className="h-4 w-4" /> Selfie (used as your profile picture)
-              </label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="user"
-                onChange={(e) => setSelfieFile(e.target.files?.[0] || null)}
-                className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
-              />
-              {selfieFile && (
-                <img
-                  src={URL.createObjectURL(selfieFile)}
-                  alt="Selfie preview"
-                  className="h-24 w-24 rounded-full object-cover"
-                />
-              )}
-            </div>
+            <DropZone
+              icon={Camera}
+              title="2. Take a Selfie"
+              description="Take a clear selfie for comparison. Make sure your face is well-lit and clearly visible. This becomes your profile picture."
+              accept="image/jpeg,image/png,image/webp"
+              capture="user"
+              file={selfieFile}
+              onChange={setSelfieFile}
+              previewShape="round"
+            />
 
             <Button type="submit" className="w-full gap-2" disabled={submitting}>
-              {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Submitting…</> : <><Upload className="h-4 w-4" /> Submit for verification</>}
+              {submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Submitting…</> : <><Upload className="h-4 w-4" /> Submit for Verification</>}
             </Button>
           </form>
 
