@@ -66,11 +66,96 @@ export function AdminDashboard() {
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
 
+  // Agent invites — invite-only agent applications (see BecomeAgent.jsx)
+  const [agentInvites, setAgentInvites] = useState([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteExpiryDays, setInviteExpiryDays] = useState('7');
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
     if (!isAdmin) { toast.error('Access denied'); navigate('/'); return; }
     fetchData();
   }, [isAuthenticated, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchAgentInvites = async () => {
+    setLoadingInvites(true);
+    try {
+      const { data: invites, error } = await supabase
+        .from('agent_invites')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const usedIds = [...new Set((invites || []).map(i => i.used_by).filter(Boolean))];
+      let namesById = {};
+      if (usedIds.length) {
+        const { data: usedUsers } = await supabase.from('users').select('id, full_name, email').in('id', usedIds);
+        namesById = Object.fromEntries((usedUsers || []).map(u => [u.id, u]));
+      }
+      setAgentInvites((invites || []).map(i => ({ ...i, used_by_user: i.used_by ? namesById[i.used_by] : null })));
+    } catch (e) {
+      console.error('Failed to load agent invites:', e);
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'agent-invites') fetchAgentInvites();
+  }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const generateAgentInvite = async () => {
+    setGeneratingInvite(true);
+    try {
+      const code = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+      const days = Math.max(1, parseInt(inviteExpiryDays, 10) || 7);
+      const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from('agent_invites').insert({
+        code, created_by: user.id, email: inviteEmail.trim() || null, expires_at: expiresAt,
+      });
+      if (error) throw error;
+      toast.success('Invite link generated');
+      setInviteEmail('');
+      await fetchAgentInvites();
+    } catch (e) {
+      toast.error(e.message || 'Failed to generate invite');
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const revokeAgentInvite = async (invite) => {
+    try {
+      const { error } = await supabase.from('agent_invites')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('id', invite.id);
+      if (error) throw error;
+      toast.success('Invite revoked');
+      await fetchAgentInvites();
+    } catch (e) {
+      toast.error(e.message || 'Failed to revoke invite');
+    }
+  };
+
+  const inviteLink = (code) => `${window.location.origin}/become-agent?invite=${code}`;
+
+  const copyInviteLink = (code) => {
+    navigator.clipboard.writeText(inviteLink(code))
+      .then(() => toast.success('Invite link copied'))
+      .catch(() => toast.error('Could not copy link'));
+  };
+
+  const shareInviteOnWhatsApp = (code) => {
+    window.open(`https://wa.me/?text=${encodeURIComponent('Apply to become a Rentora agent: ' + inviteLink(code))}`, '_blank');
+  };
+
+  const inviteStatus = (invite) => {
+    if (invite.used_by) return 'used';
+    if (invite.revoked_at) return 'revoked';
+    if (new Date(invite.expires_at) < new Date()) return 'expired';
+    return 'unused';
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -430,6 +515,7 @@ export function AdminDashboard() {
         { id: 'agents', label: 'Agents', icon: UserCog, count: agents.length },
         { id: 'verification', label: 'Agent Verification', icon: Shield, count: stats?.pending_verifications, urgent: true },
         { id: 'student-verification', label: 'Student ID', icon: GraduationCap, count: studentVerifications.filter(v => v.status === 'pending').length, urgent: true },
+        { id: 'agent-invites', label: 'Agent Invites', icon: Mail, count: agentInvites.filter(i => inviteStatus(i) === 'unused').length },
       ],
     },
     { id: 'properties', label: 'Listings', icon: Building2, count: stats?.pending_properties, urgent: true },
@@ -1348,6 +1434,95 @@ export function AdminDashboard() {
                 </div>
               );
             })()}
+          </div>
+        </TabsContent>
+
+        {/* ── Agent Invites ── */}
+        <TabsContent value="agent-invites">
+          <div className="space-y-6">
+            <Card className="p-5">
+              <h3 className="font-semibold mb-1">Generate invite link</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Agent applications are invite-only. Generate a single-use link and send it to the
+                person you want to work with — nobody can find or guess this page on their own.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  placeholder="Agent's email (optional)"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="sm:max-w-xs"
+                />
+                <Select value={inviteExpiryDays} onValueChange={setInviteExpiryDays}>
+                  <SelectTrigger className="sm:w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Expires in 1 day</SelectItem>
+                    <SelectItem value="3">Expires in 3 days</SelectItem>
+                    <SelectItem value="7">Expires in 7 days</SelectItem>
+                    <SelectItem value="30">Expires in 30 days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={generateAgentInvite} disabled={generatingInvite} className="gap-2">
+                  {generatingInvite ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                  Generate invite link
+                </Button>
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">All invites</h3>
+                <Button variant="outline" size="sm" onClick={fetchAgentInvites} disabled={loadingInvites} className="gap-2">
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingInvites ? 'animate-spin' : ''}`} /> Refresh
+                </Button>
+              </div>
+
+              {loadingInvites ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : agentInvites.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No invites generated yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {agentInvites.map((invite) => {
+                    const st = inviteStatus(invite);
+                    return (
+                      <div key={invite.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{invite.code}</code>
+                            {st === 'unused' && <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Unused</Badge>}
+                            {st === 'used' && <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Used</Badge>}
+                            {st === 'expired' && <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">Expired</Badge>}
+                            {st === 'revoked' && <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Revoked</Badge>}
+                            {invite.email && <span className="text-xs text-muted-foreground">for {invite.email}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {st === 'used'
+                              ? `Used by ${invite.used_by_user?.full_name || invite.used_by_user?.email || 'unknown'} on ${new Date(invite.used_at).toLocaleDateString()}`
+                              : `Expires ${new Date(invite.expires_at).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {st === 'unused' && (
+                            <>
+                              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => copyInviteLink(invite.code)}>
+                                <Copy className="w-3.5 h-3.5" /> Copy
+                              </Button>
+                              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => shareInviteOnWhatsApp(invite.code)}>
+                                WhatsApp
+                              </Button>
+                              <Button size="sm" variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => revokeAgentInvite(invite)}>
+                                <XCircle className="w-3.5 h-3.5" /> Revoke
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
           </div>
         </TabsContent>
 

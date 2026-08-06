@@ -88,7 +88,7 @@ const AMENITY_OPTIONS = [
 
 export function AgentDashboard() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isAgent, isAdmin } = useAuth();
+  const { user, isAuthenticated, isAgent, isAdmin, isUser } = useAuth();
   const fileInputRef = useRef(null);
 
   // Properties & viewings
@@ -139,9 +139,28 @@ export function AgentDashboard() {
   // ── Load data on mount ───────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
-    if (!isAgent && !isAdmin) { toast.error('Access denied'); navigate('/'); return; }
+    // A plain 'user' still gets in — read-only "explore" state until an
+    // admin approves their agent application (role flips to 'agent').
+    // fetchData() below is guarded to skip agent-only queries for them.
     fetchData();
   }, [isAuthenticated, isAgent, isAdmin, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pending/rejected agent application status, for the explore-mode card.
+  // Only relevant while role is still 'user' — once approved, role flips
+  // to 'agent' and the full dashboard takes over.
+  const [myAgentRequest, setMyAgentRequest] = useState(null);
+  useEffect(() => {
+    if (!isUser || !user?.id) return;
+    supabase
+      .from('agent_verification_requests')
+      .select('status, reviewed_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setMyAgentRequest(data || null))
+      .catch(() => setMyAgentRequest(null));
+  }, [isUser, user?.id]);
 
   useEffect(() => {
     locationAPI.getAll().then(res => setLocations(res.data)).catch(() => setLocations([]));
@@ -309,6 +328,7 @@ export function AgentDashboard() {
   };
 
   const handleSubmitProperty = async () => {
+    if (!isAgent && !isAdmin) { toast.error('Complete verification to start listing'); return; }
     if (!formData.title || !formData.price || !formData.location_id || !formData.contact_name || !formData.contact_phone) {
       toast.error('Please fill in all required fields'); return;
     }
@@ -410,9 +430,10 @@ export function AgentDashboard() {
     refunded: 'bg-red-100 text-red-800',
   }[status] || 'bg-gray-100 text-gray-800');
 
-  if (!isAuthenticated || (!isAgent && !isAdmin)) return null;
+  if (!isAuthenticated || (!isAgent && !isAdmin && !isUser)) return null;
 
   const handleWithdraw = async () => {
+    if (!isAgent && !isAdmin) { toast.error('Complete verification to receive payouts'); return; }
     const amt = parseFloat(withdrawAmount);
     if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
     if (amt > balance.available) { toast.error('Amount exceeds available balance'); return; }
@@ -460,15 +481,40 @@ export function AgentDashboard() {
         </div>
         <Button
           onClick={() => {
+            if (!isAgent && !isAdmin) { toast.error('Complete verification to start listing'); return; }
             if (user?.suspended) { toast.error('Your account is suspended.'); return; }
             handleOpenDialog();
           }}
-          className="gap-2" disabled={user?.suspended} data-testid="add-property-btn">
+          className="gap-2" disabled={user?.suspended || (!isAgent && !isAdmin)} data-testid="add-property-btn">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">Add Property</span>
           <span className="sm:hidden">Add</span>
         </Button>
       </div>
+
+      {isUser && (
+        <div className="mb-5 p-4 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3" data-testid="agent-verification-card">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+            <Lock className="w-4 h-4 text-blue-600" />
+          </div>
+          <div>
+            <p className="font-medium text-blue-900">
+              {myAgentRequest?.status === 'pending'
+                ? 'Your agent verification is under review'
+                : myAgentRequest?.status === 'rejected'
+                  ? 'Your agent verification was not approved'
+                  : "You're exploring in read-only mode"}
+            </p>
+            <p className="text-sm text-blue-700 mt-0.5">
+              {myAgentRequest?.status === 'pending'
+                ? "We'll notify you as soon as it's reviewed. Listing, leads and payouts unlock once approved."
+                : myAgentRequest?.status === 'rejected'
+                  ? 'Contact support for details, or reach out for a new invite to reapply.'
+                  : 'Complete verification to start listing, receive leads, and get paid out.'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {user?.suspended && (
         <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start gap-3">

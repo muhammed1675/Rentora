@@ -22,11 +22,18 @@ export function AuthCallback() {
       try {
         const profile = await completeOAuthSignIn();
         toast.success('Welcome!');
-        // Google sign-up still has to pass student verification: send them
-        // straight to the document + selfie upload page until approved.
-        const needsVerification =
-          profile?.role === 'user' && profile?.verification_status !== 'approved';
-        navigate(needsVerification ? '/verify-account' : '/browse', { replace: true });
+
+        const storedNext = sessionStorage.getItem('rentora_post_login_next');
+        sessionStorage.removeItem('rentora_post_login_next');
+
+        // Only a genuinely brand-new sign-up gets steered to verification —
+        // an existing user completing Google sign-in just goes back to
+        // wherever they were headed (or /browse). Verification is enforced
+        // at the action, not by blocking the rest of the site.
+        const destination = profile?._isNewUser
+          ? '/verify-account'
+          : (storedNext || '/browse');
+        navigate(destination, { replace: true });
       } catch (err) {
         setError(err.message || 'Failed to sign in with Google.');
       }

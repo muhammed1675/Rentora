@@ -6,5 +6,6 @@ Disallow: /admin
 Disallow: /profile
 Disallow: /payment
 Disallow: /tokens
+Disallow: /become-agent
 
 Sitemap: https://www.rentora.com.ng/sitemap.xml

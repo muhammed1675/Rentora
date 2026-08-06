@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,7 +12,10 @@ import { toast } from 'sonner';
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, requestPasswordReset, loginWithGoogle, confirmPasswordResetWithCode } = useAuth();
+
+  const nextPath = new URLSearchParams(location.search).get('next') || '/browse';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +34,11 @@ export function Login() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
+      // Google's redirect loses our query string, so stash where to
+      // return to and let AuthCallback.jsx pick it back up.
+      if (nextPath && nextPath !== '/browse') {
+        sessionStorage.setItem('rentora_post_login_next', nextPath);
+      }
       await loginWithGoogle();
       // Browser redirects to Google here; no further code runs.
     } catch (error) {
@@ -71,7 +79,7 @@ export function Login() {
       await confirmPasswordResetWithCode(resetEmail, resetCode.trim(), newPassword);
       toast.success('Password updated! You are now signed in.');
       setShowForgotPassword(false);
-      navigate('/browse');
+      navigate(nextPath);
     } catch (err) {
       toast.error(err.message || 'Invalid or expired code');
     } finally {
@@ -117,7 +125,7 @@ export function Login() {
       await login(email, password);
       recordAttempt(true);
       toast.success('Welcome back!');
-      navigate('/browse');
+      navigate(nextPath);
     } catch (error) {
       recordAttempt(false);
       toast.error(error.message || 'Invalid credentials');

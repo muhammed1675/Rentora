@@ -15,6 +15,8 @@ import {
   Calendar, 
   Receipt, 
   Shield,
+  ShieldCheck,
+  ShieldAlert,
   Building2,
   Phone,
   Home as HomeIcon,
@@ -29,10 +31,10 @@ import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, refreshUser, isUser, changePassword, deleteAccount } = useAuth();
+  const { user, isAuthenticated, refreshUser, isUser, verificationStatus, changePassword, deleteAccount } = useAuth();
   
   const [viewings, setInspections] = useState([]);
-  const [transactions, setTransactions] = useState({ token_transactions: [], inspection_transactions: [] });
+  const [transactions, setTransactions] = useState({ inspection_transactions: [] });
   const [rentPayments, setRentPayments] = useState([]);
   const [verificationRequest, setVerificationRequest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -321,6 +323,23 @@ export function Profile() {
               <Badge variant="outline" className="mt-2 capitalize">
                 {user?.role}
               </Badge>
+              {isUser && (
+                verificationStatus === 'approved' ? (
+                  <Badge className="mt-2 ml-1.5 gap-1 bg-green-100 text-green-800 hover:bg-green-100">
+                    <ShieldCheck className="w-3 h-3" /> Verified
+                  </Badge>
+                ) : verificationStatus === 'pending' ? (
+                  <Badge className="mt-2 ml-1.5 gap-1 bg-amber-100 text-amber-800 hover:bg-amber-100">
+                    <Clock className="w-3 h-3" /> Under review
+                  </Badge>
+                ) : (
+                  <Link to="/verify-account">
+                    <Badge className="mt-2 ml-1.5 gap-1 bg-red-100 text-red-800 hover:bg-red-200 cursor-pointer">
+                      <ShieldAlert className="w-3 h-3" /> Not verified
+                    </Badge>
+                  </Link>
+                )
+              )}
             </div>
           </div>
         </Card>

@@ -637,21 +637,14 @@ export const studentVerificationAPI = {
 
 export const transactionAPI = {
   getMyTransactions: async (userId) => {
-    const { data: tokenTxs } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    
     const { data: inspTxs } = await supabase
       .from('inspection_transactions')
       .select('*, viewing:inspections(property_id)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    
+
     return {
       data: {
-        token_transactions: tokenTxs || [],
         inspection_transactions: inspTxs || []
       }
     };
@@ -815,7 +808,7 @@ export const verificationAPI = {
         status === 'approved'
           ? 'Your agent verification has been approved. You can now list properties.'
           : 'Your agent verification request was not approved this time. Contact support for details.',
-        status === 'approved' ? '/agent' : '/become-agent'
+        '/agent'
       );
     }
     

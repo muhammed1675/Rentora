@@ -1,7 +1,9 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { VerifyGateProvider } from "./components/VerifyGateDialog";
+import { supabase } from "./lib/supabase";
 import { Toaster } from "./components/ui/sonner";
 import Layout from "./components/Layout";
 import { initializeAnalytics, trackPageView } from "./lib/analytics";
@@ -25,44 +27,16 @@ import { AuthCallback } from './pages/AuthCallback';
 import { NotFound } from './pages/NotFound';
 import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
-import { AgentRequirements } from './pages/AgentRequirements';
 import Notifications from './pages/Notifications';
 import VerifyAccount from './pages/VerifyAccount';
 
-// Routes an unverified student is still allowed to reach: the verification
-// page itself, legal pages, support and the auth screens. Everything else
-// redirects to /verify-account.
-const VERIFICATION_EXEMPT_PATHS = [
-  '/verify-account',
-  '/terms', '/privacy', '/refund', '/disclaimer',
-  '/contact', '/about', '/faq',
-  '/login', '/register', '/reset-password', '/auth/callback',
-];
-
-function isVerificationExempt(pathname) {
-  return VERIFICATION_EXEMPT_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-}
-
-// Global gate: a signed-in student who has not been verified can only use the
-// exempt routes above. This is the UI half of the rule — the database also
-// blocks unverified students from creating viewing requests, rent payments,
-// unlocks, reviews and reports.
-function VerificationGate({ children }) {
-  const { needsVerification, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) return children;
-  if (needsVerification && !isVerificationExempt(location.pathname)) {
-    return <Navigate to="/verify-account" replace />;
-  }
-  return children;
-}
-
-// Protected Route wrapper
+// Protected Route wrapper. Browsing is always allowed for everyone —
+// verification is enforced at the specific action, not at the route
+// level (see components/VerifyGateDialog.jsx). This wrapper only
+// checks sign-in and role.
 function ProtectedRoute({ children, allowedRoles = [] }) {
   const { isAuthenticated, user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -73,7 +47,8 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
@@ -83,6 +58,46 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   return children;
 }
 
+// Gate for the invite-only /become-agent page. No public entry point
+// links here — a valid, unused, unexpired invite code is required in
+// the URL. Without one this renders as a plain "Not found", identical
+// to any wrong URL, so the page can't be guessed or probed. A signed-
+// out visitor is sent to login and back to this same invite link.
+function AgentInviteGate({ children }) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const location = useLocation();
+  const [status, setStatus] = useState('checking'); // checking | valid | invalid
+
+  const code = new URLSearchParams(location.search).get('invite');
+
+  useEffect(() => {
+    let mounted = true;
+    if (!code) { setStatus('invalid'); return; }
+    if (!isAuthenticated) return; // wait for the login redirect below
+    supabase.rpc('check_agent_invite', { p_code: code })
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        setStatus(!error && data === true ? 'valid' : 'invalid');
+      })
+      .catch(() => { if (mounted) setStatus('invalid'); });
+    return () => { mounted = false; };
+  }, [code, isAuthenticated]);
+
+  if (authLoading) return null;
+
+  if (!isAuthenticated) {
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+
+  if (!code || status === 'invalid') {
+    return <Layout><NotFound /></Layout>;
+  }
+
+  if (status === 'checking') return null;
+
+  return children;
+}
 
 function TrackPageViews() {
   const location = useLocation();
@@ -96,9 +111,8 @@ function TrackPageViews() {
 
 function AppRoutes() {
   return (
-    <>
+    <VerifyGateProvider>
       <TrackPageViews />
-      <VerificationGate>
       <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Layout><Home /></Layout>} />
@@ -112,7 +126,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />
       <Route path="/auth/callback" element={<Layout><AuthCallback /></Layout>} />
 
-      {/* Mandatory student verification */}
+      {/* Student verification — reachable any time, never forces browsing */}
       <Route
         path="/verify-account"
         element={
@@ -133,12 +147,15 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      {/* Invite-only agent application. Not linked from anywhere in the
+          UI, excluded from the sitemap, disallowed in robots.txt and
+          noindexed — see BecomeAgent.jsx. */}
       <Route
         path="/become-agent"
         element={
-          <ProtectedRoute allowedRoles={['user']}>
+          <AgentInviteGate>
             <Layout><BecomeAgent /></Layout>
-          </ProtectedRoute>
+          </AgentInviteGate>
         }
       />
 
@@ -151,11 +168,13 @@ function AppRoutes() {
         }
       />
 
-      {/* Agent Routes */}
+      {/* Agent Routes — also reachable by a plain 'user' who applied,
+          in a read-only "explore" state until approved (see
+          AgentDashboard.jsx). */}
       <Route
         path="/agent"
         element={
-          <ProtectedRoute allowedRoles={['agent', 'admin']}>
+          <ProtectedRoute allowedRoles={['user', 'agent', 'admin']}>
             <Layout><AgentDashboard /></Layout>
           </ProtectedRoute>
         }
@@ -180,13 +199,11 @@ function AppRoutes() {
       {/* Info Pages */}
       <Route path="/about" element={<Layout><About /></Layout>} />
       <Route path="/faq" element={<Layout><FAQ /></Layout>} />
-      <Route path="/agent-requirements" element={<Layout><AgentRequirements /></Layout>} />
 
       {/* Catch all */}
       <Route path="*" element={<Layout><NotFound /></Layout>} />
     </Routes>
-    </VerificationGate>
-    </>
+    </VerifyGateProvider>
 
   );
 }

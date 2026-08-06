@@ -78,7 +78,7 @@ const faqs = [
       },
       {
         q: 'How do I become an agent on Rentora?',
-        a: 'Visit the "Become an Agent" page and submit your application. You\'ll need to provide verification documents, and our team will review your application within 3-5 business days.',
+        a: 'Agent accounts are by invite only. Reach out via the Contact page and our team will follow up if we\'re looking for agents in your area.',
       },
     ],
   },

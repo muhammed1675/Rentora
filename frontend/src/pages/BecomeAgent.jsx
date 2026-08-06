@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { verificationAPI, storageAPI } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -26,7 +27,19 @@ const FALLBACK_BANKS = [
 
 export function BecomeAgent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated, isUser } = useAuth();
+  const inviteCode = new URLSearchParams(location.search).get('invite');
+
+  // Keep this page out of search results — it's invite-only and should
+  // never surface for anyone who lands here without a link.
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow';
+    document.head.appendChild(meta);
+    return () => { document.head.removeChild(meta); };
+  }, []);
 
   const idCardRef = useRef(null);
   const selfieRef = useRef(null);
@@ -110,6 +123,15 @@ export function BecomeAgent() {
 
     setUploading(true);
     try {
+      // Re-check the invite right before we act on it — it may have been
+      // used, revoked, or expired since the page loaded.
+      const { data: redeemed, error: redeemError } = await supabase.rpc('redeem_agent_invite', { p_code: inviteCode });
+      if (redeemError || !redeemed) {
+        toast.error('This invite link is no longer valid. Please ask for a new one.');
+        setUploading(false);
+        return;
+      }
+
       toast.loading('Uploading documents...', { id: 'upload' });
       const [idCardResult, selfieResult, agreementResult] = await Promise.all([
         storageAPI.uploadFile(idCardFile, 'verification/id-cards'),
@@ -142,6 +164,7 @@ export function BecomeAgent() {
 
   if (!isAuthenticated) { navigate('/login'); return null; }
   if (!isUser) { navigate('/'); return null; }
+  if (!inviteCode) { navigate('/', { replace: true }); return null; }
 
   if (submitted) {
     return (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../lib/auth';
 import { studentVerificationAPI, storageAPI } from '../lib/api';
@@ -90,6 +90,8 @@ function DropZone({ icon: Icon, title, description, accept, capture, file, onCha
 export default function VerifyAccount() {
   const { user, refreshUser, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const nextPath = new URLSearchParams(location.search).get('next') || '/browse';
 
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -116,8 +118,10 @@ export default function VerifyAccount() {
 
   // Already approved? Nothing to do here.
   useEffect(() => {
-    if (user?.verification_status === 'approved') navigate('/browse', { replace: true });
-  }, [user?.verification_status, navigate]);
+    if (user?.verification_status === 'approved') navigate(nextPath, { replace: true });
+  }, [user?.verification_status, navigate, nextPath]);
+
+  const handleSkip = () => navigate(nextPath, { replace: true });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -170,7 +174,21 @@ export default function VerifyAccount() {
           school document and a selfie so we can confirm it's really you. Your selfie becomes
           your profile picture.
         </p>
+        {status === 'none' && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            You can browse Rentora without this — it's only needed to pay rent, book a
+            viewing, unlock a contact, or post a review.
+          </p>
+        )}
       </div>
+
+      {(status === 'none' || status === 'rejected') && (
+        <div className="mb-4 flex justify-center">
+          <Button type="button" variant="ghost" onClick={handleSkip} data-testid="skip-verification-btn">
+            Skip for now
+          </Button>
+        </div>
+      )}
 
       {status === 'pending' && (
         <Card className="p-6 text-center">

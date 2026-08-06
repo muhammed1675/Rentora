@@ -160,9 +160,6 @@ export function About() {
           <Button asChild size="lg">
             <Link to="/browse">Browse Properties</Link>
           </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link to="/become-agent">Become an Agent</Link>
-          </Button>
         </div>
       </section>
     </div>

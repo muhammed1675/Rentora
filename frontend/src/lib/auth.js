@@ -63,8 +63,7 @@ export function AuthProvider({ children }) {
             .select()
             .single();
 
-          await supabase.from('wallets').insert({ user_id: authUser.id, token_balance: 0 });
-          return created ? { ...created, token_balance: 0 } : null;
+          return created || null;
         }
 
         if (error) {
@@ -72,13 +71,7 @@ export function AuthProvider({ children }) {
           continue;
         }
 
-        const { data: wallet } = await supabase
-          .from('wallets')
-          .select('token_balance')
-          .eq('user_id', authUser.id)
-          .single();
-
-        return { ...data, token_balance: wallet?.token_balance || 0 };
+        return data;
 
       } catch (err) {
         console.warn(`Profile load attempt ${i + 1} exception:`, err.message);
@@ -176,15 +169,9 @@ export function AuthProvider({ children }) {
             await supabase.auth.signOut();
             throw new Error('Your account has been suspended. Please contact support for assistance.');
           }
-          const { data: wallet } = await supabase
-            .from('wallets')
-            .select('token_balance')
-            .eq('user_id', found.id)
-            .single();
-          const fullProfile = { ...found, token_balance: wallet?.token_balance || 0 };
-          setUser(fullProfile);
+          setUser(found);
           setSession(data.session);
-          return fullProfile;
+          return found;
         }
 
         throw new Error('Could not load your profile. Please try again in a moment.');
@@ -383,7 +370,7 @@ export function AuthProvider({ children }) {
       notifyUser(profile.id, 'welcome', 'Welcome to Rentora!', 'Your account is ready — start browsing verified listings.', '/browse');
     }
 
-    return profile;
+    return { ...profile, _isNewUser: isBrandNewUser };
   };
 
   // ── Delete account ───────────────────────────────────────────
@@ -495,7 +482,12 @@ export function AuthProvider({ children }) {
       // use the separate agent verification flow, so they are never gated.
       verificationStatus: user?.verification_status || 'none',
       isVerifiedStudent: user?.role !== 'user' || user?.verification_status === 'approved',
+      isVerifiedAgent: user?.role === 'agent' || user?.role === 'admin',
       needsVerification: !!user && user?.role === 'user' && user?.verification_status !== 'approved',
+      // Action-time gates (see components/VerifyGateDialog.jsx). Reads and
+      // browsing are never gated — only these specific actions are.
+      canPay: user?.role !== 'user' || user?.verification_status === 'approved',
+      canUnlock: user?.role !== 'user' || ['approved', 'pending'].includes(user?.verification_status),
 
     }}>
       {children}

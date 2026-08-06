@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { useVerifyGate } from '../components/VerifyGateDialog';
 import { propertyAPI, inspectionAPI, reviewAPI, rentAPI, reportAPI } from '../lib/api';
 import { openFlutterwaveCheckout } from '../lib/flutterwave';
 import { Button } from '../components/ui/button';
@@ -63,7 +64,8 @@ function toggleCompare(property) {
 export function PropertyDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated, refreshUser } = useAuth();
+  const { user, isAuthenticated, refreshUser, verificationStatus } = useAuth();
+  const { requireVerification } = useVerifyGate();
   
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +97,7 @@ export function PropertyDetails() {
 
   const handleSubmitReport = async () => {
     if (!isAuthenticated) { toast.error('Please login to report a listing'); navigate('/login'); return; }
+    if (!requireVerification('report')) return;
     if (!reportReason) { toast.error('Please select a reason'); return; }
 
     setSubmittingReport(true);
@@ -192,6 +195,7 @@ export function PropertyDetails() {
 
   const handleSubmitReview = async () => {
     if (!isAuthenticated) { toast.error('Please login to leave a review'); navigate('/login'); return; }
+    if (!requireVerification('review')) return;
     if (reviewRating === 0) { toast.error('Please select a star rating'); return; }
     if (!reviewComment.trim()) { toast.error('Please write a comment'); return; }
     setSubmittingReview(true);
@@ -242,6 +246,7 @@ export function PropertyDetails() {
   }, []);
   const handlePayRent = async () => {
     if (!user) { toast.error('Please log in first'); return; }
+    if (!requireVerification('pay')) return;
     if (property?.availability === 'unavailable') { toast.error('This property is no longer available'); return; }
     setPayingRent(true);
     try {
@@ -321,7 +326,11 @@ export function PropertyDetails() {
             className={`h-9 w-9 shrink-0 rounded-full ${isFavourited ? 'bg-red-50 border-red-200 hover:bg-red-100' : ''}`}>
             <Heart className={`w-4 h-4 ${isFavourited ? 'fill-red-500 text-red-500' : ''}`} />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setShowReportDialog(true)}
+          <Button variant="outline" size="icon" onClick={() => {
+              if (!isAuthenticated) { toast.error('Please login to report a listing'); navigate('/login'); return; }
+              if (!requireVerification('report')) return;
+              setShowReportDialog(true);
+            }}
             className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:border-destructive"
             data-testid="report-listing-btn" title="Report this listing">
             <Flag className="w-4 h-4" />
@@ -414,6 +423,36 @@ export function PropertyDetails() {
               </div>
             </Card>
           )}
+
+          {/* Contact — locked placeholder. Revealing real contact details is
+              not built yet; this only communicates the future gate. */}
+          <Card className="max-w-full overflow-hidden p-4 sm:p-6">
+            <h2 className="text-xl font-semibold mb-4">Contact</h2>
+            <div className="flex items-center gap-4 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 p-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted">
+                <Lock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" /> Contact details are locked
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {!isAuthenticated
+                    ? 'Log in to see what\u2019s needed to unlock the agent\u2019s contact.'
+                    : verificationStatus === 'approved'
+                      ? 'Coming soon.'
+                      : verificationStatus === 'pending'
+                        ? 'Your verification is under review \u2014 contact details will unlock here once approved.'
+                        : 'Verify your student status to unlock the agent\u2019s contact.'}
+                </p>
+              </div>
+              {isAuthenticated && verificationStatus !== 'approved' && (
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate('/verify-account')}>
+                  Verify
+                </Button>
+              )}
+            </div>
+          </Card>
 
           {similarProperties.length > 0 && (
             <div>
@@ -608,6 +647,7 @@ export function PropertyDetails() {
                 <p className="text-sm text-muted-foreground mb-4">Schedule a free physical visit with our verified agent.</p>
                 <Button variant="outline" onClick={() => {
                   if (!isAuthenticated) { toast.error('Please login to request a viewing'); navigate('/login'); return; }
+                  if (!requireVerification('book')) return;
                   setInspectionEmail(user?.email || '');
                   setShowInspectionDialog(true);
                 }} className="w-full min-w-0 gap-2" data-testid="request-viewing-btn">
