@@ -369,8 +369,57 @@ export const inspectionAPI = {
       throw insertError;
     }
 
-    // Tell the agent about the new (free) viewing request.
+    const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+    const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+    const sendMail = (payload) => fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify(payload),
+    });
+
+    // Confirmation email to the student — best-effort, never blocks the request.
+    try {
+      const studentEmail = data.email || user.email;
+      if (studentEmail) {
+        await sendMail({
+          type: 'inspection_booked',
+          to: studentEmail,
+          data: {
+            name: user.full_name || 'there',
+            property_title: property.title,
+            inspection_date: data.inspection_date,
+            reference,
+            amount: 0,
+          },
+        });
+      }
+    } catch (e) { console.warn('inspection_booked email failed:', e.message); }
+
+    // Tell the agent about the new (free) viewing request — email + in-app.
     if (property.uploaded_by_agent_id) {
+      try {
+        const { data: agent } = await supabase
+          .from('users')
+          .select('email, full_name')
+          .eq('id', property.uploaded_by_agent_id)
+          .maybeSingle();
+        if (agent?.email) {
+          await sendMail({
+            type: 'inspection_agent_notify',
+            to: agent.email,
+            data: {
+              agent_name: agent.full_name || property.uploaded_by_agent_name || 'there',
+              user_name: user.full_name || 'A student',
+              user_email: user.email || '',
+              user_phone: data.phone_number || '',
+              property_title: property.title,
+              inspection_date: data.inspection_date,
+              reference,
+            },
+          });
+        }
+      } catch (e) { console.warn('inspection_agent_notify email failed:', e.message); }
+
       notifyUser(
         property.uploaded_by_agent_id,
         'viewing_requested',
@@ -379,6 +428,21 @@ export const inspectionAPI = {
         '/agent'
       );
     }
+
+    // Tell admins a viewing request came in.
+    notifyAdmins({
+      title: `New viewing request: ${property.title}`,
+      eventLabel: 'New viewing request',
+      summary: `${user.full_name || 'A student'} requested a viewing of "${property.title}" on ${data.inspection_date}.`,
+      breakdown: [
+        ['Property', property.title || '—'],
+        ['Student', user.full_name || '—'],
+        ['Student email', user.email || '—'],
+        ['Agent', property.uploaded_by_agent_name || '—'],
+        ['Date', data.inspection_date || '—'],
+      ],
+      actionUrl: 'https://www.rentora.com.ng/admin',
+    });
 
     return {
       data: {
