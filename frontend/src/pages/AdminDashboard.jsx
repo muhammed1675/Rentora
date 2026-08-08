@@ -753,7 +753,7 @@ export function AdminDashboard() {
             <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                  Hello, {firstName} 👋
+                  Hello, {firstName} 
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">
                   Here's what's happening on Rentora today.

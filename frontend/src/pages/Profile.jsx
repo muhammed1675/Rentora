@@ -449,29 +449,6 @@ export function Profile() {
                           <RefreshCw className="w-4 h-4" />Retry Payment
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                        onClick={() => downloadReceiptPNG({
-                          title: 'Rent Payment Receipt',
-                          reference: rp.reference,
-                          date: new Date(rp.created_at || rp.held_at || Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
-                          status: rp.status,
-                          rows: [
-                            { label: 'Property', value: rp.property?.title || 'Property' },
-                            { label: 'Location', value: rp.property?.location || '—' },
-                            { label: 'Rent', value: formatPrice(rp.rent_amount) },
-                            { label: 'Agent Fee', value: formatPrice(rp.agent_fee) },
-                            ...(rp.caution_fee > 0 ? [{ label: 'Caution Fee', value: formatPrice(rp.caution_fee) }] : []),
-                            { label: 'Service Fee', value: formatPrice(rp.service_fee) },
-                          ],
-                          total: { label: 'Total Paid', value: formatPrice(rp.total_amount) },
-                          filename: `rentora-rent-receipt-${rp.reference || rp.id}.png`,
-                        })}
-                      >
-                        <Download className="w-4 h-4" />Receipt
-                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -538,6 +515,65 @@ export function Profile() {
         {/* Transactions */}
         <TabsContent value="transactions">
           <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold mb-4">Rent Payments</h3>
+              {rentPayments.length > 0 ? (
+                <div className="space-y-3">
+                  {rentPayments.map((rp) => (
+                    <Card key={rp.id} className="p-4">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="font-medium">{rp.property?.title || 'Property'}</p>
+                          <p className="text-sm text-muted-foreground">{rp.reference}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-bold text-primary">{formatPrice(rp.total_amount)}</p>
+                            <Badge className={
+                              rp.status === 'held' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                              : rp.status === 'move_in_reported' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100'
+                              : rp.status === 'released' ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                              : rp.status === 'refunded' ? 'bg-red-100 text-red-800 hover:bg-red-100'
+                              : rp.status === 'failed' ? 'bg-red-100 text-red-800 hover:bg-red-100'
+                              : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                            }>
+                              {rp.status === 'move_in_reported' ? 'Move-in reported' : rp.status === 'held' ? 'Held by Rentora' : rp.status}
+                            </Badge>
+                          </div>
+                          <Button
+                            size="sm" variant="outline" className="gap-1 shrink-0"
+                            onClick={() => downloadReceiptPNG({
+                              title: 'Rent Payment Receipt',
+                              reference: rp.reference,
+                              date: new Date(rp.created_at || rp.held_at || Date.now()).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+                              status: rp.status,
+                              rows: [
+                                { label: 'Property', value: rp.property?.title || 'Property' },
+                                { label: 'Location', value: rp.property?.location || '—' },
+                                { label: 'Rent', value: formatPrice(rp.rent_amount) },
+                                { label: 'Agent Fee', value: formatPrice(rp.agent_fee) },
+                                ...(rp.caution_fee > 0 ? [{ label: 'Caution Fee', value: formatPrice(rp.caution_fee) }] : []),
+                                { label: 'Service Fee', value: formatPrice(rp.service_fee) },
+                                ...(rp.status === 'refunded' ? [{ label: 'Refunded', value: rp.refunded_at ? new Date(rp.refunded_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Yes' }] : []),
+                              ],
+                              total: { label: 'Total Paid', value: formatPrice(rp.total_amount) },
+                              filename: `rentora-rent-receipt-${rp.reference || rp.id}.png`,
+                            })}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-4 text-center text-muted-foreground">
+                  No rent payments yet
+                </Card>
+              )}
+            </div>
+
             <div>
               <h3 className="font-semibold mb-4">Viewing Payments</h3>
               {transactions.inspection_transactions.length > 0 ? (
