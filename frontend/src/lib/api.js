@@ -1598,19 +1598,22 @@ export const rentAPI = {
   // availability toggle client-side (the DB also blocks it — this is just
   // for a clear UI instead of a surprise error).
   getPaymentsForAgent: async (agentId) => {
+    // Includes 'refunded' alongside 'held'/'released' so a booking that was
+    // cancelled and refunded to the student is shown plainly on the Agent
+    // Dashboard too, instead of just disappearing from view.
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
+      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .eq('agent_id', agentId)
-      .in('status', ['held', 'released'])
+      .in('status', ['held', 'released', 'refunded'])
       .order('created_at', { ascending: false });
     if (error) {
       // Fall back to the narrower shape if the join name differs — never break the dashboard.
       const fallback = await supabase
         .from('property_rent_payments')
-        .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, created_at')
+        .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at')
         .eq('agent_id', agentId)
-        .in('status', ['held', 'released'])
+        .in('status', ['held', 'released', 'refunded'])
         .order('created_at', { ascending: false });
       if (fallback.error) throw fallback.error;
       return { data: fallback.data || [] };

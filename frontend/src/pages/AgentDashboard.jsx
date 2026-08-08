@@ -617,7 +617,16 @@ export function AgentDashboard() {
                             disabled={user?.suspended || !!paidRecord} className="h-7 px-2.5 text-xs gap-1">
                             <Edit className="w-3 h-3" /> Edit
                           </Button>
-                          {paidRecord ? (
+                          {paidRecord?.status === 'refunded' ? (
+                            <Badge
+                              variant="secondary"
+                              className="h-7 px-2.5 text-xs gap-1 bg-red-100 text-red-700 hover:bg-red-100 cursor-help"
+                              title={`Refunded to the student${paidRecord.refund_reason ? ` (reason: ${paidRecord.refund_reason})` : ''} — the listing was removed and no payout was made to you for this booking. Contact support@rentora.com.ng with questions.`}
+                            >
+                              <Lock className="w-3 h-3" />
+                              Refunded
+                            </Badge>
+                          ) : paidRecord ? (
                             <Badge
                               variant="secondary"
                               className="h-7 px-2.5 text-xs gap-1 bg-green-100 text-green-700 hover:bg-green-100 cursor-help"
@@ -964,9 +973,11 @@ export function AgentDashboard() {
           {(() => {
             const held = rentPaymentsList.filter(p => p.status === 'held');
             const released = rentPaymentsList.filter(p => p.status === 'released');
+            const refunded = rentPaymentsList.filter(p => p.status === 'refunded');
             const sum = (arr, k) => arr.reduce((s, r) => s + Number(r[k] || 0), 0);
             const totalHeldByRentora = sum(held, 'total_amount');
             const totalReleased = sum(released, 'total_amount');
+            const totalRefunded = sum(refunded, 'total_amount');
             const heldRent = sum(held, 'rent_amount');
             const heldAgentFee = sum(held, 'agent_fee');
             const heldCaution = sum(held, 'caution_fee');
@@ -1001,6 +1012,11 @@ export function AgentDashboard() {
                   <p className="text-xs text-blue-800 mt-2">
                     Total released to date: <strong>₦{totalReleased.toLocaleString('en-NG')}</strong> across {released.length} payment{released.length === 1 ? '' : 's'}.
                   </p>
+                  {refunded.length > 0 && (
+                    <p className="text-xs text-red-700 mt-2">
+                      Refunded to students: <strong>₦{totalRefunded.toLocaleString('en-NG')}</strong> across {refunded.length} payment{refunded.length === 1 ? '' : 's'} — these were held in escrow but never paid out to you, so nothing was ever deducted from your balance.
+                    </p>
+                  )}
                 </Card>
 
                 {loading ? (
@@ -1020,19 +1036,34 @@ export function AgentDashboard() {
                       const locName = p.property?.locations?.name || '';
                       const student = p.student || {};
                       const isHeld = p.status === 'held';
+                      const isRefunded = p.status === 'refunded';
                       const releaseAt = p.auto_release_at ? new Date(p.auto_release_at) : null;
                       const paidAt = p.held_at ? new Date(p.held_at) : (p.created_at ? new Date(p.created_at) : null);
+                      const borderClass = isHeld ? 'border-yellow-300' : isRefunded ? 'border-red-300' : 'border-green-300';
+                      const totalLabel = isHeld ? 'Total Held' : isRefunded ? 'Total Refunded' : 'Total Released';
+                      const totalColorClass = isHeld ? 'text-yellow-700' : isRefunded ? 'text-red-700' : 'text-green-700';
                       return (
-                        <Card key={p.id} className={`p-4 ${isHeld ? 'border-yellow-300' : 'border-green-300'}`}>
+                        <Card key={p.id} className={`p-4 ${borderClass}`}>
                           <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
                             <div className="min-w-0">
                               <p className="font-semibold truncate">{propTitle}</p>
                               {locName && <p className="text-xs text-muted-foreground">{locName}</p>}
                             </div>
-                            <Badge className={isHeld ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}>
-                              {isHeld ? <><Lock className="w-3 h-3 mr-1 inline" /> Held by Rentora</> : <><CheckCircle2 className="w-3 h-3 mr-1 inline" /> Released</>}
+                            <Badge className={isHeld ? 'bg-yellow-100 text-yellow-800' : isRefunded ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                              {isHeld
+                                ? <><Lock className="w-3 h-3 mr-1 inline" /> Held by Rentora</>
+                                : isRefunded
+                                  ? <><Lock className="w-3 h-3 mr-1 inline" /> Refunded to Student</>
+                                  : <><CheckCircle2 className="w-3 h-3 mr-1 inline" /> Released</>}
                             </Badge>
                           </div>
+
+                          {isRefunded && (
+                            <div className="mb-3 p-2 rounded bg-red-50 border border-red-200 text-xs text-red-800">
+                              This booking was cancelled and the payment was refunded to the student{p.refund_reason ? ` (reason: ${p.refund_reason})` : ''}. No payout was ever made to you for it, and the listing was removed.
+                              {p.admin_note && <> Admin note: {p.admin_note}</>}
+                            </div>
+                          )}
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
                             <div>
@@ -1048,8 +1079,8 @@ export function AgentDashboard() {
                               <p className="font-semibold">₦{Number(p.caution_fee || 0).toLocaleString('en-NG')}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-muted-foreground">{isHeld ? 'Total Held' : 'Total Released'}</p>
-                              <p className={`font-bold ${isHeld ? 'text-yellow-700' : 'text-green-700'}`}>₦{Number(p.total_amount || 0).toLocaleString('en-NG')}</p>
+                              <p className="text-xs text-muted-foreground">{totalLabel}</p>
+                              <p className={`font-bold ${totalColorClass}`}>₦{Number(p.total_amount || 0).toLocaleString('en-NG')}</p>
                             </div>
                           </div>
 
@@ -1063,7 +1094,8 @@ export function AgentDashboard() {
                             <div className="md:text-right">
                               {paidAt && <>Paid: {paidAt.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</>}
                               {isHeld && releaseAt && <> · Auto-release: {releaseAt.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</>}
-                              {!isHeld && p.released_at && <> · Released: {new Date(p.released_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</>}
+                              {!isHeld && !isRefunded && p.released_at && <> · Released: {new Date(p.released_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</>}
+                              {isRefunded && p.refunded_at && <> · Refunded: {new Date(p.refunded_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</>}
                             </div>
                             {p.reference && (
                               <div className="md:col-span-2 font-mono text-[11px] break-all">Ref: {p.reference}</div>
