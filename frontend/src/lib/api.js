@@ -533,6 +533,68 @@ export const inspectionAPI = {
 // Preferred name going forward — same object, clearer wording.
 export const viewingAPI = inspectionAPI;
 
+// ============== AGENT TIP APIs ==============
+// A student can optionally tip the agent assigned to their (free) viewing
+// request. Money goes straight to the agent's Rentora balance — Rentora
+// takes no cut. Only ONE completed tip is ever allowed per viewing; this
+// is enforced both here (checked before inserting) and, as the real
+// backstop, by a partial unique index in the DB (see
+// 12_agent_tips.sql) so a race between two tabs can't produce two
+// paid tips on the same viewing.
+export const tipAPI = {
+  // Fetch every tip the current student has ever attempted, so the UI can
+  // tell which viewings already have a completed tip (hide the button) vs
+  // which don't (show it).
+  getMyTips: async (userId) => {
+    const { data, error } = await supabase
+      .from('inspection_tips')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) { console.warn('inspection_tips:', error.message); return { data: [] }; }
+    return { data: data || [] };
+  },
+
+  // Creates the pending tip row and returns what's needed to open the
+  // Flutterwave checkout. Actual crediting only happens once
+  // /api/confirm-payment.js independently verifies the charge and flips
+  // this row to 'completed' — never on the client's word alone.
+  initiate: async (inspection, amount, user) => {
+    const amt = Math.round(Number(amount));
+    if (!Number.isFinite(amt) || amt <= 0) throw new Error('Enter a valid tip amount');
+    if (!inspection?.agent_id) throw new Error('This viewing has no agent assigned yet, so it can\'t be tipped.');
+
+    // Belt-and-braces client-side check — the DB's partial unique index is
+    // the real guarantee, this just avoids a pointless checkout for the
+    // common case.
+    const { data: existing } = await supabase
+      .from('inspection_tips')
+      .select('id')
+      .eq('inspection_id', inspection.id)
+      .eq('status', 'completed')
+      .maybeSingle();
+    if (existing) throw new Error('You\'ve already tipped the agent for this viewing.');
+
+    const reference = generateReference('TIP');
+    const { error } = await supabase
+      .from('inspection_tips')
+      .insert({
+        inspection_id: inspection.id,
+        user_id: user.id,
+        agent_id: inspection.agent_id,
+        amount: amt,
+        reference,
+        status: 'pending',
+      });
+    if (error) {
+      if (error.code === '23505') throw new Error('You\'ve already tipped the agent for this viewing.');
+      throw error;
+    }
+
+    return { data: { reference, amount: amt } };
+  },
+};
+
 // ============== STUDENT VERIFICATION APIs ==============
 // School document (student ID card or admission letter) + selfie.
 // Every student must be approved before they can use Rentora.

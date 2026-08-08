@@ -88,17 +88,19 @@ async function handlePayment(req, res) {
 
   try {
     // ---- 1. Find which table this reference belongs to ----
-    const [tokenRes, inspRes, rentRes] = await Promise.all([
+    const [tokenRes, inspRes, rentRes, tipRes] = await Promise.all([
       supabase.from('transactions').select('*').eq('reference', reference).maybeSingle(),
       supabase.from('inspection_transactions').select('*').eq('reference', reference).maybeSingle(),
       supabase.from('property_rent_payments').select('*').eq('reference', reference).maybeSingle(),
+      supabase.from('inspection_tips').select('*').eq('reference', reference).maybeSingle(),
     ]);
 
     const tokenTx = tokenRes.data;
     const inspTx = inspRes.data;
     const rentTx = rentRes.data;
+    const tipTx = tipRes.data;
 
-    if (!tokenTx && !inspTx && !rentTx) {
+    if (!tokenTx && !inspTx && !rentTx && !tipTx) {
       return res.status(404).json({ error: 'No transaction found for this reference' });
     }
 
@@ -290,6 +292,66 @@ async function handlePayment(req, res) {
       }
 
       return res.status(200).json({ ok: true, type: 'rent', amount: rentTx.total_amount, agent_fee: rentTx.agent_fee });
+    }
+
+    if (tipTx) {
+      if (tipTx.status === 'completed') {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip' });
+      }
+      if (chargedAmount < Number(tipTx.amount) - UNDERCHARGE_TOLERANCE) {
+        console.error('confirm-payment: tip amount mismatch', { expected: tipTx.amount, charged: chargedAmount, reference });
+        return res.status(409).json({ error: 'Charged amount does not match the expected tip amount.' });
+      }
+
+      // Conditioned on status='pending' so a double-fired callback can't
+      // process the same tip twice. The partial unique index on
+      // inspection_tips(inspection_id) WHERE status='completed' is the
+      // real backstop against two different tip rows both completing for
+      // the same viewing.
+      const { data: updatedTip, error: tipErr } = await supabase
+        .from('inspection_tips')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('reference', reference)
+        .eq('status', 'pending')
+        .select()
+        .maybeSingle();
+      if (tipErr) {
+        // Unique violation means someone else's tip on this viewing beat
+        // this one to 'completed' in the exact same instant — treat it as
+        // already processed rather than a hard failure, since the charge
+        // did succeed and shouldn't be reported as failed to the student.
+        if (tipErr.code === '23505') {
+          return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip' });
+        }
+        throw tipErr;
+      }
+      if (!updatedTip) {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip' });
+      }
+
+      // Agent balance crediting happens via the trg_credit_agent_tip_balance
+      // DB trigger on this same UPDATE (see 12_agent_tips.sql) — nothing
+      // more to do here for the money itself. Just let the agent know.
+      try {
+        const [{ data: agent }, { data: student }, { data: inspection }] = await Promise.all([
+          supabase.from('users').select('email, full_name').eq('id', tipTx.agent_id).maybeSingle(),
+          supabase.from('users').select('full_name').eq('id', tipTx.user_id).maybeSingle(),
+          supabase.from('inspections').select('property_title').eq('id', tipTx.inspection_id).maybeSingle(),
+        ]);
+        await notify(
+          supabase,
+          tipTx.agent_id,
+          'agent_tip_received',
+          'You received a tip',
+          `${student?.full_name || 'A student'} tipped you ₦${Number(tipTx.amount).toLocaleString('en-NG')} for the viewing of "${inspection?.property_title || 'a property'}".`,
+          '/agent'
+        );
+        console.log(`[tip] credited agent_id=${tipTx.agent_id} amount=${tipTx.amount} reference=${reference}`);
+      } catch (notifyErr) {
+        console.error(`[tip] notify failed for reference=${reference}:`, notifyErr?.message || notifyErr);
+      }
+
+      return res.status(200).json({ ok: true, type: 'tip', amount: tipTx.amount });
     }
   } catch (err) {
     // Payment confirmation failed — don't return 200.
@@ -505,12 +567,13 @@ async function notifyAdminsOfPaymentAttempt(req, captured) {
   const { outcome, title, reason } = describeOutcome(status, body);
 
   // Figure out what was being paid for and by whom.
-  const [tokenRes, inspRes, rentRes] = await Promise.all([
+  const [tokenRes, inspRes, rentRes, tipRes] = await Promise.all([
     supabase.from('transactions').select('*').eq('reference', reference).maybeSingle(),
     supabase.from('inspection_transactions').select('*').eq('reference', reference).maybeSingle(),
     supabase.from('property_rent_payments').select('*').eq('reference', reference).maybeSingle(),
+    supabase.from('inspection_tips').select('*').eq('reference', reference).maybeSingle(),
   ]);
-  const tx = tokenRes.data || inspRes.data || rentRes.data || null;
+  const tx = tokenRes.data || inspRes.data || rentRes.data || tipRes.data || null;
 
   let paymentType = 'Unknown payment';
   let purpose = 'Could not determine what this payment was for.';
@@ -542,6 +605,15 @@ async function notifyAdminsOfPaymentAttempt(req, captured) {
       ['Rent', formatNaira(rentRes.data.rent_amount)],
       ['Agent fee', formatNaira(rentRes.data.agent_fee)],
       ['Caution fee', formatNaira(rentRes.data.caution_fee)],
+    ];
+  } else if (tipRes.data) {
+    paymentType = 'Agent tip';
+    amount = tipRes.data.amount;
+    const { data: inspection } = await supabase.from('inspections').select('property_title, agent_name').eq('id', tipRes.data.inspection_id).maybeSingle();
+    purpose = `Student tipped the agent for the viewing of "${inspection?.property_title || 'a property'}". Credited straight to the agent's balance.`;
+    breakdown = [
+      ['Property', inspection?.property_title || '—'],
+      ['Agent', inspection?.agent_name || '—'],
     ];
   }
 

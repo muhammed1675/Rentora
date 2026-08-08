@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, maintenanceAPI, userAPI, storageAPI } from '../lib/api';
+import { inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, tipAPI, maintenanceAPI, userAPI, storageAPI } from '../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -25,6 +25,7 @@ import {
   Clock,
   Download,
   Camera,
+  Gift,
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,6 +37,7 @@ export function Profile() {
   const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ inspection_transactions: [] });
   const [rentPayments, setRentPayments] = useState([]);
+  const [tips, setTips] = useState([]);
   const [verificationRequest, setVerificationRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -112,6 +114,9 @@ export function Profile() {
         if (res?.data?.type === 'inspection') {
           await fetchData();
           toast.success('Inspection payment confirmed!');
+        } else if (res?.data?.type === 'tip') {
+          await fetchData();
+          toast.success('Tip sent to the agent!');
         }
         window.history.replaceState({}, '', window.location.pathname);
       }).catch(() => {});
@@ -123,15 +128,17 @@ export function Profile() {
     setLoading(true);
     maintenanceAPI.expireStalePending(); // fire-and-forget fallback, not awaited
     try {
-      const [inspectionsRes, txRes, rentRes] = await Promise.all([
+      const [inspectionsRes, txRes, rentRes, tipsRes] = await Promise.all([
         inspectionAPI.getMyInspections(user.id),
         transactionAPI.getMyTransactions(user.id),
         rentAPI.getMyPayments(user.id).catch(() => ({ data: [] })),
+        tipAPI.getMyTips(user.id).catch(() => ({ data: [] })),
       ]);
       
       setInspections(inspectionsRes.data);
       setTransactions(txRes.data);
       setRentPayments(rentRes.data || []);
+      setTips(tipsRes.data || []);
 
       // Check verification request for users
       if (user?.role === 'user') {
@@ -153,6 +160,51 @@ export function Profile() {
   const [moveInPhotoFile, setMoveInPhotoFile] = useState(null);
   const [moveInPhotoPreview, setMoveInPhotoPreview] = useState(null);
   const [confirmingMoveIn, setConfirmingMoveIn] = useState(false);
+
+  const [tipDialogViewing, setTipDialogViewing] = useState(null);
+  const [tipAmount, setTipAmount] = useState('');
+  const [sendingTip, setSendingTip] = useState(false);
+
+  const tipForViewing = (viewingId) => tips.find((t) => t.inspection_id === viewingId && t.status === 'completed');
+
+  const openTipDialog = (viewing) => {
+    setTipAmount('');
+    setTipDialogViewing(viewing);
+  };
+
+  const handleSendTip = async () => {
+    if (!tipDialogViewing) return;
+    const amt = parseFloat(tipAmount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid tip amount'); return; }
+    setSendingTip(true);
+    try {
+      const res = await tipAPI.initiate(tipDialogViewing, amt, user);
+      const { openFlutterwaveCheckout } = await import('../lib/flutterwave');
+      await openFlutterwaveCheckout({
+        reference: res.data.reference,
+        amount: res.data.amount,
+        email: user.email,
+        name: user?.full_name || user?.email,
+        narration: `Tip for ${tipDialogViewing.agent_name || 'your agent'} — ${tipDialogViewing.property_title || 'viewing'}`,
+        onSuccess: async () => {
+          toast.success('Tip sent! Thank you for supporting your agent.');
+          setTipDialogViewing(null);
+          setSendingTip(false);
+          await fetchData();
+        },
+        onFailed: () => { toast.error('Tip payment failed. Please try again.'); setSendingTip(false); },
+        onPending: () => {
+          toast.message('Payment received — confirming now. This page will update automatically once confirmed.');
+          setSendingTip(false);
+          setTipDialogViewing(null);
+        },
+        onClose: () => setSendingTip(false),
+      });
+    } catch (e) {
+      toast.error(e.message || 'Failed to start tip payment');
+      setSendingTip(false);
+    }
+  };
 
   const openMoveInDialog = (payment) => {
     setMoveInDialogPayment(payment);
@@ -493,9 +545,17 @@ export function Profile() {
                       <Badge className={getStatusBadge(viewing.status)}>
                         {viewing.status}
                       </Badge>
-                      <Badge className={`ml-2 ${getStatusBadge(viewing.payment_status)}`}>
-                        Payment: {viewing.payment_status}
-                      </Badge>
+                      <div className="mt-2">
+                        {tipForViewing(viewing.id) ? (
+                          <Badge className="gap-1 bg-green-100 text-green-800 hover:bg-green-100">
+                            <Gift className="w-3 h-3" /> Tipped {formatPrice(tipForViewing(viewing.id).amount)}
+                          </Badge>
+                        ) : viewing.agent_id ? (
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => openTipDialog(viewing)}>
+                            <Gift className="w-3.5 h-3.5" /> Tip Agent
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -720,6 +780,49 @@ export function Profile() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!tipDialogViewing} onOpenChange={(open) => { if (!open) setTipDialogViewing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tip your agent</DialogTitle>
+            <DialogDescription>
+              Send {tipDialogViewing?.agent_name || 'your agent'} a one-off tip for the viewing of "{tipDialogViewing?.property_title || 'the property'}". It goes straight to their Rentora balance — Rentora takes no cut. You can only tip once per viewing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {[500, 1000, 2000, 5000].map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  size="sm"
+                  variant={tipAmount === String(preset) ? 'default' : 'outline'}
+                  onClick={() => setTipAmount(String(preset))}
+                >
+                  ₦{preset.toLocaleString('en-NG')}
+                </Button>
+              ))}
+            </div>
+            <div>
+              <Label htmlFor="tip-amount">Or enter an amount (₦)</Label>
+              <Input
+                id="tip-amount"
+                type="number"
+                min="1"
+                placeholder="e.g. 1500"
+                value={tipAmount}
+                onChange={(e) => setTipAmount(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTipDialogViewing(null)}>Cancel</Button>
+            <Button onClick={handleSendTip} disabled={sendingTip || !tipAmount}>
+              {sendingTip ? 'Processing...' : 'Send Tip'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!moveInDialogPayment} onOpenChange={(open) => { if (!open) setMoveInDialogPayment(null); }}>
         <DialogContent>
