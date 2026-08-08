@@ -1,62 +1,37 @@
-# Rentora — refund flow + account-deletion fix
+# Rentora
 
-Drop these files into the matching paths in your actual repo (they mirror
-the folder structure: `supabase/...`, `frontend/...`). Every file here is
-either brand new or a full replacement of an existing file — no partial
-diffs to apply by hand.
+Student housing rental platform for LAUTECH — connects students with verified agents and available properties around campus.
 
-## Files in this bundle
+**Live app:** https://www.rentora.com.ng
 
-| Path | Status | What it does |
-|---|---|---|
-| `supabase/schema/09_refund_and_delete_fixes.sql` | new | Migration — run once in Supabase SQL Editor |
-| `frontend/api/_flutterwave.js` | replace | Adds `refundTransaction()` / `verifyById()` helpers |
-| `frontend/api/admin-refund-payment.js` | new | Admin-only refund endpoint (Vercel serverless) |
-| `supabase/functions/send-email/index.ts` | replace | Adds 2 new quiet email templates |
-| `supabase/functions/delete-account/index.ts` | replace | Stops erasing name/phone on deletion |
-| `frontend/src/pages/AdminDashboard.jsx` | replace | Adds "Resolve" button + refund dialog in Escrow tab |
-| `frontend/src/lib/api.js` | replace | Adds `adminAPI.refundRentPayment()` |
+## Tech Stack
+- **Frontend:** React 19, React Router, Tailwind, shadcn/ui, CRACO (deployed on Vercel)
+- **Backend / DB:** Supabase (Postgres, RLS, Storage, Edge Functions)
+- **Payments:** Flutterwave
+- **Email:** Resend
 
-## Deploy order
+## Structure
+```
+frontend/       React app + Vercel serverless functions (api/)
+backend/        Optional Python service (not required for prod)
+supabase/
+  schema/       Canonical SQL — run 01→06 on a fresh project
+  functions/    Edge functions (resolve-bank, send-email)
+```
 
-1. **Run the SQL migration first.**
-   Supabase Dashboard → SQL Editor → paste the full contents of
-   `09_refund_and_delete_fixes.sql` → Run. Safe to re-run if needed.
+## Quick start
+See **[SETUP.md](./SETUP.md)** for the full setup, deployment, and handover guide.
 
-2. **Deploy the two edge functions.**
-   ```
-   supabase functions deploy send-email
-   supabase functions deploy delete-account
-   ```
+```bash
+cd frontend
+cp .env.example .env    # fill in Supabase + Flutterwave keys
+yarn install
+yarn start
+```
 
-3. **Push the frontend/API changes** (git commit + push, or however you
-   deploy to Vercel). `admin-refund-payment.js` will be picked up
-   automatically as a new serverless function — no extra Vercel config
-   needed, it uses the same env vars `confirm-payment.js` already has
-   (`FLW_SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `REACT_APP_SUPABASE_ANON_KEY`).
+## License
+Private. Not licensed for reuse.
 
-## Before using this on a real held payment
-
-- Test the refund flow against a **test/sandbox Flutterwave transaction**
-  first — I haven't been able to run this against your live Supabase or
-  Flutterwave account, only checked that the code is syntactically valid.
-- Confirm `FLW_SECRET_KEY` in your Vercel project has refund permissions
-  enabled on the Flutterwave dashboard (some merchant accounts need this
-  turned on separately from payment collection).
-- After running the migration, spot-check that `users_can_read_all` in
-  Supabase → Database → Policies now shows the updated `USING` clause —
-  RLS policy edits are easy to get subtly wrong, worth eyeballing once.
-
-## What each fix actually does, briefly
-
-- **Refund flow**: admin clicks "Resolve" on a held payment → picks a
-  reason → the student is refunded in full via Flutterwave → the
-  property's `status` is set to `'rejected'`, dropping it out of every
-  public listing query for good (it does NOT return to `'available'`).
-  No refund UI exists anywhere except this one admin screen.
-- **Account deletion**: `full_name` and `phone` are no longer wiped when
-  someone deletes their account. `deleted_at` is still set, and a new RLS
-  policy hides that row from every other user — only admins can still see
-  it, e.g. to answer a legitimate school/EFCC request about who was
-  behind an account.
+## AYOOLA MUHAMMED
+MGRAPHIX&WEB
+09131133832
