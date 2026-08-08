@@ -56,12 +56,36 @@ export async function verifyByReference(reference) {
   });
 }
 
+// Verify a transaction server-side by Flutterwave's own numeric transaction
+// id. Used by admin-refund-payment.js to get a fresh id right before issuing
+// a refund (we only ever store the reference / flw_ref string on our side,
+// never the numeric id, so this looks it up on demand rather than trusting
+// anything stale).
+export async function verifyById(transactionId) {
+  return flwFetch(`/transactions/${encodeURIComponent(transactionId)}/verify`, {
+    method: 'GET',
+  });
+}
+
+// Issue a refund for a completed charge. Docs:
+// https://developer.flutterwave.com/docs/refunds
+// amount is optional — omitting it refunds the full charged amount, which
+// is what we want here since Rentora never does partial refunds from this
+// flow (a held payment was never partially disbursed to anyone).
+export async function refundTransaction(transactionId, amount = undefined) {
+  return flwFetch(`/transactions/${encodeURIComponent(transactionId)}/refund`, {
+    method: 'POST',
+    body: JSON.stringify(amount ? { amount } : {}),
+  });
+}
+
 // Normalizes the handful of fields confirm-payment.js / flutterwave-verify.js
 // actually need out of a raw Flutterwave verify response, in exactly one
 // place, so nobody has to remember Flutterwave's field names more than once.
 export function readCharge(flwBody) {
   const data = flwBody?.data || {};
   return {
+    id: data.id, // Flutterwave's numeric transaction id — required for /transactions/{id}/refund
     status: data.status,
     // charged_amount is what the CUSTOMER paid, which can be higher than
     // `amount` when they bear the transaction fee (common for NG bank

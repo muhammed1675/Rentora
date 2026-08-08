@@ -955,7 +955,27 @@ export const adminAPI = {
         released_rent_payments: releasedRows.length,
       }
     };
-  }
+  },
+
+  // Resolve a held rent payment where the property turned out not to be
+  // available (or was misrepresented): refunds the student in full via
+  // Flutterwave and soft-delists the property (status -> 'rejected', not
+  // 'available' — see /api/admin-refund-payment.js). Admin-only; the
+  // server independently re-checks the caller's role from their own token.
+  refundRentPayment: async (paymentId, reason, note = '') => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) throw new Error('Your session has expired. Please log in again.');
+
+    const res = await fetch('/api/admin-refund-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ payment_id: paymentId, reason, note }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || 'Failed to process refund.');
+    return result;
+  },
 };
 
 // ============== PAYMENT APIs ==============

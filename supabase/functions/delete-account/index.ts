@@ -112,7 +112,7 @@ serve(async (req: Request) => {
       .from("property_rent_payments")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
-      .not("status", "in", "(released,refunded,failed)");
+      .not("status", "in", "(released,refunded,failed)"); // covers pending, held, move_in_reported, and refund_processing too
 
     if (activeRentPayments && activeRentPayments > 0) {
       return json({
@@ -122,10 +122,31 @@ serve(async (req: Request) => {
     }
   }
 
-  // ── Clear to delete: remove avatar file, anonymize the profile,
-  // then remove the auth user entirely so they can no longer sign in.
-  // Financial/transaction records are kept (not deleted) for legal and
-  // accounting reasons, but are no longer linked to identifying info. ──
+  // ── Clear to delete: remove the account's PUBLIC presence and its
+  // ability to log in — but deliberately KEEP the real name, phone number,
+  // and verification documents in place.
+  //
+  // Why: if this account was used for fraud, and a school or a law
+  // enforcement agency (e.g. EFCC) later asks who was behind it, Rentora
+  // needs to still be able to answer that. Wiping full_name/phone here
+  // would have destroyed exactly the details anyone investigating would
+  // need, right at the moment the account holder chose to disappear.
+  //
+  // What actually makes the account "gone" for everyone else:
+  //   - deleted_at is set, and the RLS policy on public.users (see
+  //     migration 09_refund_and_delete_fixes.sql) hides any row with
+  //     deleted_at set from every user except admins. The person's real
+  //     name/phone are still IN the database, just invisible to anyone
+  //     who isn't an admin.
+  //   - suspended = true blocks any in-app privileges tied to the account.
+  //   - the Supabase auth user is deleted below, so they can never log
+  //     back in with these credentials again.
+  //   - the avatar image is removed since it has no compliance value and
+  //     was only ever cosmetic.
+  //
+  // Financial/transaction records were already kept as-is (not deleted)
+  // for legal and accounting reasons — this just stops disconnecting them
+  // from who the person actually was.
   if (profile.avatar_url) {
     try {
       const marker = "/avatars/";
@@ -142,8 +163,6 @@ serve(async (req: Request) => {
   const { error: anonError } = await admin
     .from("users")
     .update({
-      full_name: "Deleted User",
-      phone: null,
       avatar_url: null,
       suspended: true,
       deleted_at: new Date().toISOString(),

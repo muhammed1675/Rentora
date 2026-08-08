@@ -60,6 +60,10 @@ export function AdminDashboard() {
   const [previewProperty, setPreviewProperty] = useState(null);
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
   const [rentPayments, setRentPayments] = useState([]);
+  const [refundTarget, setRefundTarget] = useState(null); // held payment being resolved via refund
+  const [refundReason, setRefundReason] = useState('unavailable');
+  const [refundNote, setRefundNote] = useState('');
+  const [refundBusy, setRefundBusy] = useState(false);
   const [agentBalances, setAgentBalances] = useState([]);
   const [rejectingWithdrawal, setRejectingWithdrawal] = useState(null);
   const [rejectNote, setRejectNote] = useState('');
@@ -358,6 +362,28 @@ export function AdminDashboard() {
       toast.error(e.message || 'Failed to confirm move-in');
     } finally {
       setConfirmingMoveIn(false);
+    }
+  };
+
+  // Resolving a held payment where the property turned out not to be
+  // available/misrepresented: refunds the student in full and takes the
+  // listing down for good (not back to 'available'). See
+  // /api/admin-refund-payment.js — this button is the only place that
+  // endpoint is ever called from.
+  const handleResolveRefund = async () => {
+    if (!refundTarget) return;
+    setRefundBusy(true);
+    try {
+      await adminAPI.refundRentPayment(refundTarget.id, refundReason, refundNote);
+      toast.success('Refund issued and listing removed.');
+      setRefundTarget(null);
+      setRefundNote('');
+      setRefundReason('unavailable');
+      fetchData();
+    } catch (e) {
+      toast.error(e.message || 'Failed to process refund');
+    } finally {
+      setRefundBusy(false);
     }
   };
 
@@ -1949,9 +1975,12 @@ export function AdminDashboard() {
                           <p className="text-xs text-amber-700 mt-1">Auto-releases in {daysLeft} day{daysLeft === 1 ? '' : 's'} ({autoRelease.toLocaleDateString('en-NG')})</p>
                         )}
                       </div>
-                      <div className="text-right shrink-0">
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                         <p className="text-lg font-bold text-amber-900">{formatPrice(payment.total_amount)}</p>
                         <Badge variant="outline" className="border-amber-400 text-amber-700">Held</Badge>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setRefundTarget(payment)}>
+                          Resolve
+                        </Button>
                       </div>
                     </div>
                   </Card>
@@ -2652,6 +2681,51 @@ export function AdminDashboard() {
             <Button variant="outline" onClick={() => setMoveInPreview(null)} disabled={confirmingMoveIn}>Close</Button>
             <Button onClick={() => handleAdminConfirmMoveIn(moveInPreview.id)} disabled={confirmingMoveIn}>
               {confirmingMoveIn ? 'Confirming...' : 'Confirm Move-In & Release Funds'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Resolve (Refund) Dialog — only reachable from the Resolve
+          button on a held payment. Internal-only language ("refund",
+          "reject listing") lives here in the admin dashboard; the
+          student and agent never see this screen or its wording. ── */}
+      <Dialog open={!!refundTarget} onOpenChange={(open) => { if (!open) { setRefundTarget(null); setRefundNote(''); setRefundReason('unavailable'); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resolve held payment</DialogTitle>
+            <DialogDescription>
+              This refunds {refundTarget ? formatPrice(refundTarget.total_amount) : ''} in full to the student and removes the listing from Rentora for good — it will NOT go back to "available". This can't be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {refundTarget && (
+            <div className="space-y-4">
+              <div className="text-sm">
+                <div className="font-semibold">{refundTarget.property?.title || 'Unknown property'}</div>
+                <div className="text-muted-foreground">Student: {refundTarget.student?.full_name || 'Unknown'} ({refundTarget.student?.email || '—'})</div>
+                <div className="text-muted-foreground">Reference: {refundTarget.reference}</div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Reason</label>
+                <Select value={refundReason} onValueChange={setRefundReason}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unavailable">Property is no longer available</SelectItem>
+                    <SelectItem value="misrepresented">Listing misrepresented the property</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Internal note (optional)</label>
+                <Textarea value={refundNote} onChange={(e) => setRefundNote(e.target.value)} placeholder="Context for the record — not shown to the student." rows={3} />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRefundTarget(null)} disabled={refundBusy}>Cancel</Button>
+            <Button variant="destructive" onClick={handleResolveRefund} disabled={refundBusy}>
+              {refundBusy ? 'Processing...' : 'Refund & Remove Listing'}
             </Button>
           </DialogFooter>
         </DialogContent>

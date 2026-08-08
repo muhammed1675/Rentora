@@ -286,6 +286,45 @@ function emailRentPaymentReleasedStudent(studentName: string, propertyTitle: str
   `);
 }
 
+// Deliberately calm, non-alarming copy — this is the one place the word
+// "refund" appears to the student at all, and even here it's framed as
+// resolution rather than failure. See emailRentPaymentReceipt above for the
+// matching "held safely" language used at payment time.
+function emailRentPaymentResolvedStudent(studentName: string, propertyTitle: string, amount: number, reference: string) {
+  return baseTemplate(`
+    <span class="badge badge-blue">Update on your payment</span>
+    <h2>Hi ${studentName}, we've resolved this one for you.</h2>
+    <p>After looking into <strong>${propertyTitle}</strong>, we found it's no longer a good match to proceed with. Since your payment was still held by Rentora and never released, your full payment is being returned to your original payment method.</p>
+    <div class="card">
+      <div class="card-row"><span class="label">${icon.home} Property</span><span class="value">${propertyTitle}</span></div>
+      <div class="card-row"><span class="label">${icon.money} Amount</span><span class="value">₦${Number(amount).toLocaleString()}</span></div>
+      <div class="card-row"><span class="label">${icon.tag} Reference</span><span class="value" style="font-size:12px">${reference}</span></div>
+    </div>
+    <p>This can take a few business days to reflect, depending on your bank. Feel free to keep browsing other verified listings on Rentora — if you have any questions, reach out to support@rentora.com.ng.</p>
+    <a href="https://www.rentora.com.ng/browse" class="btn">Browse Listings</a>
+  `);
+}
+
+// Agent-facing: no mention of "refund" — just that the listing was removed.
+// Keeps the student's dispute details private and avoids adjacent
+// "refund" language reaching agents/browsers of the platform at large.
+function emailRentPaymentResolvedAgent(agentName: string, propertyTitle: string, reason: string) {
+  const reasonText = reason === 'unavailable'
+    ? 'it was reported as no longer available'
+    : reason === 'misrepresented'
+    ? 'the details didn\u2019t match what was listed'
+    : 'an issue was found with it';
+  return baseTemplate(`
+    <span class="badge badge-red">Listing removed</span>
+    <h2>Hi ${agentName}, a listing has been taken down.</h2>
+    <p><strong>${propertyTitle}</strong> has been removed from Rentora because ${reasonText}. The booking associated with it has been cancelled.</p>
+    <div class="card">
+      <div class="card-row"><span class="label">${icon.home} Property</span><span class="value">${propertyTitle}</span></div>
+    </div>
+    <p>If you believe this was a mistake, contact support@rentora.com.ng and we'll review it with you.</p>
+  `);
+}
+
 function emailPropertyApproved(agentName: string, propertyTitle: string) {
   return baseTemplate(`
     <span class="badge">Listing Approved ${icon.check}</span>
@@ -411,6 +450,14 @@ serve(async (req) => {
       case "rent_payment_released_student":
         subject = `Move-In Confirmed — ${data.property_title}`;
         html = emailRentPaymentReleasedStudent(data.student_name, data.property_title, data.reference);
+        break;
+      case "rent_payment_resolved_student":
+        subject = `Update on your payment — ${data.property_title}`;
+        html = emailRentPaymentResolvedStudent(data.student_name, data.property_title, data.amount, data.reference);
+        break;
+      case "rent_payment_resolved_agent":
+        subject = `Listing removed — ${data.property_title}`;
+        html = emailRentPaymentResolvedAgent(data.agent_name, data.property_title, data.reason);
         break;
       case "property_approved":
         subject = `Your listing "${data.property_title}" is now live on Rentora`;
