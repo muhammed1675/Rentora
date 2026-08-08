@@ -375,7 +375,7 @@ export function AdminDashboard() {
     setRefundBusy(true);
     try {
       await adminAPI.refundRentPayment(refundTarget.id, refundReason, refundNote);
-      toast.success('Refund issued and listing removed.');
+      toast.success('Refund recorded and listing removed.');
       setRefundTarget(null);
       setRefundNote('');
       setRefundReason('unavailable');
@@ -551,7 +551,7 @@ export function AdminDashboard() {
       items: [
         { id: 'transactions', label: 'Transactions', icon: Receipt },
         { id: 'payouts', label: 'Agent Payouts', icon: ArrowDownCircle, count: withdrawalRequests.filter(r => r.status === 'pending').length, urgent: true },
-        { id: 'escrow', label: 'Escrow', icon: Lock, count: rentPayments.filter(p => p.status === 'held' || p.status === 'move_in_reported').length },
+        { id: 'escrow', label: 'Escrow', icon: Lock, count: rentPayments.filter(p => p.status === 'held' || p.status === 'move_in_reported' || p.status === 'refund_processing').length },
         { id: 'rentora-revenue', label: 'Revenue', icon: TrendingUp },
       ],
     },
@@ -1942,7 +1942,7 @@ export function AdminDashboard() {
             <Card className="p-4 border-amber-300 bg-amber-50">
               <p className="text-sm text-amber-700 font-medium mb-1">Currently Held</p>
               <p className="text-2xl font-bold text-amber-900">{formatPrice(stats?.total_escrow_held || 0)}</p>
-              <p className="text-xs text-amber-600 mt-0.5">{rentPayments.filter(p => p.status === 'held').length} payment(s)</p>
+              <p className="text-xs text-amber-600 mt-0.5">{rentPayments.filter(p => p.status === 'held' || p.status === 'refund_processing').length} payment(s)</p>
             </Card>
             <Card className="p-4">
               <p className="text-sm text-muted-foreground mb-1">Released All-Time</p>
@@ -1954,15 +1954,16 @@ export function AdminDashboard() {
           </div>
 
           <h3 className="font-semibold mb-3">Currently Held</h3>
-          {rentPayments.filter(p => p.status === 'held').length === 0 ? (
+          {rentPayments.filter(p => p.status === 'held' || p.status === 'refund_processing').length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground mb-6">Nothing currently held in escrow</Card>
           ) : (
             <div className="space-y-3 mb-6">
-              {rentPayments.filter(p => p.status === 'held').map(payment => {
+              {rentPayments.filter(p => p.status === 'held' || p.status === 'refund_processing').map(payment => {
                 const autoRelease = payment.auto_release_at ? new Date(payment.auto_release_at) : null;
                 const daysLeft = autoRelease ? Math.max(0, Math.ceil((autoRelease - new Date()) / (1000 * 60 * 60 * 24))) : null;
+                const stuck = payment.status === 'refund_processing';
                 return (
-                  <Card key={payment.id} className="p-4 border-amber-200">
+                  <Card key={payment.id} className={stuck ? 'p-4 border-red-200' : 'p-4 border-amber-200'}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
                         <button onClick={() => openPropertyPreviewById(payment.property_id)} className="font-semibold text-primary hover:underline text-left">
@@ -1971,13 +1972,15 @@ export function AdminDashboard() {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)}{payment.caution_fee > 0 ? ` + Caution fee ${formatPrice(payment.caution_fee)}` : ''} + Service fee {formatPrice(payment.service_fee)}
                         </p>
-                        {autoRelease && (
+                        {stuck ? (
+                          <p className="text-xs text-red-700 mt-1">A previous refund attempt didn't finish — resolve it to record the refund and remove the listing.</p>
+                        ) : autoRelease && (
                           <p className="text-xs text-amber-700 mt-1">Auto-releases in {daysLeft} day{daysLeft === 1 ? '' : 's'} ({autoRelease.toLocaleDateString('en-NG')})</p>
                         )}
                       </div>
                       <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                        <p className="text-lg font-bold text-amber-900">{formatPrice(payment.total_amount)}</p>
-                        <Badge variant="outline" className="border-amber-400 text-amber-700">Held</Badge>
+                        <p className={stuck ? 'text-lg font-bold text-red-900' : 'text-lg font-bold text-amber-900'}>{formatPrice(payment.total_amount)}</p>
+                        <Badge variant="outline" className={stuck ? 'border-red-400 text-red-700' : 'border-amber-400 text-amber-700'}>{stuck ? 'Needs resolving' : 'Held'}</Badge>
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setRefundTarget(payment)}>
                           Resolve
                         </Button>
@@ -2068,6 +2071,44 @@ export function AdminDashboard() {
                         <span className="text-xs text-muted-foreground italic">None</span>
                       )}
                     </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <h3 className="font-semibold mb-3 mt-6">Refund History</h3>
+          <Card className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Property</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Refunded By</TableHead>
+                  <TableHead>Refunded</TableHead>
+                  <TableHead>Note</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rentPayments.filter(p => p.status === 'refunded').length === 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No refunds issued yet</TableCell></TableRow>
+                ) : rentPayments.filter(p => p.status === 'refunded').sort((a, b) => new Date(b.refunded_at || b.created_at) - new Date(a.refunded_at || a.created_at)).slice(0, 25).map(payment => (
+                  <TableRow key={payment.id}>
+                    <TableCell className="font-medium">
+                      <button onClick={() => openPropertyPreviewById(payment.property_id)} className="text-primary hover:underline text-left">
+                        {payment.property?.title || '—'}
+                      </button>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {payment.student?.full_name || '—'}{payment.student?.email ? ` (${payment.student.email})` : ''}
+                    </TableCell>
+                    <TableCell>{formatPrice(payment.total_amount)}</TableCell>
+                    <TableCell><Badge variant="outline" className="capitalize text-xs">{payment.refund_reason || '—'}</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{payment.refunded_by || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{payment.refunded_at ? new Date(payment.refunded_at).toLocaleDateString('en-NG') : '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={payment.admin_note || ''}>{payment.admin_note || '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -2695,7 +2736,7 @@ export function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Resolve held payment</DialogTitle>
             <DialogDescription>
-              This refunds {refundTarget ? formatPrice(refundTarget.total_amount) : ''} in full to the student and removes the listing from Rentora for good — it will NOT go back to "available". This can't be undone.
+              Send {refundTarget ? formatPrice(refundTarget.total_amount) : ''} back to the student yourself (bank transfer), then confirm below. This records the refund and removes the listing from Rentora for good — it will NOT go back to "available". This can't be undone.
             </DialogDescription>
           </DialogHeader>
           {refundTarget && (
@@ -2725,7 +2766,7 @@ export function AdminDashboard() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setRefundTarget(null)} disabled={refundBusy}>Cancel</Button>
             <Button variant="destructive" onClick={handleResolveRefund} disabled={refundBusy}>
-              {refundBusy ? 'Processing...' : 'Refund & Remove Listing'}
+              {refundBusy ? 'Recording...' : "I've Sent the Refund — Record & Remove Listing"}
             </Button>
           </DialogFooter>
         </DialogContent>

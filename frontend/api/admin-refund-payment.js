@@ -9,29 +9,31 @@
 // confirmed. So resolving "the house isn't available" doesn't need any
 // clawback; it's a clean refund of money that was never released.
 //
-// This endpoint does THREE things atomically-in-spirit (each step checked,
-// each failure handled explicitly, nothing left half-done silently):
+// MANUAL REFUND FLOW: this endpoint does NOT call Flutterwave's refund API.
+// Flutterwave's refund endpoint proved unreliable in practice (slow/502s),
+// which left payments stuck in an in-between state with no money actually
+// returned and no clean way to retry. Instead, the admin sends the money
+// back to the student directly (bank transfer, outside the app) and then
+// clicks "Refund & Remove Listing" here purely to RECORD that it happened —
+// this is bookkeeping, not a payment call.
+//
+// This endpoint does THREE things:
 //   1. Confirms the caller is an admin (server-side, via their own JWT —
 //      never trust a role claim from the browser).
-//   2. Refunds the FULL amount via Flutterwave, server-side, using the
-//      secret key (never exposed to the browser).
-//   3. Only on confirmed refund success: marks the payment 'refunded' and
-//      soft-delists the property (status = 'rejected') so it drops out of
+//   2. Marks the payment 'refunded' (who, when, why, and an optional
+//      internal note — all stored on the row for the record).
+//   3. Soft-delists the property (status = 'rejected') so it drops out of
 //      every public listing query immediately and permanently — it does
 //      NOT go back to 'available'. An admin can manually re-approve it
 //      later if the agent proves the listing was actually fine.
 //
-// FAILS CLOSED, same principle as confirm-payment.js: if Flutterwave's
-// refund call doesn't clearly succeed, the payment is left in
-// 'refund_processing' (not silently reverted to 'held' and not marked
-// 'refunded') so it shows up for an admin to retry or resolve manually —
-// never guess.
+// Also accepts a payment already stuck in 'refund_processing' (from the
+// old Flutterwave-backed version of this endpoint) so any payment left
+// hanging by that flow can be resolved here too, in one click.
 //
-// Requires the same env vars as confirm-payment.js:
-//   FLW_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from '@supabase/supabase-js';
-import { verifyByReference, refundTransaction, readCharge } from './_flutterwave.js';
 
 const VALID_REASONS = ['unavailable', 'misrepresented', 'other'];
 
@@ -88,82 +90,61 @@ export default async function handler(req, res) {
   if (payment.status === 'refunded') {
     return res.status(200).json({ ok: true, alreadyProcessed: true });
   }
-  if (payment.status !== 'held') {
+  // 'refund_processing' is accepted here too — it's the state a payment
+  // could be left in by the old Flutterwave-backed version of this
+  // endpoint. Resolving it now just means: record the manual refund.
+  if (payment.status !== 'held' && payment.status !== 'refund_processing') {
     return res.status(409).json({
       error: `This payment is '${payment.status}', not 'held' — only a held payment (funds not yet released to the agent) can be refunded through this action.`,
     });
   }
 
-  // ---- 3. Lock it: held -> refund_processing, so a double-click or the
-  // auto-release cron can't touch it while we're mid-refund. ----
-  const { error: lockErr } = await supabase
+  // ---- 3. Record the manual refund. Conditioned on status so a
+  // double-click (or someone else resolving it first) can't double-fire
+  // the notifications below. ----
+  const { data: updated, error: refundedErr } = await supabase
     .from('property_rent_payments')
-    .update({ status: 'refund_processing', refund_reason: reason, refunded_by: caller.email || caller.full_name })
+    .update({
+      status: 'refunded',
+      refunded_at: new Date().toISOString(),
+      refund_reason: reason,
+      refunded_by: caller.email || caller.full_name,
+      admin_note: note || null,
+    })
     .eq('id', payment_id)
-    .eq('status', 'held'); // fails silently (0 rows) if someone else beat us to it
-  if (lockErr) return res.status(500).json({ error: 'Failed to lock payment for refund: ' + lockErr.message });
+    .in('status', ['held', 'refund_processing'])
+    .select()
+    .maybeSingle();
+  if (refundedErr) return res.status(500).json({ error: 'Failed to mark payment refunded: ' + refundedErr.message });
+  if (!updated) return res.status(409).json({ error: 'This payment was already resolved by someone else. Refresh and check its current status.' });
 
-  try {
-    // ---- 4. Get Flutterwave's numeric transaction id fresh, then refund ----
-    const { ok: verifyOk, body: verifyBody } = await verifyByReference(payment.reference);
-    if (!verifyOk) {
-      throw new Error(`Could not look up the original charge with Flutterwave: ${verifyBody?.message || 'unknown error'}`);
-    }
-    const charge = readCharge(verifyBody);
-    if (!charge.id) {
-      throw new Error('Flutterwave did not return a transaction id for this reference.');
-    }
+  // Soft-delist: status = 'rejected' takes it out of every public listing
+  // query (all of which filter on status = 'approved') immediately and
+  // for good — it does NOT go back to 'available'. Admin can manually
+  // re-approve later if this turns out to have been an error.
+  await supabase
+    .from('properties')
+    .update({ status: 'rejected' })
+    .eq('id', payment.property_id);
 
-    const { ok: refundOk, body: refundBody } = await refundTransaction(charge.id);
-    // Flutterwave returns status: "success" with the refund queued/completed;
-    // it does not always settle instantly, but a "success" response here
-    // means the refund was accepted and will complete on their side.
-    if (!refundOk || refundBody?.status !== 'success') {
-      throw new Error(refundBody?.message || 'Flutterwave did not accept the refund request.');
-    }
+  await notifyAndEmail(supabase, payment, reason, note, caller);
 
-    // ---- 5. Confirmed: mark refunded + soft-delist the property ----
-    const { error: refundedErr } = await supabase
-      .from('property_rent_payments')
-      .update({ status: 'refunded', refunded_at: new Date().toISOString() })
-      .eq('id', payment_id)
-      .eq('status', 'refund_processing');
-    if (refundedErr) throw refundedErr;
-
-    // Soft-delist: status = 'rejected' takes it out of every public listing
-    // query (all of which filter on status = 'approved') immediately and
-    // for good — it does NOT go back to 'available'. Admin can manually
-    // re-approve later if this turns out to have been an error.
-    await supabase
-      .from('properties')
-      .update({ status: 'rejected' })
-      .eq('id', payment.property_id);
-
-    await notifyAndEmail(supabase, payment, reason, note);
-
-    return res.status(200).json({ ok: true, refunded_amount: payment.total_amount });
-  } catch (err) {
-    console.error('admin-refund-payment: refund failed, leaving payment in refund_processing for manual follow-up', err);
-    // Deliberately do NOT revert to 'held' automatically — a payment stuck
-    // visibly in 'refund_processing' is a problem an admin will notice and
-    // retry. Silently reverting it risks the auto-release cron picking it
-    // back up and paying the agent for a house that isn't available.
-    return res.status(502).json({
-      error: 'Refund could not be completed with Flutterwave. The payment is held in refund_processing — retry, or resolve manually with Flutterwave support.',
-      detail: String(err?.message || err),
-    });
-  }
+  return res.status(200).json({ ok: true, refunded_amount: payment.total_amount });
 }
 
-// Quiet, non-alarming notifications — no "REFUND ISSUED" banners anywhere
-// in-app. The student gets a plain-language email that their payment is
-// resolved and money is on its way back; the agent gets told the listing
-// was removed, without being shown the student's dispute details.
-async function notifyAndEmail(supabase, payment, reason, note) {
-  const [{ data: student }, { data: agent }, { data: property }] = await Promise.all([
+// Quiet, non-alarming notifications for the student and agent — no
+// "REFUND ISSUED" banners anywhere in-app. The student gets a plain-language
+// email that their payment is resolved and money is on its way back
+// (already sent manually by the admin); the agent gets told the listing
+// was removed, without being shown the student's dispute details. Every
+// admin also gets a record of the refund, same pattern as other
+// significant site events (new listing, withdrawal request, etc.).
+async function notifyAndEmail(supabase, payment, reason, note, caller) {
+  const [{ data: student }, { data: agent }, { data: property }, { data: admins }] = await Promise.all([
     supabase.from('users').select('email, full_name').eq('id', payment.user_id).maybeSingle(),
     payment.agent_id ? supabase.from('users').select('email, full_name').eq('id', payment.agent_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from('properties').select('title').eq('id', payment.property_id).maybeSingle(),
+    supabase.from('users').select('id, email, full_name').eq('role', 'admin'),
   ]);
   const propertyTitle = property?.title || 'the property';
 
@@ -181,6 +162,30 @@ async function notifyAndEmail(supabase, payment, reason, note) {
         to: agent.email,
         data: { agent_name: agent.full_name || 'there', property_title: propertyTitle, reason },
       });
+    }
+    if (admins?.length) {
+      await Promise.allSettled(
+        admins.filter((a) => a.email).map((admin) =>
+          callSupabaseSendEmail({
+            type: 'admin_activity_alert',
+            to: admin.email,
+            data: {
+              title: `Refund issued: ${propertyTitle}`,
+              event_label: 'Rent refund',
+              summary: `${caller.full_name || caller.email || 'An admin'} refunded ${propertyTitle} (₦${Number(payment.total_amount).toLocaleString('en-NG')}) and removed the listing. Reason: ${reason}.${note ? ` Note: ${note}` : ''}`,
+              breakdown: [
+                ['Property', propertyTitle],
+                ['Amount', `NGN ${Number(payment.total_amount).toLocaleString('en-NG')}`],
+                ['Reason', reason],
+                ['Reference', payment.reference],
+                ['Refunded by', caller.full_name || caller.email || '—'],
+              ],
+              action_url: 'https://www.rentora.com.ng/admin?tab=escrow',
+              admin_name: admin.full_name || 'Admin',
+            },
+          })
+        )
+      );
     }
   } catch (e) {
     console.error('[admin-refund-payment] resolution email failed (non-critical):', e?.message || e);
@@ -204,6 +209,17 @@ async function notifyAndEmail(supabase, payment, reason, note) {
         body: `"${propertyTitle}" has been taken down and the booking on it was cancelled${note ? `: ${note}` : '.'}`,
         link: '/agent',
       });
+    }
+    if (admins?.length) {
+      await supabase.from('user_notifications').insert(
+        admins.map((admin) => ({
+          user_id: admin.id,
+          type: 'rent_refund_issued',
+          title: 'Refund issued',
+          body: `${caller.full_name || caller.email || 'An admin'} refunded ${propertyTitle} (₦${Number(payment.total_amount).toLocaleString('en-NG')}).`,
+          link: '/admin?tab=escrow',
+        }))
+      );
     }
   } catch (e) {
     console.error('[admin-refund-payment] notification insert failed (non-critical):', e?.message || e);
