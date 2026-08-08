@@ -671,29 +671,29 @@ export function AgentDashboard() {
                       <h3 className="font-semibold line-clamp-1">{viewing.property_title}</h3>
                       <p className="text-sm text-muted-foreground mt-0.5">Tenant: {viewing.user_name}</p>
                       <p className="text-sm text-muted-foreground">Date: {viewing.inspection_date}</p>
-                      {viewing.payment_status === 'completed' && viewing.user_phone && (
+                      {(viewing.payment_status === 'completed' || viewing.payment_status === 'not_required') && viewing.user_phone && (
                         <a href={`tel:${viewing.user_phone}`}
                           className="inline-flex items-center gap-1.5 mt-2 text-primary font-semibold text-sm hover:underline">
                           <Phone className="w-3.5 h-3.5" /> {viewing.user_phone}
                         </a>
                       )}
-                      {viewing.payment_status === 'completed' && !viewing.user_phone && (
+                      {(viewing.payment_status === 'completed' || viewing.payment_status === 'not_required') && !viewing.user_phone && (
                         <p className="text-xs text-muted-foreground mt-1">User phone not available</p>
                       )}
-                      {viewing.payment_status !== 'completed' && (
+                      {viewing.payment_status !== 'completed' && viewing.payment_status !== 'not_required' && (
                         <p className="text-xs text-yellow-600 mt-1">⏳ Awaiting payment</p>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <Badge className={getStatusBadge(viewing.status)}>{viewing.status}</Badge>
-                      {viewing.payment_status === 'completed' && viewing.user_phone && (
+                      {(viewing.payment_status === 'completed' || viewing.payment_status === 'not_required') && viewing.user_phone && (
                         <a href={`tel:${viewing.user_phone}`}>
                           <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
                             <Phone className="w-3 h-3" /> Call User
                           </Button>
                         </a>
                       )}
-                      {viewing.status !== 'completed' && viewing.payment_status === 'completed' && (
+                      {viewing.status !== 'completed' && (viewing.payment_status === 'completed' || viewing.payment_status === 'not_required') && (
                         <Button size="sm" onClick={() => handleMarkCompleted(viewing.id)} className="gap-1.5 h-7 text-xs">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Done
                         </Button>
