@@ -6,6 +6,15 @@
 // notifyUser() is called at the exact same moments the app already sends
 // an email (e.g. property approved, rent released), so the same event
 // produces both an email AND a bell notification.
+//
+// Two sources feed the same bell/page:
+//  - user_notifications: one row per (user, event) — personal.
+//  - admin_broadcasts:   one row per admin message, fanned out to every
+//    matching user at READ time (not write time) via broadcast_reads for
+//    per-user read state. See supabase/schema/13_admin_broadcasts.sql.
+// useNotifications() merges both into a single, sorted list so the bell,
+// the popover, and the /notifications page don't need to know two sources
+// exist.
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabase';
 
@@ -27,15 +36,64 @@ export async function notifyUser(userId, type, title, body, link = null) {
   }
 }
 
-const PAGE_SIZE = 30;
+// Admin-only. Sends one message to every user, or to just students/agents.
+// Used by AdminDashboard's Broadcasts tab. p_target: 'all' | 'user' | 'agent'.
+export async function sendBroadcast(title, body, target = 'all', link = null) {
+  const { data, error } = await supabase.rpc('send_broadcast', {
+    p_title: title,
+    p_body: body,
+    p_target: target,
+    p_link: link,
+  });
+  if (error) throw error;
+  return data; // new broadcast id
+}
 
-// Live list + unread count for the current user. Subscribes to Realtime so
-// the bell updates immediately when a new notification is inserted, without
-// a page refresh or polling.
-export function useNotifications(userId) {
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+const PAGE_SIZE = 30;
+const dismissedKey = (userId) => `rentora:dismissed_broadcasts:${userId}`;
+
+function loadDismissed(userId) {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(dismissedKey(userId)) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissed(userId, set) {
+  try {
+    localStorage.setItem(dismissedKey(userId), JSON.stringify([...set]));
+  } catch {
+    // storage unavailable (private mode, quota) — dismiss is session-only, fine
+  }
+}
+
+// Normalizes a row from either source into the shape the UI renders, plus
+// a `source` tag so markAsRead/delete know which table to act on.
+function fromPersonal(row) {
+  return { ...row, source: 'personal' };
+}
+function fromBroadcast(row, readAt) {
+  return {
+    id: row.id,
+    type: 'broadcast',
+    title: row.title,
+    body: row.body,
+    link: row.link,
+    created_at: row.created_at,
+    read_at: readAt || null,
+    source: 'broadcast',
+  };
+}
+
+// Live list + unread count for the current user, merging personal
+// notifications and targeted admin broadcasts. Subscribes to Realtime so
+// the bell updates immediately without a page refresh or polling.
+export function useNotifications(userId, role) {
+  const [personal, setPersonal] = useState([]);
+  const [broadcasts, setBroadcasts] = useState([]); // normalized, already merged with read state
   const [loading, setLoading] = useState(true);
+  const dismissed = useRef(new Set());
   // Every hook instance (bell + notifications page can be mounted at the same
   // time, and StrictMode mounts effects twice) needs its OWN channel topic.
   // Re-using one topic makes supabase-js hand back an already-subscribed
@@ -44,21 +102,33 @@ export function useNotifications(userId) {
   // crashed the notifications page to a blank screen.
   const instanceId = useRef(Math.random().toString(36).slice(2));
 
+  const matchesRole = useCallback((target) => target === 'all' || target === role, [role]);
+
   const load = useCallback(async () => {
-    if (!userId) { setNotifications([]); setUnreadCount(0); setLoading(false); return; }
+    if (!userId) { setPersonal([]); setBroadcasts([]); setLoading(false); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('user_notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE);
-    if (!error && data) {
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.read_at).length);
+    dismissed.current = loadDismissed(userId);
+
+    const [personalRes, broadcastRes, readsRes] = await Promise.all([
+      supabase.from('user_notifications').select('*')
+        .eq('user_id', userId).order('created_at', { ascending: false }).limit(PAGE_SIZE),
+      supabase.from('admin_broadcasts').select('*')
+        .order('created_at', { ascending: false }).limit(PAGE_SIZE),
+      supabase.from('broadcast_reads').select('broadcast_id, read_at').eq('user_id', userId),
+    ]);
+
+    if (!personalRes.error && personalRes.data) setPersonal(personalRes.data.map(fromPersonal));
+
+    if (!broadcastRes.error && broadcastRes.data) {
+      const readMap = new Map((readsRes.data || []).map(r => [r.broadcast_id, r.read_at]));
+      const list = broadcastRes.data
+        .filter(b => matchesRole(b.target) && !dismissed.current.has(b.id))
+        .map(b => fromBroadcast(b, readMap.get(b.id)));
+      setBroadcasts(list);
     }
+
     setLoading(false);
-  }, [userId]);
+  }, [userId, matchesRole]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -72,16 +142,14 @@ export function useNotifications(userId) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${userId}` },
         (payload) => {
-          setNotifications(prev => [payload.new, ...prev].slice(0, PAGE_SIZE));
-          setUnreadCount(prev => prev + 1);
+          setPersonal(prev => [fromPersonal(payload.new), ...prev].slice(0, PAGE_SIZE));
         }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${userId}` },
         (payload) => {
-          setNotifications(prev => prev.map(n => (n.id === payload.new.id ? payload.new : n)));
-          setUnreadCount(prev => Math.max(0, prev - (payload.new.read_at && !payload.old.read_at ? 1 : 0)));
+          setPersonal(prev => prev.map(n => (n.id === payload.new.id ? fromPersonal(payload.new) : n)));
         }
       )
       .on(
@@ -90,11 +158,29 @@ export function useNotifications(userId) {
         (payload) => {
           const deletedId = payload.old?.id;
           if (!deletedId) return;
-          setNotifications(prev => {
-            const removed = prev.find(n => n.id === deletedId);
-            if (removed && !removed.read_at) setUnreadCount(c => Math.max(0, c - 1));
-            return prev.filter(n => n.id !== deletedId);
-          });
+          setPersonal(prev => prev.filter(n => n.id !== deletedId));
+        }
+      )
+      // No server-side filter on target here — postgres_changes filters only
+      // support simple equality, and target can be 'all' OR the user's role.
+      // The table is small/low-frequency (admin sends), so filtering the
+      // small payload client-side is cheap.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'admin_broadcasts' },
+        (payload) => {
+          const b = payload.new;
+          if (!matchesRole(b.target) || dismissed.current.has(b.id)) return;
+          setBroadcasts(prev => [fromBroadcast(b, null), ...prev].slice(0, PAGE_SIZE));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'admin_broadcasts' },
+        (payload) => {
+          const deletedId = payload.old?.id;
+          if (!deletedId) return;
+          setBroadcasts(prev => prev.filter(b => b.id !== deletedId));
         }
       )
       .subscribe();
@@ -106,67 +192,105 @@ export function useNotifications(userId) {
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, matchesRole]);
 
-  const markAsRead = useCallback(async (notificationId) => {
-    setNotifications(prev => prev.map(n => (n.id === notificationId ? { ...n, read_at: n.read_at || new Date().toISOString() } : n)));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+  const markAsRead = useCallback(async (notification) => {
+    if (notification.source === 'broadcast') {
+      setBroadcasts(prev => prev.map(b => (b.id === notification.id ? { ...b, read_at: b.read_at || new Date().toISOString() } : b)));
+      const { error } = await supabase.rpc('mark_broadcast_read', { p_broadcast_id: notification.id });
+      if (error) console.warn('markAsRead(broadcast) failed:', error.message);
+      return;
+    }
+    setPersonal(prev => prev.map(n => (n.id === notification.id ? { ...n, read_at: n.read_at || new Date().toISOString() } : n)));
     const { error } = await supabase
       .from('user_notifications')
       .update({ read_at: new Date().toISOString() })
-      .eq('id', notificationId)
+      .eq('id', notification.id)
       .is('read_at', null);
     if (error) console.warn('markAsRead failed:', error.message);
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
-    setUnreadCount(0);
+    const now = new Date().toISOString();
+    setPersonal(prev => prev.map(n => ({ ...n, read_at: n.read_at || now })));
+    setBroadcasts(prev => prev.map(b => ({ ...b, read_at: b.read_at || now })));
+
     const { error } = await supabase.rpc('mark_all_notifications_read');
     if (error) console.warn('markAllAsRead failed:', error.message);
-  }, []);
 
-  // Delete a single notification. Optimistic: the row disappears instantly,
-  // and is restored if the delete fails server-side.
-  const deleteNotification = useCallback(async (notificationId) => {
+    const unreadBroadcastIds = broadcasts.filter(b => !b.read_at).map(b => b.id);
+    if (userId && unreadBroadcastIds.length) {
+      const rows = unreadBroadcastIds.map(broadcast_id => ({ broadcast_id, user_id: userId }));
+      const { error: bErr } = await supabase
+        .from('broadcast_reads')
+        .upsert(rows, { onConflict: 'broadcast_id,user_id', ignoreDuplicates: true });
+      if (bErr) console.warn('markAllAsRead(broadcasts) failed:', bErr.message);
+    }
+  }, [userId, broadcasts]);
+
+  // Removes a notification from view. Personal notifications are truly
+  // deleted server-side. Broadcasts are shared rows other users still need
+  // to see, so "delete" here means: mark read + remember locally that this
+  // user dismissed it, so it won't resurface for THEM on reload.
+  const deleteNotification = useCallback(async (notification) => {
+    if (notification.source === 'broadcast') {
+      dismissed.current.add(notification.id);
+      if (userId) saveDismissed(userId, dismissed.current);
+      setBroadcasts(prev => prev.filter(b => b.id !== notification.id));
+      if (!notification.read_at) {
+        const { error } = await supabase.rpc('mark_broadcast_read', { p_broadcast_id: notification.id });
+        if (error) console.warn('dismiss(broadcast) failed:', error.message);
+      }
+      return;
+    }
+
     let snapshot;
-    setNotifications(prev => {
-      snapshot = prev;
-      const removed = prev.find(n => n.id === notificationId);
-      if (removed && !removed.read_at) setUnreadCount(c => Math.max(0, c - 1));
-      return prev.filter(n => n.id !== notificationId);
-    });
+    setPersonal(prev => { snapshot = prev; return prev.filter(n => n.id !== notification.id); });
     const { error } = await supabase
       .from('user_notifications')
       .delete()
-      .eq('id', notificationId);
+      .eq('id', notification.id);
     if (error) {
       console.warn('deleteNotification failed:', error.message);
-      if (snapshot) {
-        setNotifications(snapshot);
-        setUnreadCount(snapshot.filter(n => !n.read_at).length);
-      }
+      if (snapshot) setPersonal(snapshot);
     }
-  }, []);
+  }, [userId]);
 
-  // Delete every notification for the current user.
+  // Clears everything currently in view: deletes personal notifications,
+  // dismisses every loaded broadcast (see deleteNotification above).
   const clearAll = useCallback(async () => {
     if (!userId) return;
     let snapshot;
-    setNotifications(prev => { snapshot = prev; return []; });
-    setUnreadCount(0);
+    setPersonal(prev => { snapshot = prev; return []; });
+    const broadcastIds = broadcasts.map(b => b.id);
+    if (broadcastIds.length) {
+      broadcastIds.forEach(id => dismissed.current.add(id));
+      saveDismissed(userId, dismissed.current);
+      setBroadcasts([]);
+    }
+
     const { error } = await supabase
       .from('user_notifications')
       .delete()
       .eq('user_id', userId);
     if (error) {
       console.warn('clearAll failed:', error.message);
-      if (snapshot) {
-        setNotifications(snapshot);
-        setUnreadCount(snapshot.filter(n => !n.read_at).length);
-      }
+      if (snapshot) setPersonal(snapshot);
     }
-  }, [userId]);
+
+    const unread = broadcasts.filter(b => !b.read_at).map(b => ({ broadcast_id: b.id, user_id: userId }));
+    if (unread.length) {
+      const { error: bErr } = await supabase
+        .from('broadcast_reads')
+        .upsert(unread, { onConflict: 'broadcast_id,user_id', ignoreDuplicates: true });
+      if (bErr) console.warn('clearAll(broadcasts) failed:', bErr.message);
+    }
+  }, [userId, broadcasts]);
+
+  const notifications = [...personal, ...broadcasts].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  );
+  const unreadCount = notifications.filter(n => !n.read_at).length;
 
   return { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll, refresh: load };
 }

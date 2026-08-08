@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { sendBroadcast } from '../lib/notifications';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -18,7 +19,7 @@ import {
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
-  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage
+  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -77,6 +78,17 @@ export function AdminDashboard() {
   const [inviteExpiryDays, setInviteExpiryDays] = useState('7');
   const [generatingInvite, setGeneratingInvite] = useState(false);
 
+  // Broadcasts — admin → all users (or a role) push, shown via the same
+  // bell/notifications system as personal notifications. See lib/notifications.js.
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [loadingBroadcasts, setLoadingBroadcasts] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastLink, setBroadcastLink] = useState('');
+  const [broadcastTarget, setBroadcastTarget] = useState('all');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastReach, setBroadcastReach] = useState({}); // { [broadcastId]: { total, read } }
+
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
     if (!isAdmin) { toast.error('Access denied'); navigate('/'); return; }
@@ -108,6 +120,66 @@ export function AdminDashboard() {
   useEffect(() => {
     if (isAdmin && activeTab === 'agent-invites') fetchAgentInvites();
   }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchBroadcasts = async () => {
+    setLoadingBroadcasts(true);
+    try {
+      const { data, error } = await supabase
+        .from('admin_broadcasts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setBroadcasts(data || []);
+      // Reach (read count) is a separate admin-only RPC — fetch it per
+      // broadcast rather than joining, since it aggregates across users.
+      (data || []).forEach(async (b) => {
+        const { data: reach, error: reachErr } = await supabase.rpc('broadcast_reach', { p_broadcast_id: b.id });
+        if (!reachErr && reach) setBroadcastReach(prev => ({ ...prev, [b.id]: reach }));
+      });
+    } catch (e) {
+      console.error('Failed to load broadcasts:', e);
+    } finally {
+      setLoadingBroadcasts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'broadcasts') fetchBroadcasts();
+  }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) {
+      toast.error('Add both a title and a message');
+      return;
+    }
+    setSendingBroadcast(true);
+    try {
+      await sendBroadcast(broadcastTitle.trim(), broadcastBody.trim(), broadcastTarget, broadcastLink.trim() || null);
+      toast.success('Broadcast sent');
+      setBroadcastTitle('');
+      setBroadcastBody('');
+      setBroadcastLink('');
+      setBroadcastTarget('all');
+      fetchBroadcasts();
+    } catch (e) {
+      toast.error(e.message || 'Failed to send broadcast');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  const deleteBroadcast = async (broadcastId) => {
+    if (!window.confirm('Delete this broadcast for everyone? This cannot be undone.')) return;
+    try {
+      const { error } = await supabase.from('admin_broadcasts').delete().eq('id', broadcastId);
+      if (error) throw error;
+      setBroadcasts(prev => prev.filter(b => b.id !== broadcastId));
+      toast.success('Broadcast deleted');
+    } catch (e) {
+      toast.error(e.message || 'Failed to delete broadcast');
+    }
+  };
 
   const generateAgentInvite = async () => {
     setGeneratingInvite(true);
@@ -557,6 +629,7 @@ export function AdminDashboard() {
     },
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
     { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
+    { id: 'broadcasts', label: 'Broadcasts', icon: Megaphone },
   ];
 
   const navQuery = navSearch.trim().toLowerCase();
@@ -1800,6 +1873,97 @@ export function AdminDashboard() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* ── Broadcasts Tab ── */}
+        <TabsContent value="broadcasts">
+          <div className="space-y-6">
+            <Card className="p-5">
+              <h3 className="font-semibold mb-1">Send a broadcast</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Delivered instantly to the bell icon and /notifications page for every matching user —
+                no email involved. Keep it short; there's no character limit but shorter reads better in the bell popover.
+              </p>
+              <div className="space-y-3">
+                <Input
+                  placeholder="Title (e.g. Scheduled maintenance tonight)"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                />
+                <Textarea
+                  placeholder="Message"
+                  value={broadcastBody}
+                  onChange={(e) => setBroadcastBody(e.target.value)}
+                  rows={3}
+                />
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Input
+                    placeholder="Link when tapped (optional, e.g. /properties)"
+                    value={broadcastLink}
+                    onChange={(e) => setBroadcastLink(e.target.value)}
+                    className="sm:flex-1"
+                  />
+                  <Select value={broadcastTarget} onValueChange={setBroadcastTarget}>
+                    <SelectTrigger className="sm:w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Everyone</SelectItem>
+                      <SelectItem value="user">Students only</SelectItem>
+                      <SelectItem value="agent">Agents only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleSendBroadcast} disabled={sendingBroadcast} className="gap-2 sm:w-40">
+                    {sendingBroadcast ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Sent broadcasts</h3>
+                <Button variant="outline" size="sm" onClick={fetchBroadcasts} disabled={loadingBroadcasts} className="gap-2">
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingBroadcasts ? 'animate-spin' : ''}`} /> Refresh
+                </Button>
+              </div>
+
+              {loadingBroadcasts ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : broadcasts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No broadcasts sent yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {broadcasts.map((b) => {
+                    const reach = broadcastReach[b.id];
+                    return (
+                      <div key={b.id} className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 rounded-lg border p-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{b.title}</span>
+                            <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">
+                              {b.target === 'all' ? 'Everyone' : b.target === 'user' ? 'Students' : 'Agents'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{b.body}</p>
+                          <p className="text-xs text-foreground/45 mt-1.5">
+                            {new Date(b.created_at).toLocaleString()}
+                            {reach ? ` · ${reach.read}/${reach.total} read` : ''}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm" variant="ghost"
+                          className="gap-1.5 text-destructive hover:text-destructive shrink-0"
+                          onClick={() => deleteBroadcast(b.id)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ── Payouts Tab ── */}

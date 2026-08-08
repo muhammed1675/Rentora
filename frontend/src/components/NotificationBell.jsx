@@ -20,12 +20,12 @@ function timeAgo(dateString) {
 export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id, user?.role);
 
   if (!user) return null;
 
   const handleClick = (n) => {
-    if (!n.read_at) markAsRead(n.id);
+    if (!n.read_at) markAsRead(n);
     if (n.link) navigate(n.link);
   };
 
@@ -71,14 +71,19 @@ export function NotificationBell() {
                 >
                   <button onClick={() => handleClick(n)} className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium text-primary">{n.title}</span>
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                        {n.source === 'broadcast' && (
+                          <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">Announcement</span>
+                        )}
+                        {n.title}
+                      </span>
                       {!n.read_at && <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
                     </div>
                     <span className="text-xs leading-5 text-muted-foreground">{n.body}</span>
                     <span className="mt-0.5 text-[11px] text-muted-foreground/70">{timeAgo(n.created_at)}</span>
                   </button>
                   <button
-                    onClick={() => deleteNotification(n.id)}
+                    onClick={() => deleteNotification(n)}
                     aria-label="Delete notification"
                     className="flex-shrink-0 rounded-full p-1.5 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
                   >
@@ -108,7 +113,7 @@ export function NotificationBell() {
 export function NotificationBellLink({ className = '' }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { unreadCount } = useNotifications(user?.id);
+  const { unreadCount } = useNotifications(user?.id, user?.role);
 
   if (!user) return null;
 
