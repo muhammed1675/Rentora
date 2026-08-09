@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { VerifyGateProvider } from "./components/VerifyGateDialog";
@@ -109,10 +109,31 @@ function TrackPageViews() {
   return null;
 }
 
+// Tapping a push notification (see public/sw.js 'notificationclick') posts
+// {type:'notification-click', link} to this tab if one is already open, so
+// we navigate inside the SPA instead of a full page reload to that link.
+function PushClickListener() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handler = (event) => {
+      if (event.data?.type === 'notification-click' && event.data.link) {
+        navigate(event.data.link);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, [navigate]);
+
+  return null;
+}
+
 function AppRoutes() {
   return (
     <VerifyGateProvider>
       <TrackPageViews />
+      <PushClickListener />
       <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Layout><Home /></Layout>} />

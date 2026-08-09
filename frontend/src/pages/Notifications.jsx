@@ -1,7 +1,9 @@
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Trash2 } from 'lucide-react';
+import { Bell, BellRing, CheckCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useNotifications } from '../lib/notifications';
+import { isPushSupported, isPushEnabledOnThisDevice, enablePush, disablePush } from '../lib/push';
 
 function timeAgo(dateString) {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
@@ -15,14 +17,64 @@ function timeAgo(dateString) {
   return new Date(dateString).toLocaleDateString();
 }
 
+// Enable/disable toggle for real push notifications on this device.
+// Separate from the always-on in-app bell — this is the "even with the
+// app closed" layer, opt-in only. See lib/push.js.
+function PushToggle({ userId }) {
+  const [supported, setSupported] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    const ok = isPushSupported();
+    setSupported(ok);
+    if (ok) setEnabled(await isPushEnabledOnThisDevice());
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  if (!supported) return null;
+
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      if (enabled) {
+        await disablePush();
+        setEnabled(false);
+      } else {
+        const ok = await enablePush(userId);
+        setEnabled(ok);
+        if (!ok && Notification.permission === 'denied') {
+          alert("Notifications are blocked for Rentora in your browser settings. You'll need to allow them there to turn this on.");
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium hover:bg-white disabled:opacity-60 ${
+        enabled ? 'border-primary/20 text-primary' : 'border-black/10 text-muted-foreground'
+      }`}
+    >
+      <BellRing className="h-4 w-4" />
+      {enabled ? 'Push on' : 'Turn on push'}
+    </button>
+  );
+}
+
 export default function Notifications() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead, deleteNotification, clearAll } =
-    useNotifications(user?.id);
+    useNotifications(user?.id, user?.role);
 
   const handleClick = (n) => {
-    if (!n.read_at) markAsRead(n.id);
+    if (!n.read_at) markAsRead(n);
     if (n.link) navigate(n.link);
   };
 
@@ -36,6 +88,7 @@ export default function Notifications() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <PushToggle userId={user?.id} />
           {unreadCount > 0 && (
             <button
               onClick={markAllAsRead}
@@ -73,14 +126,19 @@ export default function Notifications() {
             >
               <button onClick={() => handleClick(n)} className="flex min-w-0 flex-1 flex-col gap-1 text-left">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-sm font-medium text-primary">{n.title}</span>
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                    {n.source === 'broadcast' && (
+                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Announcement</span>
+                    )}
+                    {n.title}
+                  </span>
                   {!n.read_at && <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />}
                 </div>
                 <span className="text-sm leading-6 text-muted-foreground">{n.body}</span>
                 <span className="text-xs text-muted-foreground/70">{timeAgo(n.created_at)}</span>
               </button>
               <button
-                onClick={() => deleteNotification(n.id)}
+                onClick={() => deleteNotification(n)}
                 aria-label="Delete notification"
                 className="mt-0.5 flex-shrink-0 rounded-full p-2 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
               >

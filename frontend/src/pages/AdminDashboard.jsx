@@ -155,13 +155,32 @@ export function AdminDashboard() {
     }
     setSendingBroadcast(true);
     try {
-      await sendBroadcast(broadcastTitle.trim(), broadcastBody.trim(), broadcastTarget, broadcastLink.trim() || null);
+      const broadcastId = await sendBroadcast(broadcastTitle.trim(), broadcastBody.trim(), broadcastTarget, broadcastLink.trim() || null);
       toast.success('Broadcast sent');
       setBroadcastTitle('');
       setBroadcastBody('');
       setBroadcastLink('');
       setBroadcastTarget('all');
       fetchBroadcasts();
+
+      // Fan out to real push subscriptions — best-effort, same pattern as
+      // the email calls elsewhere in this file. The in-app broadcast above
+      // has already succeeded either way, so a push failure here shouldn't
+      // look like the whole send failed.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+        if (accessToken && SUPABASE_URL) {
+          await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({ broadcast_id: broadcastId }),
+          });
+        }
+      } catch (pushErr) {
+        console.warn('send-push failed (non-critical, in-app broadcast already sent):', pushErr);
+      }
     } catch (e) {
       toast.error(e.message || 'Failed to send broadcast');
     } finally {

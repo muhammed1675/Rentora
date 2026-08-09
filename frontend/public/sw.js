@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentora-v4';
+const CACHE_NAME = 'rentora-v5';
 const STATIC_ASSETS = ['/', '/browse', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -62,5 +62,48 @@ self.addEventListener('fetch', (event) => {
           return new Response('', { status: 504, statusText: 'Offline and not cached' });
         });
       })
+  );
+});
+
+// ── Web Push ──────────────────────────────────────────────
+// Fired when the send-push edge function delivers a message to this
+// device's subscription, whether or not the app is open. The payload is
+// whatever JSON send-push sent — see supabase/functions/send-push.
+self.addEventListener('push', (event) => {
+  let payload = { title: 'Rentora', body: 'You have a new notification.' };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch {
+    // Non-JSON payload — fall back to the default above rather than crash.
+  }
+
+  const { title, body, link } = payload;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/launchericon-192x192.png',
+      badge: '/launchericon-72x72.png',
+      data: { link: link || '/' },
+    })
+  );
+});
+
+// Tapping the notification focuses an already-open Rentora tab if one
+// exists (and sends it to the link), otherwise opens a new one.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsList) => {
+      for (const client of clientsList) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'notification-click', link });
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(link);
+    })
   );
 });
