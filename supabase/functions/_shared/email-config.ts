@@ -25,8 +25,9 @@ export const SENDERS = {
     name: "Rentora Billing",
   },
   noreply: {
-    email: Deno.env.get("EMAIL_ADDR_NOREPLY") || "noreply@rentora.com.ng",
-    name: "Rentora",
+    // Keep the legacy role for compatibility, but use a monitored mailbox.
+    email: Deno.env.get("EMAIL_ADDR_SUPPORT") || "support@rentora.com.ng",
+    name: "Rentora Support",
   },
 } as const;
 
