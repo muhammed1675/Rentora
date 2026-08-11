@@ -191,9 +191,10 @@ const iconPaths: Record<string, string> = {
   trash: `<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`,
 };
 
-function ic(name: string, size = 14): string {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block">${iconPaths[name] || ""}</svg>`;
-}
+  function ic(_name: string, size = 14): string {
+    // Gmail flags inline SVGs, so use a lightweight text marker instead.
+    return `<span aria-hidden="true" style="display:block;font-size:${size}px;line-height:1">&#9679;</span>`;
+  }
 
 // One icon-badge row. Pass `value` for a label/value data row (e.g.
 // "Property → Ajumobi Lodge"); omit it for a single-line feature row

@@ -1202,7 +1202,7 @@ export function AdminDashboard() {
                         </div>
                         <div className="flex flex-col gap-1.5 justify-center">
                           <Button size="sm" className="h-7 gap-1 bg-green-600 hover:bg-green-700 text-white text-xs"
-                            onClick={() => setSelectedAgent(agents.find(a => a.id === req.user_id) || { id: req.user_id, full_name: req.users?.full_name, email: req.users?.email, verification: verifications.find(v => v.user_id === req.user_id && v.status === 'approved') })}>
+                            onClick={() => setSelectedAgent(agents.find(a => a.id === req.user_id) || { id: req.user_id, full_name: req.users?.full_name, email: req.users?.email, phone: req.users?.phone, verification: verifications.find(v => v.user_id === req.user_id && v.status === 'approved') })}>
                             <Eye className="w-3 h-3" /> View Agent
                           </Button>
                         </div>
@@ -2372,10 +2372,14 @@ export function AdminDashboard() {
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-base">{selectedAgentData.full_name}</p>
                   <p className="text-sm text-muted-foreground truncate">{selectedAgentData.email}</p>
-                  {selectedAgentData.phone && (
+                  {selectedAgentData.phone ? (
                     <a href={`tel:${selectedAgentData.phone}`} className="text-xs text-primary font-medium flex items-center gap-1 mt-1 hover:underline">
                       <Phone className="w-3 h-3" /> {selectedAgentData.phone}
                     </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      <Phone className="w-3 h-3" /> No agent number on file
+                    </span>
                   )}
                   <Badge className="mt-1.5 bg-green-100 text-green-700 text-xs">✓ Verified Agent</Badge>
                 </div>
