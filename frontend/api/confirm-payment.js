@@ -32,6 +32,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { verifyByReference, readCharge, getSecretKey } from './_flutterwave.js';
+import { applyCors } from './_cors.js';
 
 // Admin notification wrapper: every attempt to confirm a payment (success or
 // failure) is reported by email to every user with role='admin' in Supabase,
@@ -63,9 +64,7 @@ export default async function handler(req, res) {
 }
 
 async function handlePayment(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -367,13 +366,17 @@ async function handlePayment(req, res) {
 
 async function callSupabaseSendEmail(payload) {
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(`callSupabaseSendEmail: missing env vars (hasUrl=${!!SUPABASE_URL}, hasAnonKey=${!!SUPABASE_ANON_KEY}) for type=${payload?.type}`);
+  const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    throw new Error(`callSupabaseSendEmail: missing env vars (hasUrl=${!!SUPABASE_URL}, hasServiceRoleKey=${!!SERVICE_ROLE_KEY}) for type=${payload?.type}`);
   }
+  // Uses the service-role key (private, server-side only) rather than the
+  // public anon key — the send-email edge function trusts this key fully,
+  // since only trusted server code (this file) ever has it. See
+  // supabase/functions/send-email/index.ts for the corresponding check.
   const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_ROLE_KEY}` },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {

@@ -1,35 +1,40 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
+import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { GoogleButton } from '../components/GoogleButton';
 import { toast } from 'sonner';
 
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, requestPasswordReset, loginWithGoogle, confirmPasswordResetWithCode } = useAuth();
+  const { requestOtpCode, verifyOtpCode, loginWithGoogle } = useAuth();
 
   const nextPath = new URLSearchParams(location.search).get('next') || '/browse';
 
+  // step: 'email' → enter address, 'code' → enter the 6-digit code
+  const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [code, setCode] = useState('');
+  const [sendLoading, setSendLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  const [resetCode, setResetCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [codeSubmitLoading, setCodeSubmitLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const codeInputRef = useRef(null);
+
+  useEffect(() => {
+    if (step === 'code') codeInputRef.current?.focus();
+  }, [step]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -47,90 +52,39 @@ export function Login() {
     }
   };
 
-  const openForgotPassword = () => {
-    setResetEmail(email);
-    setResetSent(false);
-    setResetCode('');
-    setNewPassword('');
-    setConfirmNewPassword('');
-    setShowForgotPassword(true);
-  };
-
-  const handleForgotPassword = async () => {
-    if (!resetEmail) { toast.error('Enter your email address'); return; }
-    setResetLoading(true);
+  const sendCode = async () => {
+    if (!email.trim()) { toast.error('Enter your email address'); return; }
+    setSendLoading(true);
     try {
-      await requestPasswordReset(resetEmail);
-      setResetSent(true);
-    } catch (err) {
-      toast.error(err.message || 'Failed to send reset link');
+      await requestOtpCode(email.trim(), { isNewAccount: false });
+      setStep('code');
+      setCode('');
+      setResendCooldown(30);
+      toast.success('Code sent — check your email');
+    } catch (error) {
+      toast.error(error.message || 'Could not send code');
     } finally {
-      setResetLoading(false);
+      setSendLoading(false);
     }
   };
 
-  const handleResetWithCode = async () => {
-    if (!resetCode.trim()) { toast.error('Enter the code from your email'); return; }
-    if (!newPassword || newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
-    if (newPassword !== confirmNewPassword) { toast.error('Passwords do not match'); return; }
-
-    setCodeSubmitLoading(true);
-    try {
-      await confirmPasswordResetWithCode(resetEmail, resetCode.trim(), newPassword);
-      toast.success('Password updated! You are now signed in.');
-      setShowForgotPassword(false);
-      navigate(nextPath);
-    } catch (err) {
-      toast.error(err.message || 'Invalid or expired code');
-    } finally {
-      setCodeSubmitLoading(false);
-    }
-  };
-
-  // Rate limiting — max 5 attempts per 15 minutes
-  const getRateLimitKey = () => `rentora_login_attempts_${email.toLowerCase().trim()}`;
-  const isRateLimited = () => {
-    try {
-      const key = getRateLimitKey();
-      const data = JSON.parse(localStorage.getItem(key) || '{"count":0,"reset":0}');
-      if (Date.now() > data.reset) return false; // window expired
-      return data.count >= 5;
-    } catch { return false; }
-  };
-  const recordAttempt = (success) => {
-    try {
-      const key = getRateLimitKey();
-      if (success) { localStorage.removeItem(key); return; }
-      const data = JSON.parse(localStorage.getItem(key) || '{"count":0,"reset":0}');
-      const reset = Date.now() > data.reset ? Date.now() + 15 * 60 * 1000 : data.reset;
-      localStorage.setItem(key, JSON.stringify({ count: (data.count || 0) + 1, reset }));
-    } catch {}
-  };
-
-  const handleSubmit = async (e) => {
+  const handleSendCode = async (e) => {
     e.preventDefault();
-    
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
+    await sendCode();
+  };
 
-    if (isRateLimited()) {
-      toast.error('Too many failed attempts. Please wait 15 minutes before trying again.');
-      return;
-    }
-
-    setLoading(true);
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    if (!code.trim() || code.trim().length !== 6) { toast.error('Enter the 6-digit code'); return; }
+    setVerifyLoading(true);
     try {
-      await login(email, password);
-      recordAttempt(true);
+      await verifyOtpCode(email.trim(), code.trim());
       toast.success('Welcome back!');
       navigate(nextPath);
     } catch (error) {
-      recordAttempt(false);
-      toast.error(error.message || 'Invalid credentials');
+      toast.error(error.message || 'Invalid or expired code');
     } finally {
-      setLoading(false);
+      setVerifyLoading(false);
     }
   };
 
@@ -139,78 +93,97 @@ export function Login() {
       <Card className="w-full max-w-md p-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <img 
-            src="/rentora-logo.svg" 
-            alt="Rentora Logo" 
+          <img
+            src="/rentora-logo.svg"
+            alt="Rentora Logo"
             className="h-10 w-auto object-contain bg-transparent" loading="eager" decoding="async" width="64" height="64" />
         </div>
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
-          <p className="text-muted-foreground mt-2">Sign in to your account</p>
+          <p className="text-muted-foreground mt-2">
+            {step === 'email' ? 'Sign in with a code sent to your email' : `Enter the code sent to ${email}`}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="pl-10 h-12"
-                autoComplete="email"
-                data-testid="login-email"
-              />
+        {step === 'email' ? (
+          <form onSubmit={handleSendCode} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="pl-10 h-12"
+                  autoComplete="email"
+                  autoFocus
+                  data-testid="login-email"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
+            <Button
+              type="submit"
+              disabled={sendLoading}
+              className="w-full h-12 active:scale-[0.98] transition-transform"
+              data-testid="login-send-code"
+            >
+              {sendLoading ? 'Sending code...' : 'Send Code'}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyCode} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="code">6-digit code</Label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="code"
+                  ref={codeInputRef}
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  className="pl-10 h-12 tracking-widest text-center text-lg"
+                  autoComplete="one-time-code"
+                  data-testid="login-code"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={verifyLoading}
+              className="w-full h-12 active:scale-[0.98] transition-transform"
+              data-testid="login-verify-code"
+            >
+              {verifyLoading ? 'Verifying...' : 'Verify & Sign In'}
+            </Button>
+
+            <div className="flex items-center justify-between text-sm">
               <button
                 type="button"
-                onClick={openForgotPassword}
-                className="text-xs text-primary hover:underline"
-                data-testid="login-forgot-password"
+                onClick={() => setStep('email')}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                Forgot password?
+                <ArrowLeft className="w-3.5 h-3.5" /> Change email
               </button>
-            </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="pl-10 pr-10 h-12"
-                autoComplete="current-password"
-                data-testid="login-password"
-              />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={sendCode}
+                disabled={resendCooldown > 0 || sendLoading}
+                className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
               </button>
             </div>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full h-12 active:scale-[0.98] transition-transform"
-            data-testid="login-submit"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </Button>
-        </form>
+          </form>
+        )}
 
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
@@ -230,112 +203,6 @@ export function Login() {
           </Link>
         </p>
       </Card>
-
-      <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset your password</DialogTitle>
-            <DialogDescription>
-              {resetSent
-                ? "Click the link in your email, or enter the 6-digit code below."
-                : "Enter your email and we'll send you a reset link and a code."}
-            </DialogDescription>
-          </DialogHeader>
-          {resetSent ? (
-            <div className="py-2 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                We've sent a reset link and a 6-digit code to <span className="font-medium text-foreground">{resetEmail}</span>. It may take a minute to arrive — check your spam folder if you don't see it.
-              </p>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Have the code?</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reset-code">6-digit code</Label>
-                <Input
-                  id="reset-code"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={resetCode}
-                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
-                  className="h-12 tracking-widest text-center text-lg"
-                  data-testid="reset-code"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reset-new-password">New password</Label>
-                <Input
-                  id="reset-new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  className="h-12"
-                  autoComplete="new-password"
-                  data-testid="reset-new-password"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reset-confirm-password">Confirm new password</Label>
-                <Input
-                  id="reset-confirm-password"
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  placeholder="Re-enter new password"
-                  className="h-12"
-                  autoComplete="new-password"
-                  data-testid="reset-confirm-password"
-                />
-              </div>
-              <Button
-                onClick={handleResetWithCode}
-                disabled={codeSubmitLoading}
-                className="w-full h-12"
-                data-testid="reset-with-code-submit"
-              >
-                {codeSubmitLoading ? 'Updating password...' : 'Reset Password'}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2 py-2">
-              <Label htmlFor="reset-email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="reset-email"
-                  type="email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="pl-10 h-12"
-                  autoComplete="email"
-                  data-testid="reset-email"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            {resetSent ? (
-              <Button variant="outline" onClick={() => setShowForgotPassword(false)} className="w-full">Cancel</Button>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setShowForgotPassword(false)}>Cancel</Button>
-                <Button onClick={handleForgotPassword} disabled={resetLoading} data-testid="send-reset-link">
-                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

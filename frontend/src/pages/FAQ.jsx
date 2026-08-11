@@ -11,7 +11,7 @@ const faqs = [
     questions: [
       {
         q: 'How do I create an account on Rentora?',
-        a: 'Click the "Register" button in the top right corner, fill in your details (name, email, password, and LAUTECH student ID), and verify your email. Once verified, you can start browsing and booking properties.',
+        a: 'Click the "Register" button in the top right corner, fill in your details (name, email, phone number, and LAUTECH student ID), then verify your email with the 6-digit code we send you. Once verified, you can start browsing and booking properties.',
       },
       {
         q: 'Is Rentora only for LAUTECH students?',
@@ -86,8 +86,8 @@ const faqs = [
     category: 'Account & Security',
     questions: [
       {
-        q: 'How do I reset my password?',
-        a: 'Click "Forgot Password" on the login page, enter your email, and we\'ll send you a password reset link. Follow the instructions in the email to create a new password.',
+        q: 'Do I need a password to log in?',
+        a: 'No — Rentora doesn\'t use passwords. Enter your email on the login page and we\'ll send you a 6-digit code to sign in. You can also use Google sign-in.',
       },
       {
         q: 'Is my personal information safe?',
@@ -108,7 +108,7 @@ const faqs = [
     questions: [
       {
         q: "Why can't I log in?",
-        a: 'Make sure you\'re using the correct email and password. If you forgot your password, use the "Forgot Password" link. If the issue persists, clear your browser cache or contact support.',
+        a: 'Make sure you\'re entering the same email you registered with and typing the 6-digit code correctly — it expires after a few minutes, so request a fresh one if it\'s been a while. If the issue persists, clear your browser cache or contact support.',
       },
       {
         q: "My payment was successful but my booking wasn't confirmed. What should I do?",

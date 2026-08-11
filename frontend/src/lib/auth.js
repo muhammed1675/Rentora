@@ -5,23 +5,34 @@ import { notifyUser } from './notifications';
 
 const AuthContext = createContext(null);
 
+// Calls the send-email edge function with a real user access token (not the
+// public anon key) so the function can verify a genuine account is behind
+// the request — see supabase/functions/send-email/index.ts.
+const sendTransactionalEmail = async (accessToken, payload) => {
+  const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+  const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+  const token = accessToken || SUPABASE_ANON_KEY;
+  return fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+};
+
 const parseAuthError = (error) => {
   if (!error) return 'Something went wrong. Please try again.';
   const msg = (error.message || error.toString()).toLowerCase();
   if (msg.includes('body stream') || msg.includes('json') || msg.includes('already read'))
-    return 'Wrong email or password. Please try again.';
+    return 'Something went wrong. Please try again.';
   if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch'))
     return 'Network error. Please check your connection and try again.';
-  if (msg.includes('invalid login credentials') || msg.includes('invalid email or password'))
-    return 'Wrong email or password. Please try again.';
-  if (msg.includes('user not found') || msg.includes('no user found'))
-    return 'No account found with this email. Please register first.';
-  if (msg.includes('email not confirmed'))
-    return 'Please confirm your email first. Check your inbox.';
-  if (msg.includes('email already') || msg.includes('already registered'))
-    return 'An account with this email already exists. Please login instead.';
-  if (msg.includes('password') && msg.includes('short'))
-    return 'Password must be at least 6 characters.';
+  if (msg.includes('token has expired') || msg.includes('otp_expired') || msg.includes('token is invalid'))
+    return 'That code is incorrect or has expired. Please request a new one.';
+  if (msg.includes('user not found') || msg.includes('no user found') || msg.includes('signups not allowed'))
+    return 'No account found with this email. Please create an account first.';
   if (msg.includes('too many requests') || msg.includes('rate limit'))
     return 'Too many attempts. Please wait a moment and try again.';
   if (msg.includes('signup is disabled'))
@@ -56,6 +67,7 @@ export function AuthProvider({ children }) {
               id: authUser.id,
               email: authUser.email,
               full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+              phone: authUser.user_metadata?.phone || null,
               avatar_url: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
               role: 'user',
               suspended: false
@@ -111,71 +123,50 @@ export function AuthProvider({ children }) {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, [loadUserProfile]);
 
-  // ── Login ────────────────────────────────────────────────────
-  const login = async (email, password) => {
+  // ── OTP: request a 6-digit code ─────────────────────────────
+  // isNewAccount=true (signup): creates the auth user if it doesn't
+  //   exist yet; if the email is already registered, Supabase just
+  //   sends a login code for the existing account instead — no error,
+  //   no enumeration signal either way.
+  // isNewAccount=false (login): does NOT create an account. If the
+  //   email isn't registered, Supabase returns an error and we surface
+  //   "No account found" — this is an intentional product decision
+  //   (so people know to sign up instead of guessing forever), not an
+  //   accidental leak, and it no longer involves a separate query
+  //   against the world-readable users table to determine it.
+  const requestOtpCode = async (email, { isNewAccount = false, fullName, phone } = {}) => {
+    await enforceRateLimit(email, 'otp_request');
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: isNewAccount,
+        ...(isNewAccount ? { data: { full_name: fullName, phone } } : {}),
+      },
+    });
+    if (error) throw new Error(parseAuthError(error));
+  };
+
+  // ── OTP: verify the 6-digit code and complete sign-in ──────
+  const verifyOtpCode = async (email, code) => {
     setLoading(true);
     try {
-      // Rate limit BEFORE touching Supabase auth at all — throws if this
-      // email has had too many attempts recently (see lib/rateLimit.js).
-      await enforceRateLimit(email, 'login');
+      await enforceRateLimit(email, 'otp_verify');
 
-      let data, error;
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: code.trim(),
+        type: 'email',
+      });
+      if (error) throw new Error(parseAuthError(error));
 
-      try {
-        const result = await supabase.auth.signInWithPassword({ email, password });
-        data = result.data;
-        error = result.error;
-      } catch (fetchErr) {
-        throw new Error(parseAuthError(fetchErr));
-      }
+      const authUser = data?.user;
+      if (!authUser) throw new Error('Could not complete sign-in. Please try again.');
 
-      if (error) {
-        const msg = (error.message || '').toLowerCase();
-        // Supabase deliberately returns the same generic error for "wrong
-        // password" and "no such account" (to prevent email enumeration
-        // via the login form itself). We check the public users table
-        // separately — it's already world-readable — to tell users which
-        // one actually happened, so they know to register instead of
-        // retrying a password forever.
-        if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
-          const { data: existing } = await supabase
-            .from('users')
-            .select('id')
-            .ilike('email', email.trim())
-            .maybeSingle();
+      const isBrandNewUser = authUser.created_at &&
+        (Date.now() - new Date(authUser.created_at).getTime()) < 60000;
 
-          if (!existing) {
-            throw new Error('This email is not registered. Please create an account first.');
-          } else {
-            throw new Error('Incorrect password. Please try again.');
-          }
-        }
-        throw new Error(parseAuthError(error));
-      }
-
-      await new Promise(r => setTimeout(r, 800));
-
-      const profile = await loadUserProfile(data.user);
-
-      if (!profile) {
-        const { data: found } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', data.user.email)
-          .single();
-
-        if (found) {
-          if (found.suspended) {
-            await supabase.auth.signOut();
-            throw new Error('Your account has been suspended. Please contact support for assistance.');
-          }
-          setUser(found);
-          setSession(data.session);
-          return found;
-        }
-
-        throw new Error('Could not load your profile. Please try again in a moment.');
-      }
+      const profile = await loadUserProfile(authUser);
+      if (!profile) throw new Error('Could not load your profile. Please try again in a moment.');
 
       if (profile.suspended) {
         await supabase.auth.signOut();
@@ -185,106 +176,53 @@ export function AuthProvider({ children }) {
       setUser(profile);
       setSession(data.session);
 
-      // Successful login — clear this email's rate-limit counter so an
-      // earlier mistyped password doesn't keep counting against it.
-      clearRateLimit(email, 'login');
+      // Successful verification — clear rate-limit counters for this email.
+      clearRateLimit(email, 'otp_verify');
+      clearRateLimit(email, 'otp_request');
 
-      // Send sign-in notification email (non-blocking)
-      try {
-        const ip = await fetch('https://api.ipify.org?format=json')
-          .then(r => r.json()).then(d => d.ip).catch(() => 'Unknown');
-        const geo = await fetch(`https://ipapi.co/${ip}/json/`)
-          .then(r => r.json()).catch(() => ({}));
-        const location = geo.city && geo.country_name
-          ? `${geo.city}, ${geo.country_name}`
-          : geo.country_name || 'Unknown';
-        const device = /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)
-          ? 'Mobile Device' : 'Desktop / Laptop';
-        const time = new Date().toLocaleString('en-NG', {
-          dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos'
-        });
-        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
+      const accessToken = data.session?.access_token;
+
+      if (isBrandNewUser) {
+        // Send welcome email (non-blocking)
+        try {
+          await sendTransactionalEmail(accessToken, {
+            type: 'welcome',
+            to: profile.email,
+            data: { name: profile.full_name },
+          });
+        } catch (e) {
+          console.warn('Welcome email failed (non-critical):', e.message);
+        }
+
+        notifyUser(profile.id, 'welcome', 'Welcome to Rentora!', 'Your account is ready — start browsing verified listings.', '/browse');
+      } else {
+        // Send sign-in notification email (non-blocking)
+        try {
+          const ip = await fetch('https://api.ipify.org?format=json')
+            .then(r => r.json()).then(d => d.ip).catch(() => 'Unknown');
+          const geo = await fetch(`https://ipapi.co/${ip}/json/`)
+            .then(r => r.json()).catch(() => ({}));
+          const location = geo.city && geo.country_name
+            ? `${geo.city}, ${geo.country_name}`
+            : geo.country_name || 'Unknown';
+          const device = /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)
+            ? 'Mobile Device' : 'Desktop / Laptop';
+          const time = new Date().toLocaleString('en-NG', {
+            dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Lagos'
+          });
+          await sendTransactionalEmail(accessToken, {
             type: 'sign_in',
             to: profile.email,
             data: { name: profile.full_name, ip, location, device, time }
-          }),
-        });
-      } catch (e) {
-        console.warn('Sign-in email failed (non-critical):', e.message);
+          });
+        } catch (e) {
+          console.warn('Sign-in email failed (non-critical):', e.message);
+        }
       }
 
-      return profile;
+      return { ...profile, _isNewUser: isBrandNewUser };
     } finally {
       setLoading(false);
-    }
-  };
-
-  // ── Register ─────────────────────────────────────────────────
-  const register = async (email, password, fullName, phone = '') => {
-    try {
-      // Rate limit signups by IP rather than email — the email doesn't
-      // exist as an account yet, so IP is what actually stops one source
-      // from spamming out registrations.
-      const signupIdentifier = await fetch('https://api.ipify.org?format=json')
-        .then(r => r.json()).then(d => d.ip).catch(() => email.trim().toLowerCase());
-      await enforceRateLimit(signupIdentifier, 'signup');
-
-      const { data, error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { full_name: fullName, phone } }
-      });
-
-      if (error) throw new Error(parseAuthError(error));
-      if (!data.session) return { requiresConfirmation: true };
-
-      await new Promise(r => setTimeout(r, 1000));
-      const profile = await loadUserProfile(data.user);
-
-      // Save phone to users table
-      if (phone && data.user) {
-        await supabase
-          .from('users')
-          .update({ phone })
-          .eq('id', data.user.id);
-      }
-
-      setUser(profile);
-      setSession(data.session);
-
-      // Send welcome email (non-blocking)
-      try {
-        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            type: 'welcome',
-            to: email,
-            data: { name: profile?.full_name || fullName }
-          }),
-        });
-      } catch (e) {
-        console.warn('Welcome email failed (non-critical):', e.message);
-      }
-
-      notifyUser(data.user.id, 'welcome', 'Welcome to Rentora!', 'Your account is ready — start browsing verified listings.', '/browse');
-
-      return profile;
-    } catch (err) {
-      if (err.message && err.message.length < 120) throw err;
-      throw new Error(parseAuthError(err));
     }
   };
 
@@ -302,9 +240,9 @@ export function AuthProvider({ children }) {
 
   // ── Google OAuth: finish sign-in after redirect back from Google ──
   // Called from the /auth/callback page. This project uses Supabase's
-  // implicit flow (same as the password-reset link in ResetPassword.jsx),
-  // so Google/Supabase send the user back with tokens in the URL HASH
-  // (e.g. #access_token=...&refresh_token=...), not a `?code=` query param.
+  // implicit flow, so Google/Supabase send the user back with tokens in
+  // the URL HASH (e.g. #access_token=...&refresh_token=...), not a
+  // `?code=` query param.
   const completeOAuthSignIn = async () => {
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.replace('#', ''));
@@ -349,19 +287,10 @@ export function AuthProvider({ children }) {
     // Send a welcome email for genuinely new sign-ups (non-blocking)
     if (isBrandNewUser) {
       try {
-        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            type: 'welcome',
-            to: profile.email,
-            data: { name: profile.full_name },
-          }),
+        await sendTransactionalEmail(data.session?.access_token, {
+          type: 'welcome',
+          to: profile.email,
+          data: { name: profile.full_name },
         });
       } catch (e) {
         console.warn('Welcome email failed (non-critical):', e.message);
@@ -409,49 +338,6 @@ export function AuthProvider({ children }) {
     setSession(null);
   };
 
-  // ── Request password reset email ────────────────────────────
-  // Sends a recovery email containing BOTH a link (to /reset-password,
-  // handled by ResetPassword.jsx) AND a 6-digit code the user can paste
-  // into the "forgot password" dialog instead (see confirmPasswordResetWithCode).
-  // Requires the Supabase "Reset Password" email template to include
-  // {{ .Token }} alongside {{ .ConfirmationURL }}.
-  const requestPasswordReset = async (email) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) throw new Error(parseAuthError(error));
-  };
-
-  // ── Change password (already logged in) ─────────────────────
-  const changePassword = async (newPassword) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) throw new Error(parseAuthError(error));
-  };
-
-  // ── Confirm password reset using a 6-digit code (alternative to the
-  // email link — same recovery email, user pastes the code instead) ──
-  const confirmPasswordResetWithCode = async (email, code, newPassword) => {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token: code,
-      type: 'recovery',
-    });
-    if (error) throw new Error(parseAuthError(error));
-
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-    if (updateError) throw new Error(parseAuthError(updateError));
-
-    // verifyOtp logs the user in — reflect that in app state right away.
-    const authUser = data?.session?.user;
-    if (authUser) {
-      const profile = await loadUserProfile(authUser);
-      if (profile) {
-        setUser(profile);
-        setSession(data.session);
-      }
-    }
-  };
-
   // ── Refresh user ─────────────────────────────────────────────
   const refreshUser = async () => {
     const { data: { session: s } } = await supabase.auth.getSession();
@@ -472,8 +358,8 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, session, loading,
-      login, register, logout, refreshUser, requestPasswordReset, changePassword,
-      loginWithGoogle, completeOAuthSignIn, confirmPasswordResetWithCode, deleteAccount,
+      requestOtpCode, verifyOtpCode, logout, refreshUser,
+      loginWithGoogle, completeOAuthSignIn, deleteAccount,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',
       isAgent: user?.role === 'agent',

@@ -54,29 +54,6 @@ export async function sendVerificationEmail(email, userName, verificationLink) {
 }
 
 /**
- * Send password reset email
- */
-export async function sendPasswordResetEmail(email, resetLink) {
-  try {
-    const emailData = {
-      to: email,
-      subject: 'Reset Your Rentora Password',
-      template: 'resetPassword',
-      variables: {
-        ...templateVariables,
-        resetLink,
-        email,
-      },
-    };
-
-    return await sendEmail(emailData);
-  } catch (error) {
-    console.error('[EmailService] Failed to send password reset email:', error);
-    throw error;
-  }
-}
-
-/**
  * Send welcome email to new users
  */
 export async function sendWelcomeEmail(email, userName) {
@@ -244,7 +221,6 @@ export async function sendContactFormResponse(email, name, subject) {
 
 export default {
   sendVerificationEmail,
-  sendPasswordResetEmail,
   sendWelcomeEmail,
   sendBookingConfirmationEmail,
   sendAgentNotificationEmail,

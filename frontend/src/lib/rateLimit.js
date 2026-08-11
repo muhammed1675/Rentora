@@ -8,8 +8,8 @@ import { supabase } from './supabase';
 
 // Defaults — tune here without touching auth.js.
 const LIMITS = {
-  login: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 15 },
-  signup: { maxAttempts: 4, windowMinutes: 60, blockMinutes: 60 },
+  otp_request: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 15 },
+  otp_verify: { maxAttempts: 8, windowMinutes: 15, blockMinutes: 15 },
 };
 
 function formatWait(seconds) {
@@ -38,7 +38,7 @@ export async function enforceRateLimit(identifier, action) {
   }
 
   if (!data?.allowed) {
-    const noun = action === 'login' ? 'sign-in attempts' : 'sign-up attempts';
+    const noun = action === 'otp_verify' ? 'code attempts' : 'requests';
     throw new Error(`Too many ${noun}. Please try again in ${formatWait(data.retry_after_seconds)}.`);
   }
 }

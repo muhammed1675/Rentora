@@ -13,6 +13,19 @@
 // re-runs the same verified confirmation path as /api/confirm-payment.
 
 import confirmPayment from './confirm-payment.js';
+import { timingSafeEqual } from 'crypto';
+
+// Constant-time string comparison — a plain `!==` here leaks timing
+// information proportional to how many leading characters match, which
+// (in theory) lets an attacker recover the secret hash byte-by-byte over
+// many requests. Doesn't fully protect if lengths differ (see below) but
+// removes the character-by-character oracle for equal-length guesses.
+function safeCompare(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 export default async function handler(req, res) {
   try {
@@ -37,8 +50,8 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Missing verif-hash header' });
     }
 
-    if (signature !== expectedHash) {
-      console.warn('[webhook] ERROR: Signature mismatch. Expected:', expectedHash.substring(0, 10) + '...', 'Got:', signature.substring(0, 10) + '...');
+    if (!safeCompare(signature, expectedHash)) {
+      console.warn('[webhook] ERROR: Signature mismatch.');
       return res.status(401).json({ error: 'Invalid signature' });
     }
 

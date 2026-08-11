@@ -22,7 +22,6 @@ import PaymentCallback from "./pages/PaymentCallback";
 import { PolicyPage } from "./pages/PolicyPage";
 import Contact from "./pages/Contact";
 import { Compare } from './pages/Compare';
-import { ResetPassword } from './pages/ResetPassword';
 import { AuthCallback } from './pages/AuthCallback';
 import { NotFound } from './pages/NotFound';
 import { About } from './pages/About';
@@ -144,7 +143,6 @@ function AppRoutes() {
       <Route path="/payment/callback" element={<Layout><PaymentCallback /></Layout>} />
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
       <Route path="/compare" element={<Layout><Compare /></Layout>} />
-      <Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />
       <Route path="/auth/callback" element={<Layout><AuthCallback /></Layout>} />
 
       {/* Student verification — reachable any time, never forces browsing */}

@@ -34,13 +34,12 @@
 // Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from '@supabase/supabase-js';
+import { applyCors } from './_cors.js';
 
 const VALID_REASONS = ['unavailable', 'misrepresented', 'other'];
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -228,13 +227,16 @@ async function notifyAndEmail(supabase, payment, reason, note, caller) {
 
 async function callSupabaseSendEmail(payload) {
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
     throw new Error(`callSupabaseSendEmail: missing env vars for type=${payload?.type}`);
   }
+  // Service-role key (private, server-side only) — see confirm-payment.js's
+  // callSupabaseSendEmail and supabase/functions/send-email/index.ts for
+  // why this replaced the public anon key here.
   const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_ROLE_KEY}` },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {

@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, refreshUser, isUser, verificationStatus, changePassword, deleteAccount } = useAuth();
+  const { user, isAuthenticated, refreshUser, isUser, verificationStatus, deleteAccount } = useAuth();
   
   const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ inspection_transactions: [] });
@@ -249,26 +249,6 @@ export function Profile() {
       toast.error('Photo uploaded, but confirming move-in failed: ' + (e.message || 'unknown error') + '. Please try again — your photo will not need to be re-uploaded if you retry immediately.');
     } finally {
       setConfirmingMoveIn(false);
-    }
-  };
-
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
-
-  const handleChangePassword = async () => {
-    if (!newPassword || newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
-    if (newPassword !== confirmNewPassword) { toast.error('Passwords do not match'); return; }
-    setChangingPassword(true);
-    try {
-      await changePassword(newPassword);
-      toast.success('Password updated');
-      setNewPassword('');
-      setConfirmNewPassword('');
-    } catch (e) {
-      toast.error(e.message || 'Failed to update password');
-    } finally {
-      setChangingPassword(false);
     }
   };
 
@@ -728,39 +708,6 @@ export function Profile() {
                   {user?.suspended ? 'Suspended' : 'Active'}
                 </Badge>
               </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 mt-4">
-            <h3 className="font-semibold mb-4">Change Password</h3>
-            <div className="space-y-3 max-w-sm">
-              <div className="space-y-1.5">
-                <Label htmlFor="new-password" className="text-sm text-muted-foreground">New password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  autoComplete="new-password"
-                  data-testid="profile-new-password"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm-new-password" className="text-sm text-muted-foreground">Confirm new password</Label>
-                <Input
-                  id="confirm-new-password"
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  placeholder="Re-enter new password"
-                  autoComplete="new-password"
-                  data-testid="profile-confirm-new-password"
-                />
-              </div>
-              <Button onClick={handleChangePassword} disabled={changingPassword} data-testid="profile-change-password-submit">
-                {changingPassword ? 'Updating...' : 'Update Password'}
-              </Button>
             </div>
           </Card>
 

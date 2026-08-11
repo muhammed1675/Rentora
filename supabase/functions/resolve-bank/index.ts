@@ -54,6 +54,23 @@ serve(async (req: Request) => {
       );
     }
 
+    // Basic input validation — Nigerian NUBAN account numbers are exactly
+    // 10 digits, bank codes are short numeric strings. Rejecting anything
+    // else here means malformed/oversized input never reaches Flutterwave's
+    // API (which we're paying per-call for) or gets logged verbatim below.
+    if (!/^\d{10}$/.test(String(account_number))) {
+      return new Response(
+        JSON.stringify({ success: false, message: "account_number must be exactly 10 digits" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (!/^\d{1,10}$/.test(String(bank_code))) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Invalid bank_code" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const res = await fetch(`${FLW_BASE_URL}/accounts/resolve`, {
       method: "POST",
       headers: {
@@ -64,7 +81,6 @@ serve(async (req: Request) => {
     });
 
     const data = await res.json();
-    console.log("Flutterwave resolve response:", JSON.stringify(data));
 
     if (data?.status === "success" && data?.data?.account_name) {
       return new Response(

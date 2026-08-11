@@ -14,6 +14,26 @@ const generateReference = (prefix) => {
 const withLocationName = (row) => row ? { ...row, location: row.locations?.name || null } : row;
 const withLocationNames = (rows) => (rows || []).map(withLocationName);
 
+// Calls the send-email edge function using the CURRENT USER'S real session
+// token (not the public anon key). The edge function verifies this token
+// resolves to a real logged-in account before sending anything — see
+// supabase/functions/send-email/index.ts. Falls back to the anon key only
+// if there's genuinely no session (the function will then reject anything
+// except the few email types that don't require auth, if any); this keeps
+// the call from throwing in edge cases rather than silently no-op'ing.
+const sendTransactionalEmail = async (payload) => {
+  const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
+  const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || SUPABASE_ANON_KEY;
+
+  return fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+};
+
 // Emails every admin (users.role = 'admin') about a significant site event —
 // a new listing submitted, a new agent verification request, a withdrawal
 // request, a property report, a contact message, a student reporting
@@ -29,26 +49,19 @@ const notifyAdmins = async ({ title, eventLabel, summary, breakdown, actionUrl }
     const { data: admins, error } = await supabase.from('users').select('email, full_name').eq('role', 'admin');
     if (error || !admins?.length) return;
 
-    const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-    const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-
     await Promise.allSettled(
       admins.filter((a) => a.email).map((admin) =>
-        fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({
-            type: 'admin_activity_alert',
-            to: admin.email,
-            data: {
-              title,
-              event_label: eventLabel,
-              summary,
-              breakdown: breakdown || [],
-              action_url: actionUrl,
-              admin_name: admin.full_name || 'Admin',
-            },
-          }),
+        sendTransactionalEmail({
+          type: 'admin_activity_alert',
+          to: admin.email,
+          data: {
+            title,
+            event_label: eventLabel,
+            summary,
+            breakdown: breakdown || [],
+            action_url: actionUrl,
+            admin_name: admin.full_name || 'Admin',
+          },
         })
       )
     );
@@ -255,19 +268,13 @@ export const propertyAPI = {
           const agentRes = await supabase.from('users').select('email, full_name').eq('id', property.uploaded_by_agent_id).limit(1);
           const agent = agentRes.data?.[0];
           if (agent?.email) {
-            const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-            const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-            await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-              body: JSON.stringify({
-                type: 'property_approved',
-                to: agent.email,
-                data: {
-                  agent_name: agent.full_name || 'there',
-                  property_title: property.title,
-                },
-              }),
+            await sendTransactionalEmail({
+              type: 'property_approved',
+              to: agent.email,
+              data: {
+                agent_name: agent.full_name || 'there',
+                property_title: property.title,
+              },
             });
           }
           notifyUser(
@@ -369,13 +376,7 @@ export const inspectionAPI = {
       throw insertError;
     }
 
-    const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-    const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-    const sendMail = (payload) => fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify(payload),
-    });
+    const sendMail = sendTransactionalEmail;
 
     // Confirmation email to the student — best-effort, never blocks the request.
     try {
@@ -729,16 +730,10 @@ export const studentVerificationAPI = {
 
     try {
       if (request.user_email) {
-        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-          body: JSON.stringify({
-            type: emailType,
-            to: request.user_email,
-            data: { name: request.user_name || 'there', reason: adminNote || '' },
-          }),
+        await sendTransactionalEmail({
+          type: emailType,
+          to: request.user_email,
+          data: { name: request.user_name || 'there', reason: adminNote || '' },
         });
       }
     } catch (e) { console.warn(`${emailType} email failed:`, e); }
@@ -913,16 +908,10 @@ export const verificationAPI = {
       const emailType = status === 'approved' ? 'verification_approved' : 'verification_rejected';
       try {
         if (request.user_email) {
-          const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-          const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-          await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-            body: JSON.stringify({
-              type: emailType,
-              to: request.user_email,
-              data: { name: request.user_name || 'there' },
-            }),
+          await sendTransactionalEmail({
+            type: emailType,
+            to: request.user_email,
+            data: { name: request.user_name || 'there' },
           });
         }
       } catch (e) { console.warn(`${emailType} email failed:`, e); }
@@ -1768,19 +1757,13 @@ export const rentAPI = {
         .limit(1);
       const row = rows?.[0];
       if (row) {
-        const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
         const [agentRes, studentRes] = await Promise.all([
           row.agent_id ? supabase.from('users').select('email, full_name').eq('id', row.agent_id).limit(1) : Promise.resolve({ data: [] }),
           supabase.from('users').select('email, full_name').eq('id', row.user_id).limit(1),
         ]);
         const agent = agentRes.data?.[0];
         const student = studentRes.data?.[0];
-        const sendMail = (body) => fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-          body: JSON.stringify(body),
-        });
+        const sendMail = sendTransactionalEmail;
         if (agent?.email) {
           await sendMail({
             type: 'rent_payment_released',

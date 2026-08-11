@@ -15,7 +15,7 @@ export const supabase = (() => {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false, // We handle the reset token manually in ResetPassword.jsx
+      detectSessionInUrl: false, // We handle the Google OAuth hash token manually in AuthCallback.jsx
     }
   });
   return instance;

@@ -122,6 +122,11 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
    emails (signup confirmation, password reset, magic link) can't be routed
    to support@ the way the custom emails below can.
 9. (Optional) Customise email templates under Authentication → Email Templates.
+10. **Required for login/signup to work:** the "Magic Link" template under
+    Authentication → Email Templates must include `{{ .Token }}` (the 6-digit
+    code) — Rentora's login and signup both use `signInWithOtp` and never send
+    magic-link URLs. If a person clicks "Send Code" and never receives a
+    usable code, check this template first.
 
 ---
 
