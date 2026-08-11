@@ -89,7 +89,7 @@ function baseTemplate(opts: {
 
     /* ── Header (hero) ───────────────────────────── */
     .header { background:#2E86D8; padding:36px 32px 32px; text-align:center; }
-    .logo-pill { display:inline-flex; align-items:center; justify-content:center; background:#ffffff; border-radius:10px; padding:9px 18px; margin-bottom:24px; }
+    .logo-pill { display:inline-flex; align-items:center; justify-content:center; background:transparent; padding:0; margin-bottom:24px; }
     .logo-pill img { height:24px; width:auto; display:block; }
     .eyebrow { display:block; color:rgba(255,255,255,0.75); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700; margin:0 0 10px; }
     .header h1 { color:#ffffff; font-size:24px; font-weight:700; line-height:1.32; margin:0 0 12px; letter-spacing:-0.01em; }
