@@ -241,7 +241,7 @@ export function Browse() {
           {[...Array(8)].map((_, i) => <PropertyCardSkeleton key={i} />)}
         </div>
       ) : filteredProperties.length > 0 ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="results-fade-in grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredProperties.map((property) => <PropertyCard key={property.id} property={property} />)}
         </div>
       ) : (

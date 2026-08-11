@@ -37,6 +37,50 @@ img {
     to { transform: rotate(360deg); }
 }
 
+/* Payment success entrance — rare, high-emotion moment; small overshoot is earned here */
+@keyframes success-pop {
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.success-icon {
+    animation: success-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .success-icon {
+        animation: none;
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes results-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.results-fade-in {
+    animation: results-fade-in 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .results-fade-in { animation: none; opacity: 1; }
+}
+
+@keyframes badge-pop {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.badge-pop {
+    animation: badge-pop 160ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .badge-pop { animation: none; opacity: 1; transform: scale(1); }
+}
+
 /* Page transitions */
 .page-enter {
     opacity: 0;
