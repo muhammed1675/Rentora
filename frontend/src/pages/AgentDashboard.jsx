@@ -903,19 +903,24 @@ export function AgentDashboard() {
           <Card className="p-4 sm:p-6 mb-6">
             <h3 className="font-semibold mb-4">Earnings History</h3>
             {earningsHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No earnings yet — completed viewings and released rent agent fees will show up here</p>
+              <p className="text-sm text-muted-foreground text-center py-8">No earnings yet — completed viewings, released rent agent fees, and tips will show up here</p>
             ) : (
               <div className="space-y-3">
                 {earningsHistory.map((e) => (
                   <div key={e.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className={e.type === 'inspection' ? 'text-blue-600 border-blue-300' : 'text-green-600 border-green-300'}>
+                        <Badge variant="outline" className={
+                          e.type === 'inspection' ? 'text-blue-600 border-blue-300'
+                          : e.type === 'tip' ? 'text-purple-600 border-purple-300'
+                          : 'text-green-600 border-green-300'
+                        }>
                           {e.label}
                         </Badge>
                         <p className="font-medium text-sm truncate">{e.property_title}</p>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
+                        {e.type === 'tip' && e.tipper_name ? `From ${e.tipper_name} · ` : ''}
                         {e.date ? new Date(e.date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                       </p>
                     </div>

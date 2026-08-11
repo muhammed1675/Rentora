@@ -1366,7 +1366,7 @@ export const balanceAPI = {
   // sorted list, since agent_balances only stores a running total, not a
   // per-transaction ledger.
   getEarningsHistory: async (agentId) => {
-    const [inspectionRes, rentRes] = await Promise.all([
+    const [inspectionRes, rentRes, tipsRes] = await Promise.all([
       supabase
         .from('inspection_transactions')
         .select('id, amount, created_at, viewing:inspections!inner(agent_id, property:properties(title))')
@@ -1377,6 +1377,11 @@ export const balanceAPI = {
         .select('id, rent_amount, agent_fee, caution_fee, released_at, property:properties(title)')
         .eq('agent_id', agentId)
         .eq('status', 'released'),
+      supabase
+        .from('inspection_tips')
+        .select('id, amount, completed_at, user_id, inspection:inspections(property:properties(title))')
+        .eq('status', 'completed')
+        .eq('agent_id', agentId),
     ]);
 
     const inspectionRows = (inspectionRes.data || []).map((tx) => ({
@@ -1399,7 +1404,28 @@ export const balanceAPI = {
       date: rp.released_at,
     }));
 
-    const combined = [...inspectionRows, ...rentRows].sort(
+    // Tips go straight to the agent's balance with no Rentora cut (see
+    // 12_agent_tips.sql) — fetched separately here so they show up in the
+    // same Earnings History list instead of only being reflected silently
+    // in the total balance.
+    const tipRows = tipsRes.data || [];
+    const tipperIds = [...new Set(tipRows.map((t) => t.user_id).filter(Boolean))];
+    let tippersById = {};
+    if (tipperIds.length) {
+      const { data: tippers } = await supabase.from('users').select('id, full_name').in('id', tipperIds);
+      tippersById = Object.fromEntries((tippers || []).map((u) => [u.id, u.full_name]));
+    }
+    const tipRowsMapped = tipRows.map((t) => ({
+      id: `tip_${t.id}`,
+      type: 'tip',
+      label: 'Tip Received',
+      property_title: t.inspection?.property?.title || 'Property',
+      tipper_name: tippersById[t.user_id] || 'A student',
+      amount: Number(t.amount || 0),
+      date: t.completed_at,
+    }));
+
+    const combined = [...inspectionRows, ...rentRows, ...tipRowsMapped].sort(
       (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
     );
     return { data: combined };
