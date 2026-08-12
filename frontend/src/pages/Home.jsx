@@ -68,10 +68,23 @@ export function Home() {
   }, []);
 
   useEffect(() => {
-    if (!localStorage.getItem('rentora_welcome_seen')) {
+    if (localStorage.getItem('rentora_welcome_seen')) return;
+
+    // If the visitor already answered the consent banner (e.g. on a
+    // previous visit), show the welcome tour on its normal timer.
+    if (localStorage.getItem('rentora_consent')) {
       const t = setTimeout(() => setWelcomeOpen(true), 600);
       return () => clearTimeout(t);
     }
+
+    // Otherwise the consent banner hasn't been answered yet — wait for it
+    // to be dismissed (Accept or Decline) before showing the welcome tour,
+    // so the two never overlap on screen.
+    const handleConsentDecided = () => {
+      setTimeout(() => setWelcomeOpen(true), 400);
+    };
+    window.addEventListener('rentora:consent-decided', handleConsentDecided);
+    return () => window.removeEventListener('rentora:consent-decided', handleConsentDecided);
   }, []);
 
   const closeWelcome = () => {

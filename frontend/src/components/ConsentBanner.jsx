@@ -35,7 +35,10 @@ export function ConsentBanner() {
     }
 
     setEntered(false); // reverse the entrance transition
-    setTimeout(() => setRender(false), 300); // unmount once it's finished
+    setTimeout(() => {
+      setRender(false); // unmount once it's finished
+      window.dispatchEvent(new CustomEvent('rentora:consent-decided', { detail: consentValue }));
+    }, 300);
   };
 
   const accept = () => dismiss('true');
