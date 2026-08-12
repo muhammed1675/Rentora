@@ -9,25 +9,8 @@ export function ConsentBanner() {
 
   useEffect(() => {
     if (localStorage.getItem('rentora_consent')) return;
-
-    const onboardingSeen = localStorage.getItem('rentora_onboarding_seen');
-
-    if (onboardingSeen) {
-      // Already seen onboarding before — also set done so everything stays in sync
-      localStorage.setItem('rentora_onboarding_done', 'true');
-      const t = setTimeout(() => setRender(true), 800);
-      return () => clearTimeout(t);
-    }
-
-    // New visitor — wait for onboarding to finish
-    const interval = setInterval(() => {
-      if (localStorage.getItem('rentora_onboarding_done')) {
-        clearInterval(interval);
-        setTimeout(() => setRender(true), 500);
-      }
-    }, 300);
-
-    return () => clearInterval(interval);
+    const t = setTimeout(() => setRender(true), 800);
+    return () => clearTimeout(t);
   }, []);
 
   // Mount first, then flip to "entered" on the next frame so the
@@ -40,6 +23,17 @@ export function ConsentBanner() {
 
   const dismiss = (consentValue) => {
     localStorage.setItem('rentora_consent', consentValue);
+
+    if (window.gtag) {
+      window.gtag('consent', 'update', {
+        analytics_storage: consentValue === 'true' ? 'granted' : 'denied',
+      });
+    }
+
+    if (consentValue === 'true' && window.__initPostHogAnalytics) {
+      window.__initPostHogAnalytics();
+    }
+
     setEntered(false); // reverse the entrance transition
     setTimeout(() => setRender(false), 300); // unmount once it's finished
   };

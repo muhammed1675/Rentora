@@ -12,6 +12,23 @@
             function gtag() {
                 dataLayer.push(arguments);
             }
+
+            // Consent Mode v2: default to "denied" for analytics until the
+            // visitor accepts the consent banner. If they already made a
+            // choice on a previous visit, honor it immediately so returning
+            // users who accepted aren't re-blocked on every load.
+            var storedConsent = null;
+            try {
+                storedConsent = localStorage.getItem('rentora_consent');
+            } catch (e) {}
+
+            gtag('consent', 'default', {
+                'analytics_storage': storedConsent === 'true' ? 'granted' : 'denied',
+                'ad_storage': 'denied',
+                'ad_user_data': 'denied',
+                'ad_personalization': 'denied'
+            });
+
             gtag('js', new Date());
             gtag('config', 'G-CVXKXET4K2');
         </script>
@@ -235,14 +252,34 @@
                     }),
                     (e.__SV = 1));
             })(document, window.posthog || []);
-            posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
-                api_host: "https://us.i.posthog.com",
-                person_profiles: "identified_only",
-                session_recording: {
-                    recordCrossOriginIframes: true,
-                    capturePerformance: false,
-                },
-            });
+
+            // Don't start PostHog (including session recording) until the
+            // visitor has accepted the consent banner. This function is
+            // exposed on window so ConsentBanner.jsx can call it the moment
+            // someone clicks Accept, without needing a page reload.
+            window.__initPostHogAnalytics = function () {
+                if (window.__posthogInitialized) return;
+                window.__posthogInitialized = true;
+                posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
+                    api_host: "https://us.i.posthog.com",
+                    person_profiles: "identified_only",
+                    session_recording: {
+                        recordCrossOriginIframes: true,
+                        capturePerformance: false,
+                    },
+                });
+            };
+
+            // Returning visitor who already accepted — start immediately.
+            // Anyone who hasn't decided yet, or who declined, gets nothing
+            // until/unless they click Accept.
+            var storedPosthogConsent = null;
+            try {
+                storedPosthogConsent = localStorage.getItem('rentora_consent');
+            } catch (e) {}
+            if (storedPosthogConsent === 'true') {
+                window.__initPostHogAnalytics();
+            }
         </script>
         <script>
           if ('serviceWorker' in navigator) {
