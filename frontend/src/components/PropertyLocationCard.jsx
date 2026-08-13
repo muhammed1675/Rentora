@@ -1,4 +1,5 @@
-import { MapPin, Navigation, ExternalLink } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { MapPin, Navigation, ExternalLink, Loader2 } from 'lucide-react';
 import { Card } from './ui/card';
 
 // Google Maps short links (https://maps.app.goo.gl/xxxx) CANNOT be embedded
@@ -23,8 +24,38 @@ export function parseLatLng(link) {
   return null;
 }
 
-export function buildMapEmbed({ link, address, location, title }) {
-  const coords = parseLatLng(link);
+export function isShortMapLink(link) {
+  return !!link && /(^|\.)(maps\.app\.goo\.gl|goo\.gl)/.test(link);
+}
+
+// Google's share sheet only hands out short links, which can't be iframed and
+// carry no coordinates. /api/resolve-map-link follows the redirect server-side
+// and returns the real lat/lng, which we then cache in sessionStorage.
+export async function resolveMapLink(link) {
+  const cacheKey = `map-coords:${link}`;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch {
+    /* sessionStorage unavailable — just resolve again */
+  }
+  const res = await fetch(`/api/resolve-map-link?url=${encodeURIComponent(link)}`);
+  if (!res.ok) throw new Error(`resolve-map-link ${res.status}`);
+  const data = await res.json();
+  if (typeof data?.lat !== 'number' || typeof data?.lng !== 'number') {
+    throw new Error('resolve-map-link returned no coordinates');
+  }
+  const coords = { lat: String(data.lat), lng: String(data.lng) };
+  try {
+    sessionStorage.setItem(cacheKey, JSON.stringify(coords));
+  } catch {
+    /* ignore quota errors */
+  }
+  return coords;
+}
+
+export function buildMapEmbed({ link, address, location, title, coords: given }) {
+  const coords = given || parseLatLng(link);
   if (coords) {
     return `https://www.google.com/maps?q=${coords.lat},${coords.lng}&z=16&output=embed`;
   }
@@ -35,13 +66,32 @@ export function buildMapEmbed({ link, address, location, title }) {
 
 export default function PropertyLocationCard({ property }) {
   const link = property?.google_maps_link || null;
+  const linkCoords = parseLatLng(link);
+  const [resolved, setResolved] = useState(null);
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    setResolved(null);
+    if (linkCoords || !isShortMapLink(link)) return;
+    let active = true;
+    setResolving(true);
+    resolveMapLink(link)
+      .then((c) => active && setResolved(c))
+      .catch(() => {})
+      .finally(() => active && setResolving(false));
+    return () => {
+      active = false;
+    };
+  }, [link, linkCoords?.lat, linkCoords?.lng]);
+
+  const coords = linkCoords || resolved;
   const embedUrl = buildMapEmbed({
     link,
+    coords,
     address: property?.address,
     location: property?.location,
     title: property?.title,
   });
-  const coords = parseLatLng(link);
   const directionsUrl =
     link ||
     (coords
@@ -64,10 +114,16 @@ export default function PropertyLocationCard({ property }) {
             </span>
           </p>
         </div>
-        {!coords && (
-          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-            Approximate area
+        {resolving ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> Locating
           </span>
+        ) : (
+          !coords && (
+            <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              Approximate area
+            </span>
+          )
         )}
       </div>
 
@@ -75,6 +131,7 @@ export default function PropertyLocationCard({ property }) {
         <div className="relative aspect-[16/10] w-full bg-muted sm:aspect-[16/7]">
           <iframe
             title={`Map of ${property?.title || 'this property'}`}
+            key={embedUrl}
             src={embedUrl}
             className="absolute inset-0 h-full w-full border-0"
             loading="lazy"

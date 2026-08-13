@@ -226,19 +226,24 @@ async function notifyAndEmail(supabase, payment, reason, note, caller) {
 }
 
 async function callSupabaseSendEmail(payload) {
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || '').trim();
+  const SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const INTERNAL_EMAIL_SECRET = (process.env.INTERNAL_EMAIL_SECRET || '').trim();
+  if (!SUPABASE_URL || (!SERVICE_ROLE_KEY && !INTERNAL_EMAIL_SECRET)) {
     throw new Error(`callSupabaseSendEmail: missing env vars for type=${payload?.type}`);
   }
-  // Service-role key (private, server-side only) — see confirm-payment.js's
-  // callSupabaseSendEmail and supabase/functions/send-email/index.ts for
-  // why this replaced the public anon key here.
+  // Server-to-server call. The x-internal-secret header is the primary
+  // trust signal (survives service-role key rotation / key-format changes);
+  // the bearer key is kept as a fallback for older deployments.
+  const headers = { 'Content-Type': 'application/json' };
+  if (SERVICE_ROLE_KEY) headers['Authorization'] = `Bearer ${SERVICE_ROLE_KEY}`;
+  if (INTERNAL_EMAIL_SECRET) headers['x-internal-secret'] = INTERNAL_EMAIL_SECRET;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_ROLE_KEY}` },
+    headers,
     body: JSON.stringify(payload),
   });
+
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`callSupabaseSendEmail: send-email returned ${res.status} for type=${payload?.type} — ${body}`);
