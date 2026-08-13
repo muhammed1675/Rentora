@@ -16,6 +16,7 @@ import {
   Check, CheckCircle2, Eye, GitCompare, Star, Send, Flag,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import PropertyLocationCard from '../components/PropertyLocationCard';
 
 function getFavourites() {
   try { return JSON.parse(localStorage.getItem('rentora_favourites') || '[]'); }
@@ -385,23 +386,31 @@ export function PropertyDetails() {
             </div>
           )}
 
-          <div>
-            <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{property.title}</h1>
-            <div className="flex items-center gap-2 mt-2 text-muted-foreground flex-wrap">
-              <MapPin className="w-5 h-5 shrink-0" /><span className="min-w-0 break-words">{property.location}</span>
+          {/* Title block — clean typographic hierarchy: title, then a single
+              muted location line, then the address. The old inline
+              "Get Directions on Google Maps" button lived here and made the
+              block look cramped; it now lives in the Location card below. */}
+          <div className="min-w-0 space-y-2">
+            <h1 className="break-words text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
+              {property.title}
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <MapPin className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 break-words">{property.location}</span>
+              </span>
+              {property.property_type && (
+                <>
+                  <span className="hidden h-1 w-1 rounded-full bg-muted-foreground/40 sm:block" />
+                  <span className="inline-flex items-center gap-1.5 capitalize">
+                    <TypeIcon className="h-4 w-4 shrink-0" />
+                    {property.property_type}
+                  </span>
+                </>
+              )}
             </div>
             {property.address && (
-              <p className="mt-1 text-sm text-muted-foreground break-words">{property.address}</p>
-            )}
-            {property.google_maps_link && (
-              <a
-                href={property.google_maps_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:px-4"
-              >
-                <MapPin className="h-4 w-4 shrink-0" /><span className="min-w-0 truncate">Get Directions on Google Maps</span>
-              </a>
+              <p className="text-sm text-muted-foreground/80 break-words">{property.address}</p>
             )}
           </div>
 
@@ -409,6 +418,9 @@ export function PropertyDetails() {
             <h2 className="text-xl font-semibold mb-4">Description</h2>
             <p className="whitespace-pre-wrap break-words text-muted-foreground">{property.description}</p>
           </Card>
+
+          <PropertyLocationCard property={property} />
+
 
           {property.amenities?.length > 0 && (
             <Card className="max-w-full overflow-hidden p-4 sm:p-6">

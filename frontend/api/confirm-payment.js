@@ -381,20 +381,26 @@ async function handlePayment(req, res) {
 // already handles these templates, same as the rest of the app. ----
 
 async function callSupabaseSendEmail(payload) {
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
-  const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    throw new Error(`callSupabaseSendEmail: missing env vars (hasUrl=${!!SUPABASE_URL}, hasServiceRoleKey=${!!SERVICE_ROLE_KEY}) for type=${payload?.type}`);
+  const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL || '').trim();
+  const SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const INTERNAL_EMAIL_SECRET = (process.env.INTERNAL_EMAIL_SECRET || '').trim();
+  if (!SUPABASE_URL || (!SERVICE_ROLE_KEY && !INTERNAL_EMAIL_SECRET)) {
+    throw new Error(`callSupabaseSendEmail: missing env vars (hasUrl=${!!SUPABASE_URL}, hasServiceRoleKey=${!!SERVICE_ROLE_KEY}, hasInternalSecret=${!!INTERNAL_EMAIL_SECRET}) for type=${payload?.type}`);
   }
-  // Uses the service-role key (private, server-side only) rather than the
-  // public anon key — the send-email edge function trusts this key fully,
-  // since only trusted server code (this file) ever has it. See
-  // supabase/functions/send-email/index.ts for the corresponding check.
+  // Two trust signals are sent. x-internal-secret is the reliable one: the
+  // send-email edge function compares it to its own INTERNAL_EMAIL_SECRET,
+  // so this no longer breaks when the service-role key is rotated in one
+  // platform but not the other (that drift is what produced the
+  // "Invalid or expired session" 401s on the payment webhook).
+  const headers = { 'Content-Type': 'application/json' };
+  if (SERVICE_ROLE_KEY) headers['Authorization'] = `Bearer ${SERVICE_ROLE_KEY}`;
+  if (INTERNAL_EMAIL_SECRET) headers['x-internal-secret'] = INTERNAL_EMAIL_SECRET;
   const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_ROLE_KEY}` },
+    headers,
     body: JSON.stringify(payload),
   });
+
   if (!res.ok) {
     // Previously this response was never inspected, so a failed send here
     // (bad payload, Resend error surfaced by the edge function, etc.) was

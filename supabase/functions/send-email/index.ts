@@ -551,8 +551,25 @@ serve(async (req) => {
   //      for "welcome"/"sign_in" specifically, `to` must also match
   //      that verified user's own email.
   const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.replace("Bearer ", "").trim();
-  if (!token) {
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+  // Tier 1a — dedicated internal secret. This is the reliable path for
+  // server-to-server calls: it does NOT depend on the service-role key
+  // being byte-identical in two different platforms (Vercel + Supabase).
+  // Rotating the service-role key, migrating to the new sb_secret_* key
+  // format, or a stray newline pasted into a Vercel env var used to make
+  // the equality check below fail, and the request then fell through to
+  // auth.getUser() — which rejected the key with the misleading
+  // "Invalid or expired session" 401 seen in the payment webhook logs.
+  const INTERNAL_SECRET = (Deno.env.get("INTERNAL_EMAIL_SECRET") || "").trim();
+  const internalHeader = (req.headers.get("x-internal-secret") || "").trim();
+  const serviceKey = (SERVICE_ROLE_KEY || "").trim();
+
+  const isTrustedServer =
+    (INTERNAL_SECRET.length > 0 && internalHeader === INTERNAL_SECRET) ||
+    (serviceKey.length > 0 && token === serviceKey);
+
+  if (!isTrustedServer && !token) {
     return new Response(JSON.stringify({ error: "Missing authorization token" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -560,10 +577,17 @@ serve(async (req) => {
   }
 
   let callerEmail: string | null = null;
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isTrustedServer) {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData?.user) {
+      // Safe fingerprints only (never the key material itself) so an
+      // env-drift mismatch is diagnosable straight from the function logs.
+      console.error(
+        `[send-email] auth rejected — tokenLen=${token.length} tokenPrefix=${token.slice(0, 6)} ` +
+        `serviceKeyLen=${serviceKey.length} serviceKeyPrefix=${serviceKey.slice(0, 6)} ` +
+        `internalSecretConfigured=${INTERNAL_SECRET.length > 0} internalHeaderSent=${internalHeader.length > 0}`,
+      );
       return new Response(JSON.stringify({ error: "Invalid or expired session. Please log in again." }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -571,8 +595,9 @@ serve(async (req) => {
     }
     callerEmail = authData.user.email || null;
   }
-  // token === SERVICE_ROLE_KEY: fully trusted server caller, callerEmail
-  // stays null and the SELF_ONLY_TYPES check below is skipped for it.
+  // Trusted server caller: callerEmail stays null and the SELF_ONLY_TYPES
+  // check below is skipped for it.
+
 
   try {
     const { type, to, data: rawData } = await req.json();
