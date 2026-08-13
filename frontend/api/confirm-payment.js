@@ -265,6 +265,22 @@ async function handlePayment(req, res) {
         .eq('status', 'pending');
       if (rentErr) throw rentErr;
 
+      // Lock the property the instant rent is actually held — otherwise
+      // nothing stops a second student from also successfully paying for
+      // the same property before the agent notices and marks it taken by
+      // hand. This is best-effort: the payment itself already succeeded
+      // and must not be rolled back just because this follow-up update
+      // fails, so log and move on rather than throwing.
+      try {
+        const { error: availErr } = await supabase
+          .from('properties')
+          .update({ availability: 'unavailable' })
+          .eq('id', rentTx.property_id);
+        if (availErr) console.error('confirm-payment: failed to lock property availability', availErr.message, { property_id: rentTx.property_id, reference });
+      } catch (availEx) {
+        console.error('confirm-payment: exception locking property availability', availEx?.message || availEx, { property_id: rentTx.property_id, reference });
+      }
+
       // Await this (same fix already applied to the inspection emails above) —
       // firing this without awaiting let Vercel freeze/terminate the function
       // as soon as res.status(200).json(...) was sent, often killing the

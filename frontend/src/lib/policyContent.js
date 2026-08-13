@@ -30,7 +30,7 @@ export const sections = [
       },
       {
         title: '6. Prohibited Activities',
-        body: `Users must NOT:\n• Attempt to bypass the platform for fraudulent purposes\n• Misuse agent or owner contact information\n• Harass agents or property owners\n• Attempt chargebacks after services have been delivered\n• Engage in illegal or abusive conduct\n\nViolation may result in suspension or termination.`
+        body: `Users must NOT:\n• Attempt to bypass the platform for fraudulent purposes\n• Misuse agent or owner contact information\n• Harass agents or property owners\n• Attempt chargebacks after services have been delivered\n• Engage in illegal or abusive conduct\n\nAgents specifically must keep listings accurate and up to date — a property must be marked as taken on Rentora as soon as it is no longer available, whether it was rented through Rentora or elsewhere. Repeatedly leaving unavailable properties listed as available is treated as a violation of this section.\n\nViolation may result in suspension or termination.`
       },
       {
         title: '7. Limitation of Liability',
@@ -51,27 +51,31 @@ export const sections = [
     content: [
       {
         title: '1. Information We Collect',
-        body: `We may collect:\n• Full name\n• Phone number\n• Email address\n• Location\n• Payment confirmation data\n• Account activity logs`
+        body: `Depending on how you use Rentora, we may collect:\n\n• Full name, phone number, email address\n• Location and property search activity\n• Payment confirmation data (see Section 3)\n• Account activity logs\n\nIf you become a verified student or apply to become an agent, we additionally collect:\n\n• A government-issued ID and a selfie photo, used to verify your identity\n• Your address\n• Bank account name, number, and bank name (agents only, for receiving payouts)\n\nIf you list a property as an agent, we also collect the property owner's name, phone number, the property address, its map location, and photographs you upload (including move-in confirmation photos).\n\nWe also collect limited technical/device information (browser type, general device information) and, with your consent via the cookie banner, analytics data — see Section 7.`
       },
       {
         title: '2. How We Use Information',
-        body: `Your information is used to:\n• Create and manage accounts\n• Process rent and viewing payments\n• Facilitate viewing bookings\n• Prevent fraud\n• Improve platform performance`
+        body: `Your information is used to:\n• Create and manage accounts\n• Verify your identity as a student or agent\n• Process rent and viewing payments, and pay out agents\n• Facilitate viewing bookings\n• Display an agent's name and contact details on their listings, so renters can reach them\n• Prevent fraud\n• Improve platform performance`
       },
       {
         title: '3. Payment Information',
-        body: `All payments on Rentora are processed securely through third-party payment providers.\n\nRentora does NOT store:\n• Card numbers\n• CVV details\n• Bank card credentials`
+        body: `All payments on Rentora are processed securely through third-party payment providers (currently Flutterwave).\n\nRentora does NOT store:\n• Card numbers\n• CVV details\n• Bank card credentials\n\nAgent payout bank details (account name, number, bank name) are stored by Rentora, restricted to that agent and Rentora admins, in order to send payouts.`
       },
       {
         title: '4. Data Sharing',
-        body: `Rentora does not sell user data.\n\nInformation may be shared:\n• With assigned agents for viewing purposes\n• When required by law\n• To prevent fraud or abuse`
+        body: `Rentora does not sell user data.\n\nInformation may be shared:\n• With assigned agents for viewing purposes\n• Publicly on a listing, for an agent's name and contact details specifically (so renters can reach out about that property) — this does not apply to renter/student accounts, whose information is not made public\n• With payment providers (Flutterwave) and email providers (Resend) solely to carry out payments and send you emails\n• With analytics providers (Google Analytics, PostHog), only if you accept the cookie/analytics consent banner\n• When required by law\n• To prevent fraud or abuse`
       },
       {
         title: '5. Data Security',
-        body: `We implement reasonable security measures, but no online system is 100% secure.`
+        body: `We implement reasonable security measures — including access controls restricting who can view sensitive records like verification documents and bank details, and encrypted connections — but no online system is 100% secure.`
       },
       {
         title: '6. Account Deletion',
-        body: `Users may request account deletion by contacting support.`
+        body: `Users may request account deletion by contacting support or, where available in-app, through account settings.\n\nWhen an account is deleted, it is immediately hidden from other users and from the app. Some records — such as payment/transaction history and verification records tied to a completed transaction — may be retained for a period after deletion where we have a legitimate legal, accounting, or fraud-prevention reason to do so, rather than being erased instantly. Contact support if you have questions about what is retained for your account specifically.`
+      },
+      {
+        title: '7. Cookies & Analytics',
+        body: `On your first visit, Rentora asks for your consent before running any analytics. If you accept, we use Google Analytics (pageview/usage analytics) and PostHog (usage analytics, including session replay of on-screen interactions) to understand how the site is used. If you decline, or haven't yet responded, neither tool runs and no analytics data is collected about your visit. You can clear your browser's local storage to be asked again.`
       },
     ]
   },

@@ -36,13 +36,13 @@ which had drifted out of sync with reality).
   fully runnable.
 
 ⚠️ **This README only describes 01–06, the original snapshot.** Files
-`07` through `16` (plus `add_recurring_payment.sql`) were added later as
-runnable migrations on top of this snapshot — including two
-security-critical ones (`15_enable_rls.sql`, `16_storage_lockdown.sql`).
-See `../../SETUP.md` §4 for the full, correct run order and why skipping
-15/16 leaves the database insecure. This file wasn't updated when those
-were added — treat SETUP.md as the source of truth for run order, not this
-list.
+`07` through `17` (plus `add_recurring_payment.sql`) were added later as
+runnable migrations on top of this snapshot — including three
+security-critical ones (`15_enable_rls.sql`, `16_storage_lockdown.sql`,
+`17_restrict_user_pii.sql`). See `../../SETUP.md` §4 for the full, correct
+run order and why skipping any of the three leaves the database insecure.
+This file wasn't updated when those were added — treat SETUP.md as the
+source of truth for run order, not this list.
 
 ## What this does NOT cover
 

@@ -16,7 +16,7 @@ Rentora/
 │   └── .env.example          # Frontend env vars (REACT_APP_*)
 ├── backend/                  # Optional Python service (FastAPI). Not required for prod.
 ├── supabase/
-│   ├── schema/                          # See §4 — 17 files, NOT just 6. Run in the
+│   ├── schema/                          # See §4 — 18 files, NOT just 6. Run in the
 │   │   │                                #   exact order documented there.
 │   │   ├── 01_tables.sql                # ─┐
 │   │   ├── 02_functions_reference.sql   #  │ Snapshot of the live DB schema
@@ -34,14 +34,15 @@ Rentora/
 │   │   ├── 13_admin_broadcasts.sql                   #  │
 │   │   ├── 14_push_subscriptions.sql                 #  │
 │   │   ├── 15_enable_rls.sql            # ⚠️ SECURITY — see §4            │
-│   │   ├── 16_storage_lockdown.sql      # ⚠️ SECURITY — see §4          ─┘
+│   │   ├── 16_storage_lockdown.sql      # ⚠️ SECURITY — see §4            │
+│   │   ├── 17_restrict_user_pii.sql     # ⚠️ SECURITY — see §4          ─┘
 │   │   └── add_recurring_payment.sql    # Optional, no numeric prefix — see §4
 │   └── functions/            # Edge Functions (Deno)
 │       ├── _shared/          # email-config.ts — centralized sender/reply-to config
 │       ├── resolve-bank/     # Verifies bank accounts via Flutterwave
 │       ├── send-email/       # Transactional email via Resend
-│       └── delete-account/   # Account deletion + confirmation email
-│       # NOTE: no send-push function exists yet — see §11.
+│       ├── delete-account/   # Account deletion + confirmation email
+│       └── send-push/        # Delivers real OS/browser push — see §11
 ├── Documents/                 # Agent agreement + project overview (PDF/DOCX),
 │                               #   used for agent onboarding, not the app itself.
 ├── legal-documents/          # CAC certificate, TIN, and other Nigerian registration docs
@@ -114,7 +115,7 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
 
 1. Create a new project at https://supabase.com. Note the **Project URL** and **anon key** (Settings → API).
 2. Also copy the **service_role key** — server‑side only, never expose to the browser.
-3. Open **SQL Editor** and run every file in `supabase/schema/` **in this exact order** — there are 17 files total, not 6:
+3. Open **SQL Editor** and run every file in `supabase/schema/` **in this exact order** — there are 18 files total, not 6:
 
    **Base snapshot** (reconstructed from the live DB — see `schema/README.md`):
    1. `01_tables.sql`
@@ -144,6 +145,15 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
        from `06_storage.sql` have no `TO authenticated` clause, so buckets
        like verification docs and move-in photos are readable/writable by
        anyone, including anonymous requests.
+   18. **`17_restrict_user_pii.sql`** ⚠️ — closes a real gap left by
+       `09_refund_and_delete_fixes.sql`: that migration only stopped
+       *deleted* accounts from being readable by everyone — it left every
+       **active** user's full name, email, and phone readable by anyone
+       holding just the public anon key, no login required. This migration
+       restricts that to agent/admin rows only (their contact info is
+       meant to be public on listings) plus the row's own owner or an
+       admin. Do not skip this — RLS being "on" doesn't help if the policy
+       itself is this permissive.
 
    **Optional, no numeric prefix, safe to run any time after `01_tables.sql`:**
    - `add_recurring_payment.sql` — adds a display-only field to properties;
@@ -169,7 +179,8 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
    for the full type → sender mapping (financial receipts/escrow → billing@,
    everything else automated → noreply@, admin replies to the contact form →
    support@ via `frontend/api/send-reply.js`, unrelated to these secrets).
-   There is no `send-push` function to deploy — see §11.
+   Deploy `send-push` too (see §11) — this is the fourth function alongside
+   the three above.
 6. Configure **Authentication → URL Configuration**:
    - Site URL: `https://yourdomain.com`
    - Redirect URLs: add both `https://yourdomain.com/**` and `http://localhost:3000/**`
@@ -275,7 +286,7 @@ Everything a buyer needs is in this repo **except** live credentials and live da
 3. **Data export** — from Supabase Dashboard → Database → Backups, download the latest `pg_dump`. Ship the `.sql` file to the buyer over a secure channel. They restore it into their own Supabase project after running the schema (or restore the full dump and skip step 4 below).
 4. **Buyer setup path** — buyer follows this SETUP.md end‑to‑end with their own accounts:
    - Fork/import repo to their GitHub
-   - Create their own Supabase project → run all 17 files in `supabase/schema/*.sql` in the order in §4 → deploy edge functions
+   - Create their own Supabase project → run all 18 files in `supabase/schema/*.sql` in the order in §4 → deploy edge functions
    - Restore data dump (if included) via Supabase SQL Editor or `psql`
    - Import to their Vercel account, set env vars, deploy
    - Create their own GA4 property and PostHog project, swap the IDs in `frontend/public/index.html` (§8)
@@ -306,22 +317,66 @@ Keep a private "operations" doc in your password manager listing where each of t
 
 ---
 
-## 11. Known incomplete features
+## 11. Push notifications (browser/OS-level)
 
-- **Push notifications (browser/OS-level) are half-built.** The subscribe
-  side is fully wired: `frontend/src/lib/push.js` requests permission,
-  subscribes via the service worker, and saves the subscription to the
-  `push_subscriptions` table (created by `14_push_subscriptions.sql`). The
-  service worker (`frontend/public/sw.js`) is ready to *receive* a push and
-  even references `supabase/functions/send-push` in a comment — but that
-  function does not exist anywhere in this repo. Nothing currently sends a
-  push. If you want this feature working end-to-end, you need to write a
-  `send-push` edge function (using something like the `web-push` npm
-  package with the corresponding VAPID *private* key, which also doesn't
-  exist yet anywhere in this repo — only the public key is used, client-side).
-  Until then, users can toggle push "on" in the UI, but will never receive
-  anything through that channel — they still get in-app notifications via
-  the bell (`lib/notifications.js`), which is fully working and unrelated.
+The subscribe side (`frontend/src/lib/push.js`, the `push_subscriptions`
+table) and the send side (`supabase/functions/send-push`) now both exist.
+Wiring them together needs a one-time setup:
+
+1. **Generate a VAPID key pair** (skip if you already have one — see the
+   warning below):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   This prints a public and private key. **Do this once and keep both —
+   regenerating later silently breaks push for every already-subscribed
+   user**, since their browser has the old public key baked into its
+   subscription and there's no way to update it remotely; they'd have to
+   revisit the site and re-enable push.
+
+2. **Set the public key in the frontend** — `frontend/.env`:
+   ```
+   REACT_APP_VAPID_PUBLIC_KEY=<the public key>
+   ```
+
+3. **Deploy the edge function and set its secrets:**
+   ```bash
+   supabase functions deploy send-push
+   supabase secrets set \
+     VAPID_PUBLIC_KEY=<the public key> \
+     VAPID_PRIVATE_KEY=<the private key> \
+     VAPID_SUBJECT=mailto:support@rentora.com.ng
+   ```
+   The public key must be set in **both** places (step 2 and here) — it's
+   the same value twice, once for the browser and once for the server side
+   that signs pushes.
+
+4. **Connect the trigger — Supabase Dashboard → Database → Webhooks →
+   Create a new hook:**
+   - Table: `user_notifications`
+   - Events: `Insert`
+   - Type: `Supabase Edge Functions`
+   - Edge Function: `send-push`
+   - HTTP method: `POST`
+   This makes every new row in `user_notifications` (i.e. every existing
+   call to `notifyUser()` in the app — property approved, rent released,
+   move-in confirmed, etc.) automatically trigger a push, without editing
+   any of those call sites individually.
+
+5. **Test it:** log in on a device, enable push when prompted (or via
+   whatever UI toggle triggers `push.js`'s subscribe flow), then trigger
+   any event that calls `notifyUser()` — e.g. as an admin, approve a
+   pending property — and confirm a real OS notification appears.
+
+**Note:** `send-push` deliberately only accepts requests carrying the exact
+service role key (not just any logged-in user's token) — this is what
+Database Webhooks authenticate with automatically. If you ever call it by
+hand for testing, you need to pass that key as the Bearer token.
+
+---
+
+## 12. Other known incomplete features
+
 - **`src/lib/emailService.js` is dead code.** Nothing imports it. All real
   transactional email goes through Supabase Edge Functions (`send-email`)
   or `frontend/api/send-reply.js` instead. Don't set
@@ -333,7 +388,7 @@ Keep a private "operations" doc in your password manager listing where each of t
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom                                | Fix                                                            |
 |----------------------------------------|------------------------------------------------------------------|
@@ -341,13 +396,15 @@ Keep a private "operations" doc in your password manager listing where each of t
 | RLS "permission denied"                | Re‑run `04_policies.sql`; confirm user role in `public.users`  |
 | Anyone can read/write tables directly, bypassing RLS | `15_enable_rls.sql` was never run — see §4 |
 | Storage bucket readable/writable by anonymous users | `16_storage_lockdown.sql` was never run — see §4 |
+| Anyone (even logged out) can read all users' name/email/phone via the API | `17_restrict_user_pii.sql` was never run — see §4 |
 | Storage upload fails                   | Bucket missing or wrong policy — re‑run `06_storage.sql`       |
 | Edge function 500                      | `supabase functions logs <n>` → check missing secret        |
 | Payments not verifying                 | Flutterwave secret key not set in Vercel env / edge function       |
 | "Unsuccessful Webhook Delivery" email  | `FLW_WEBHOOK_HASH` missing/mismatched in Vercel, or webhook URL/SSL wrong — see §7 |
 | Flutterwave balance not in bank account yet | Normal T+1 local settlement delay, not an integration bug — see §7 |
 | Vercel 404 on refresh                  | Root Directory not set to `frontend`                            |
-| User toggles push notifications "on" but never receives any | Expected — no send-side function exists yet, see §11 |
+| User toggles push "on" but never receives anything | Check the Database Webhook is set up (§11 step 4) and `supabase functions logs send-push` for errors |
+| Push worked before, now silently stops for everyone | VAPID keys were regenerated — see the warning in §11 step 1 |
 | GA/PostHog show zero events even after clicking Accept | Check `localStorage['rentora_consent']` is `'true'`; check browser ad-blocker isn't blocking `googletagmanager.com` / `i.posthog.com` outright |
 | Backend (`backend/server.py`) can't connect to Supabase | Check you used `SUPABASE_SERVICE_KEY` / `SUPABASE_ANON_KEY` (not `_ROLE_` or other names) in `backend/.env` — see §3.3 |
 

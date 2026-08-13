@@ -68,7 +68,8 @@ export function ConsentBanner() {
             By using Rentora, you agree to our{' '}
             <Link to="/terms" className="text-primary hover:underline font-medium" onClick={accept}>Terms & Conditions</Link>{' '}and{' '}
             <Link to="/terms" className="text-primary hover:underline font-medium" onClick={accept}>Privacy Policy</Link>.
-            We store your login session and preferences in your browser's local storage to keep you signed in. No tracking or advertising data is collected.
+            We store your login session and preferences in your browser's local storage to keep you signed in.
+            With your consent, we also use analytics (Google Analytics and PostHog) to understand how the site is used. You can decline and still use Rentora normally.
           </p>
           <div className="flex gap-2">
             <Button onClick={accept} size="sm" className="flex-1 h-9 text-xs">Accept All</Button>
