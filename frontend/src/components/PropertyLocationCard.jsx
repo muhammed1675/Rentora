@@ -42,10 +42,14 @@ export async function resolveMapLink(link) {
   const res = await fetch(`/api/resolve-map-link?url=${encodeURIComponent(link)}`);
   if (!res.ok) throw new Error(`resolve-map-link ${res.status}`);
   const data = await res.json();
-  if (typeof data?.lat !== 'number' || typeof data?.lng !== 'number') {
-    throw new Error('resolve-map-link returned no coordinates');
+  let coords;
+  if (typeof data?.lat === 'number' && typeof data?.lng === 'number') {
+    coords = { lat: String(data.lat), lng: String(data.lng) };
+  } else if (typeof data?.query === 'string' && data.query) {
+    coords = { query: data.query };
+  } else {
+    throw new Error('resolve-map-link returned nothing usable');
   }
-  const coords = { lat: String(data.lat), lng: String(data.lng) };
   try {
     sessionStorage.setItem(cacheKey, JSON.stringify(coords));
   } catch {
@@ -56,7 +60,10 @@ export async function resolveMapLink(link) {
 
 export function buildMapEmbed({ link, address, location, title, coords: given }) {
   const coords = given || parseLatLng(link);
-  if (coords) {
+  if (coords?.query) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(coords.query)}&z=16&output=embed`;
+  }
+  if (coords?.lat) {
     return `https://www.google.com/maps?q=${coords.lat},${coords.lng}&z=16&output=embed`;
   }
   const query = [address, location, title].filter(Boolean).join(', ');

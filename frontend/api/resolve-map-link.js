@@ -95,6 +95,14 @@ export default async function handler(req, res) {
     }
 
     if (!found) {
+      // Place-style share links (…/maps?q=Business+Name,+Street) carry no
+      // lat/lng — hand the text query back so the client can still embed it.
+      const q = /[?&]q=([^&]+)/.exec(current);
+      if (q) {
+        const query = decodeURIComponent(q[1].replace(/\+/g, ' '));
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.status(200).json({ query, source: 'redirect-query' });
+      }
       return res.status(422).json({ error: 'Could not resolve coordinates from this link' });
     }
 
