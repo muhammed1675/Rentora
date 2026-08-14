@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Shield, Upload, ArrowLeft, CheckCircle2, FileText, Download, Loader2, X, ImageIcon, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const FALLBACK_BANKS = [
   { code: '044', name: 'Access Bank' }, { code: '050', name: 'Ecobank Nigeria' },
@@ -26,6 +27,7 @@ const FALLBACK_BANKS = [
 ];
 
 export function BecomeAgent() {
+  const { guard } = useSubmitGuard();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isUser } = useAuth();
@@ -215,7 +217,7 @@ export function BecomeAgent() {
         </Card>
 
         <Card className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={guard(handleSubmit)} className="space-y-6">
 
             {/* ID Card */}
             <div className="space-y-2">

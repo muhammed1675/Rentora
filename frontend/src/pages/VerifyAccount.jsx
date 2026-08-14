@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Upload, ShieldCheck, Clock, XCircle, Camera, FileText, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const DOC_TYPES = [
   { value: 'student_id', label: 'Student ID card' },
@@ -88,6 +89,7 @@ function DropZone({ icon: Icon, title, description, accept, capture, file, onCha
 }
 
 export default function VerifyAccount() {
+  const { guard } = useSubmitGuard();
   const { user, refreshUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -222,7 +224,7 @@ export default function VerifyAccount() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={guard(handleSubmit)} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium">Document type</label>
               <div className="flex flex-wrap gap-2">

@@ -49,6 +49,35 @@ export async function sendBroadcast(title, body, target = 'all', link = null) {
   return data; // new broadcast id
 }
 
+// Admin-only. Emails an already-created broadcast to every matching user's
+// email address, via /api/broadcast-email (Resend, batched server-side).
+// The endpoint claims each broadcast_id exactly once, so calling it twice for
+// the same broadcast is a no-op ({ already_sent: true }) rather than a
+// duplicate blast. See supabase/schema/18_broadcast_emails.sql.
+export async function sendBroadcastEmail({ broadcastId, title, body, target = 'all', link = null, linkLabel = null }) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const accessToken = session?.access_token;
+  if (!accessToken) throw new Error('Your session expired — log in again to send emails.');
+
+  const res = await fetch('/api/broadcast-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      broadcast_id: broadcastId,
+      title,
+      message: body,
+      target,
+      link,
+      link_label: linkLabel,
+    }),
+  });
+
+  let payload = null;
+  try { payload = await res.json(); } catch { /* non-JSON error page */ }
+  if (!res.ok) throw new Error(payload?.error || `Email send failed (${res.status})`);
+  return payload; // { recipients, sent, failed, already_sent? }
+}
+
 const PAGE_SIZE = 30;
 const dismissedKey = (userId) => `rentora:dismissed_broadcasts:${userId}`;
 

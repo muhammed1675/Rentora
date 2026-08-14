@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
-import { sendBroadcast } from '../lib/notifications';
+import { sendBroadcast, sendBroadcastEmail } from '../lib/notifications';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -87,6 +87,11 @@ export function AdminDashboard() {
   const [broadcastLink, setBroadcastLink] = useState('');
   const [broadcastTarget, setBroadcastTarget] = useState('all');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  // Synchronous guard: a state flag alone can still lose the race against a
+  // double-click, which would create two broadcasts (and two email blasts).
+  const sendingBroadcastRef = useRef(false);
+  const [broadcastAsEmail, setBroadcastAsEmail] = useState(false);
+  const [broadcastEmailedIds, setBroadcastEmailedIds] = useState({}); // { [broadcastId]: { sent, recipients } }
   const [broadcastReach, setBroadcastReach] = useState({}); // { [broadcastId]: { total, read } }
 
   useEffect(() => {
@@ -149,11 +154,20 @@ export function AdminDashboard() {
   }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSendBroadcast = async () => {
+    if (sendingBroadcastRef.current) return; // already sending — ignore the extra click
     if (!broadcastTitle.trim() || !broadcastBody.trim()) {
       toast.error('Add both a title and a message');
       return;
     }
+    sendingBroadcastRef.current = true;
     setSendingBroadcast(true);
+    const emailToo = broadcastAsEmail;
+    const emailPayload = {
+      title: broadcastTitle.trim(),
+      body: broadcastBody.trim(),
+      target: broadcastTarget,
+      link: broadcastLink.trim() || null,
+    };
     try {
       const broadcastId = await sendBroadcast(broadcastTitle.trim(), broadcastBody.trim(), broadcastTarget, broadcastLink.trim() || null);
       toast.success('Broadcast sent');
@@ -181,9 +195,26 @@ export function AdminDashboard() {
       } catch (pushErr) {
         console.warn('send-push failed (non-critical, in-app broadcast already sent):', pushErr);
       }
+
+      // Optional email blast to every matching user's inbox. Server-side it is
+      // claimed once per broadcast id, so it can never go out twice.
+      if (emailToo) {
+        try {
+          const result = await sendBroadcastEmail({ broadcastId, ...emailPayload });
+          if (result?.already_sent) {
+            toast.info('Emails for this broadcast were already sent.');
+          } else {
+            setBroadcastEmailedIds(prev => ({ ...prev, [broadcastId]: result }));
+            toast.success(`Emailed ${result?.sent ?? 0} of ${result?.recipients ?? 0} users${result?.failed ? ` · ${result.failed} failed` : ''}`);
+          }
+        } catch (emailErr) {
+          toast.error(`In-app broadcast sent, but email failed: ${emailErr.message}`);
+        }
+      }
     } catch (e) {
       toast.error(e.message || 'Failed to send broadcast');
     } finally {
+      sendingBroadcastRef.current = false;
       setSendingBroadcast(false);
     }
   };
@@ -1900,8 +1931,9 @@ export function AdminDashboard() {
             <Card className="p-5">
               <h3 className="font-semibold mb-1">Send a broadcast</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Delivered instantly to the bell icon and /notifications page for every matching user —
-                no email involved. Keep it short; there's no character limit but shorter reads better in the bell popover.
+                Delivered instantly to the bell icon and /notifications page for every matching user.
+                Tick “Also send as email” to deliver the same message to every matching user's inbox as a
+                branded Rentora email. Keep it short; shorter reads better in the bell popover.
               </p>
               <div className="space-y-3">
                 <Input
@@ -1932,9 +1964,25 @@ export function AdminDashboard() {
                   </Select>
                   <Button onClick={handleSendBroadcast} disabled={sendingBroadcast} className="gap-2 sm:w-40">
                     {sendingBroadcast ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Send
+                    {sendingBroadcast ? 'Sending…' : 'Send'}
                   </Button>
                 </div>
+
+                <label className="flex items-start gap-2.5 rounded-lg border bg-slate-50/60 p-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={broadcastAsEmail}
+                    onChange={(e) => setBroadcastAsEmail(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-primary"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Also send as email</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      One branded email per recipient, sent to every matching user's inbox in batches.
+                      Each broadcast can only ever be emailed once, so a double click can't send it twice.
+                    </span>
+                  </span>
+                </label>
               </div>
             </Card>
 
@@ -1967,6 +2015,7 @@ export function AdminDashboard() {
                           <p className="text-xs text-foreground/45 mt-1.5">
                             {new Date(b.created_at).toLocaleString()}
                             {reach ? ` · ${reach.read}/${reach.total} read` : ''}
+                            {broadcastEmailedIds[b.id] ? ` · emailed ${broadcastEmailedIds[b.id].sent}` : ''}
                           </p>
                         </div>
                         <Button

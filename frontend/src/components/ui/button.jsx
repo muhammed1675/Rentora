@@ -34,12 +34,59 @@ const buttonVariants = cva(
   }
 )
 
-const Button = React.forwardRef(({ className, variant, size, asChild = false, ...props }, ref) => {
+// App-wide double-submit protection.
+//
+// Every button in the app goes through here, so the guard lives here instead
+// of being re-implemented on each page. If a click handler returns a promise
+// (i.e. it is `async` — every submit/save/approve handler in this app is),
+// the button is locked until that promise settles: extra clicks are swallowed
+// and the button renders disabled. Synchronous handlers (tabs, carousels,
+// dialog toggles, lightbox arrows) are untouched, so rapid clicking still
+// works where it should.
+const Button = React.forwardRef(({ className, variant, size, asChild = false, onClick, disabled, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
+  const pendingRef = React.useRef(false)
+  const [pending, setPending] = React.useState(false)
+  const mountedRef = React.useRef(true)
+
+  React.useEffect(() => () => { mountedRef.current = false }, [])
+
+  const handleClick = React.useCallback((event) => {
+    if (!onClick) return
+    // Synchronous ref check — a `disabled` prop driven by state can still
+    // lose the race against a fast double-tap, a ref cannot.
+    if (pendingRef.current) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+
+    let result
+    try {
+      result = onClick(event)
+    } catch (err) {
+      throw err
+    }
+
+    if (result && typeof result.then === "function") {
+      pendingRef.current = true
+      setPending(true)
+      const release = () => {
+        pendingRef.current = false
+        if (mountedRef.current) setPending(false)
+      }
+      result.then(release, release)
+    }
+  }, [onClick])
+
   return (
     <Comp
       className={cn(buttonVariants({ variant, size, className }))}
       ref={ref}
+      onClick={onClick ? handleClick : undefined}
+      disabled={asChild ? undefined : (disabled || pending)}
+      aria-busy={pending || undefined}
+      data-pending={pending ? "true" : undefined}
       {...props} />
   );
 })

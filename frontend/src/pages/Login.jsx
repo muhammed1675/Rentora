@@ -8,8 +8,10 @@ import { Label } from '../components/ui/label';
 import { Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { GoogleButton } from '../components/GoogleButton';
 import { toast } from 'sonner';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 export function Login() {
+  const { guard } = useSubmitGuard();
   const navigate = useNavigate();
   const location = useLocation();
   const { requestOtpCode, verifyOtpCode, loginWithGoogle } = useAuth();
@@ -107,7 +109,7 @@ export function Login() {
         </div>
 
         {step === 'email' ? (
-          <form onSubmit={handleSendCode} className="space-y-4">
+          <form onSubmit={guard(handleSendCode)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -136,7 +138,7 @@ export function Login() {
             </Button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyCode} className="space-y-4">
+          <form onSubmit={guard(handleVerifyCode)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="code">6-digit code</Label>
               <div className="relative">

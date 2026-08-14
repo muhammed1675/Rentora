@@ -10,6 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { MessageSquare, Mail, Phone, MapPin, CheckCircle2, Send, ArrowLeft, Home } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const SUBJECTS = [
   'General Inquiry',
@@ -22,6 +23,7 @@ const SUBJECTS = [
 ];
 
 export function Contact() {
+  const { guard } = useSubmitGuard();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -166,7 +168,7 @@ export function Contact() {
         {/* Form */}
         <Card className="lg:col-span-2 p-6 border-border/60">
           <h2 className="font-semibold text-lg mb-5">Send a Message</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={guard(handleSubmit)} className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name *</Label>

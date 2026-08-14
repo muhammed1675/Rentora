@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Building2, Plus, Calendar, Edit, CheckCircle2, XCircle, Home, Building, Upload, Image, Loader2, Expand, ChevronLeft, ChevronRight, X, CreditCard, Copy, Pencil, Phone, Wallet, TrendingUp, ArrowDownCircle, EyeOff, Eye, Lock, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSubmitGuard } from '../hooks/useSubmitGuard';
 
 const FALLBACK_BANKS = [
   { code: '044', name: 'Access Bank' }, { code: '050', name: 'Ecobank Nigeria' },
@@ -99,6 +100,10 @@ export function AgentDashboard() {
   const [showPropertyDialog, setShowPropertyDialog] = useState(false);
   const [editingProperty, setEditingProperty] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  // Double-submit guard for the property dialog: a synchronous ref, so a fast
+  // double-click can't slip a second INSERT through before React re-renders.
+  const submittingPropertyRef = useRef(false);
+  const [submittingProperty, setSubmittingProperty] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   const [locations, setLocations] = useState([]);
   const [formData, setFormData] = useState({
@@ -328,6 +333,7 @@ export function AgentDashboard() {
   };
 
   const handleSubmitProperty = async () => {
+    if (submittingPropertyRef.current) return; // already saving — ignore the extra click
     if (!isAgent && !isAdmin) { toast.error('Complete verification to start listing'); return; }
     if (!formData.title || !formData.price || !formData.location_id || !formData.contact_name || !formData.contact_phone) {
       toast.error('Please fill in all required fields'); return;
@@ -335,6 +341,8 @@ export function AgentDashboard() {
     if (!formData.owner_full_name || !formData.owner_phone) {
       toast.error('Please fill in the property owner\'s name and phone number.'); return;
     }
+    submittingPropertyRef.current = true;
+    setSubmittingProperty(true);
     try {
       const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
       const priceVal = parseInt(formData.price);
@@ -356,7 +364,11 @@ export function AgentDashboard() {
         const proceed = window.confirm(
           `This looks similar to an existing listing — "${match.title}" (${match.location}) posted by ${match.uploaded_by_agent_name}.\n\nIf this is a different property, click OK to continue. If it's the same house, please don't post a duplicate.`
         );
-        if (!proceed) return;
+        if (!proceed) {
+          submittingPropertyRef.current = false;
+          setSubmittingProperty(false);
+          return;
+        }
       }
 
       const data = { ...formData, location_id: locationIdVal, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, recurring_payment: formData.recurring_payment ? parseInt(formData.recurring_payment) : null, inspection_fee: inspectionFeeVal, images: formData.images };
@@ -377,6 +389,9 @@ export function AgentDashboard() {
       fetchData();
     } catch (error) {
       toast.error(error.message || 'Failed to save property');
+    } finally {
+      submittingPropertyRef.current = false;
+      setSubmittingProperty(false);
     }
   };
 
@@ -1331,8 +1346,10 @@ export function AgentDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowPropertyDialog(false); resetForm(); }}>Cancel</Button>
-            <Button onClick={handleSubmitProperty} disabled={uploadingImage}>
-              {uploadingImage ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</> : <>{editingProperty ? 'Update' : 'Create'} Property</>}
+            <Button onClick={handleSubmitProperty} disabled={uploadingImage || submittingProperty}>
+              {uploadingImage ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Uploading...</>
+                : submittingProperty ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{editingProperty ? 'Updating' : 'Submitting'}...</>
+                : <>{editingProperty ? 'Update' : 'Create'} Property</>}
             </Button>
           </DialogFooter>
         </DialogContent>
