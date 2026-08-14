@@ -35,7 +35,8 @@ Rentora/
 │   │   ├── 14_push_subscriptions.sql                 #  │
 │   │   ├── 15_enable_rls.sql            # ⚠️ SECURITY — see §4            │
 │   │   ├── 16_storage_lockdown.sql      # ⚠️ SECURITY — see §4            │
-│   │   ├── 17_restrict_user_pii.sql     # ⚠️ SECURITY — see §4          ─┘
+│   │   ├── 17_restrict_user_pii.sql     # ⚠️ SECURITY — see 
+§4          ─┘
 │   │   └── add_recurring_payment.sql    # Optional, no numeric prefix — see §4
 │   └── functions/            # Edge Functions (Deno)
 │       ├── _shared/          # email-config.ts — centralized sender/reply-to config
