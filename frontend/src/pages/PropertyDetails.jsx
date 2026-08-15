@@ -13,11 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { 
   MapPin, Phone, User, Lock, Calendar as CalendarIcon, ArrowLeft,
   Home, Building, ChevronLeft, ChevronRight, ExternalLink, Heart, Share2,
-  Check, CheckCircle2, Eye, GitCompare, Star, Send, Flag,
+  Check, CheckCircle2, Eye, GitCompare, Star, Send, Flag, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PropertyLocationCard from '../components/PropertyLocationCard';
 import { ImageWatermark } from '../components/ImageWatermark';
+import { downloadWatermarkedImage } from '../lib/watermarkDownload';
 
 function getFavourites() {
   try { return JSON.parse(localStorage.getItem('rentora_favourites') || '[]'); }
@@ -175,6 +176,22 @@ export function PropertyDetails() {
         setTimeout(() => setCopied(false), 3000);
       } catch { toast.error('Could not copy link'); }
     }
+  };
+
+  const [downloadingImage, setDownloadingImage] = useState(false);
+  const handleDownloadImage = async () => {
+    const url = property?.images?.[currentImageIndex];
+    if (!url || downloadingImage) return;
+    setDownloadingImage(true);
+    const slug = (property?.title || 'property').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const ok = await downloadWatermarkedImage(url, `rentora-${slug}-${currentImageIndex + 1}`);
+    if (!ok) {
+      toast.error('Could not save a branded copy — opening the original photo instead');
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      toast.success('Photo saved with the Rentora watermark');
+    }
+    setDownloadingImage(false);
   };
 
   const handleCompare = () => {
@@ -365,6 +382,11 @@ export function PropertyDetails() {
               </div>
             )}
             <Badge className="absolute top-4 left-4 gap-1"><TypeIcon className="w-3 h-3" />{property.property_type}</Badge>
+            <Button variant="secondary" size="icon" onClick={handleDownloadImage} disabled={downloadingImage}
+              className="absolute bottom-4 left-4 h-9 w-9 rounded-full"
+              title="Save photo with Rentora watermark">
+              <Download className="w-4 h-4" />
+            </Button>
             {property.views > 0 && (
               <div className="absolute bottom-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
                 <Eye className="w-3 h-3" />{property.views} {property.views === 1 ? 'view' : 'views'}
