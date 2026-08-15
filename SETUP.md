@@ -35,8 +35,7 @@ Rentora/
 │   │   ├── 14_push_subscriptions.sql                 #  │
 │   │   ├── 15_enable_rls.sql            # ⚠️ SECURITY — see §4            │
 │   │   ├── 16_storage_lockdown.sql      # ⚠️ SECURITY — see §4            │
-│   │   ├── 17_restrict_user_pii.sql     # ⚠️ SECURITY — see 
-§4          ─┘
+│   │   ├── 17_restrict_user_pii.sql     # ⚠️ SECURITY — see §4          ─┘
 │   │   └── add_recurring_payment.sql    # Optional, no numeric prefix — see §4
 │   └── functions/            # Edge Functions (Deno)
 │       ├── _shared/          # email-config.ts — centralized sender/reply-to config
@@ -61,7 +60,7 @@ You will need accounts and credentials for:
 | Service    | Why                                     | Where to get it                                      |
 |------------|-----------------------------------------|--------------------------------------------------------|
 | Supabase   | Database, auth, storage, edge functions | https://supabase.com → new project                   |
-| Flutterwave    | Payments (tokens, inspections, rent)    | https://flutterwave.com → dashboard → API keys           |
+| Flutterwave    | Payments (rent, optional agent tips)    | https://flutterwave.com → dashboard → API keys           |
 | Resend     | Transactional email (contact, receipts) | https://resend.com → API keys                        |
 | Vercel     | Frontend + serverless hosting           | https://vercel.com                                   |
 | GitHub     | Source hosting / CI                     | https://github.com                                   |
@@ -225,6 +224,8 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
    - **Output Directory:** `build`
 4. Under **Environment Variables**, add every variable from `frontend/.env.example` AND `frontend/api/.env.example` (Vercel serverless functions read from the same env).
 5. Deploy. Add a custom domain under Vercel → Domains and point your DNS.
+
+**Property link previews:** `frontend/vercel.json` has a `has`-conditioned rewrite that sends ONLY known link-preview bots (WhatsApp, Twitter/X, Facebook, Telegram, Slack, etc. — matched by User-Agent) hitting `/property/:id` to `api/og-property.js` instead of the SPA. That function looks up the one property and returns a tiny HTML page with that property's own photo/title/price as Open Graph tags, so pasting a property link into a chat app shows the property, not the generic Rentora logo. Real visitors are unaffected — they never match the bot condition and always get the normal React app. No extra setup needed beyond the Supabase env vars already listed above; if link previews stop showing a property's photo after a redeploy, check that the rewrite in `vercel.json` still comes *before* the catch-all SPA rewrite (rewrite order matters — first match wins).
 
 ---
 

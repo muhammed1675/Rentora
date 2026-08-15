@@ -4,6 +4,18 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "comment": "Link-preview crawlers (WhatsApp, Twitter/X, Facebook, Telegram, iMessage, Slack, Discord, LinkedIn) don't run JS, so they'd otherwise see index.html's generic Rentora-logo Open Graph tags for every property link. Route ONLY these bots to a server-rendered page with that property's own photo/title. Real visitors never match this — they fall through to the normal SPA rewrite below. See api/og-property.js.",
+      "source": "/property/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|TelegramBot|LinkedInBot|Slackbot|Discordbot|redditbot|SkypeUriPreview|vkShare|Pinterest|W3C_Validator|Applebot|Google-InspectionTool).*"
+        }
+      ],
+      "destination": "/api/og-property?id=:id"
+    },
+    {
       "source": "/((?!static|favicon|manifest|robots|logo).*)",
       "destination": "/index.html"
     }

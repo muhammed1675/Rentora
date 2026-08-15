@@ -29,9 +29,9 @@ function receiptEmailHtml({ userName, amount, type, tokens, reference, date }) {
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
         <!-- Header -->
-        <tr><td style="background:#0062AE;padding:32px;text-align:center">
+        <tr><td style="background:#16a34a;padding:32px;text-align:center">
           <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700">Rentora</h1>
-          <p style="margin:8px 0 0;color:#bfdbfe;font-size:14px">Payment Receipt</p>
+          <p style="margin:8px 0 0;color:#bbf7d0;font-size:14px">Payment Receipt</p>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:32px">
@@ -40,7 +40,7 @@ function receiptEmailHtml({ userName, amount, type, tokens, reference, date }) {
             Your payment was successful. Here are your receipt details:
           </p>
           <!-- Receipt card -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px">
             <tr><td style="padding:20px">
               <table width="100%" cellpadding="6" cellspacing="0">
                 <tr>
@@ -57,11 +57,11 @@ function receiptEmailHtml({ userName, amount, type, tokens, reference, date }) {
                 </tr>
                 ${isToken ? `<tr>
                   <td style="color:#555;font-size:14px">Tokens Added</td>
-                  <td align="right" style="color:#0062AE;font-size:14px;font-weight:700">${tokens} token${tokens > 1 ? 's' : ''}</td>
+                  <td align="right" style="color:#16a34a;font-size:14px;font-weight:700">${tokens} token${tokens > 1 ? 's' : ''}</td>
                 </tr>` : ''}
-                <tr style="border-top:1px solid #bfdbfe">
+                <tr style="border-top:1px solid #bbf7d0">
                   <td style="color:#111;font-size:16px;font-weight:700;padding-top:12px">Amount Paid</td>
-                  <td align="right" style="color:#0062AE;font-size:18px;font-weight:800;padding-top:12px">
+                  <td align="right" style="color:#16a34a;font-size:18px;font-weight:800;padding-top:12px">
                     ₦${Number(amount).toLocaleString('en-NG')}
                   </td>
                 </tr>
@@ -138,9 +138,9 @@ function inspectionEmailHtml({ toAgent, userName, userEmail, userPhone, agentNam
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 16px">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-        <tr><td style="background:#0062AE;padding:32px;text-align:center">
+        <tr><td style="background:#16a34a;padding:32px;text-align:center">
           <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700">Rentora</h1>
-          <p style="margin:8px 0 0;color:#bfdbfe;font-size:14px">Inspection Booking Confirmed</p>
+          <p style="margin:8px 0 0;color:#bbf7d0;font-size:14px">Inspection Booking Confirmed</p>
         </td></tr>
         <tr><td style="padding:32px">
           <p style="margin:0 0 8px;font-size:16px;color:#111">Hi <strong>${userName}</strong>,</p>
@@ -148,17 +148,17 @@ function inspectionEmailHtml({ toAgent, userName, userEmail, userPhone, agentNam
             Your inspection has been booked and your payment received. An agent will be in touch shortly.
           </p>
           <!-- Receipt -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:20px">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px">
             <tr><td style="padding:20px">
               <p style="margin:0 0 12px;font-weight:700;color:#111;font-size:14px">Payment Receipt</p>
               <table width="100%" cellpadding="6" cellspacing="0">
                 <tr><td style="color:#555;font-size:14px">Property</td><td align="right" style="color:#111;font-size:14px;font-weight:600">${propertyTitle}</td></tr>
-                <tr><td style="color:#555;font-size:14px">Inspection Date</td><td align="right" style="color:#0062AE;font-size:14px;font-weight:700">${inspectionDate}</td></tr>
+                <tr><td style="color:#555;font-size:14px">Inspection Date</td><td align="right" style="color:#16a34a;font-size:14px;font-weight:700">${inspectionDate}</td></tr>
                 <tr><td style="color:#555;font-size:14px">Reference</td><td align="right" style="color:#111;font-size:13px">${reference}</td></tr>
                 <tr><td style="color:#555;font-size:14px">Date Paid</td><td align="right" style="color:#111;font-size:14px">${date}</td></tr>
-                <tr style="border-top:1px solid #bfdbfe">
+                <tr style="border-top:1px solid #bbf7d0">
                   <td style="color:#111;font-size:16px;font-weight:700;padding-top:12px">Amount Paid</td>
-                  <td align="right" style="color:#0062AE;font-size:18px;font-weight:800;padding-top:12px">₦3,000</td>
+                  <td align="right" style="color:#16a34a;font-size:18px;font-weight:800;padding-top:12px">₦3,000</td>
                 </tr>
               </table>
             </td></tr>

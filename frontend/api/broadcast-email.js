@@ -81,7 +81,7 @@ function broadcastEmailHtml({ firstName, title, body, link, linkLabel }) {
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f1f5f9;padding:32px 12px">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(15,23,42,0.07)">
-        <tr><td style="height:6px;background:#0062AE"></td></tr>
+        <tr><td style="height:6px;background:#16a34a"></td></tr>
         <tr><td align="center" style="padding:28px 32px 8px">
           <img src="${SITE_URL}/rentora-logo.png" alt="Rentora" width="132" style="display:block;border:0;max-width:132px;height:auto" />
         </td></tr>
@@ -91,7 +91,7 @@ function broadcastEmailHtml({ firstName, title, body, link, linkLabel }) {
           ${paragraphs}
           ${ctaUrl ? `
           <table cellpadding="0" cellspacing="0" role="presentation" style="margin:26px 0 8px">
-            <tr><td align="center" style="background:#0062AE;border-radius:10px">
+            <tr><td align="center" style="background:#16a34a;border-radius:10px">
               <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">${escapeHtml(linkLabel || 'Open Rentora')} &rarr;</a>
             </td></tr>
           </table>` : ''}
@@ -100,7 +100,7 @@ function broadcastEmailHtml({ firstName, title, body, link, linkLabel }) {
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0" />
           <p style="margin:0;font-size:14px;font-weight:700;color:#0f172a">Rentora</p>
           <p style="margin:4px 0 0;font-size:13px;color:#6b7280">Student housing you can trust</p>
-          <p style="margin:10px 0 0;font-size:13px"><a href="${SITE_URL}" style="color:#0062AE;text-decoration:none">www.rentora.com.ng</a></p>
+          <p style="margin:10px 0 0;font-size:13px"><a href="${SITE_URL}" style="color:#16a34a;text-decoration:none">www.rentora.com.ng</a></p>
         </td></tr>
       </table>
       <p style="margin:16px 0 0;font-size:11px;color:#94a3b8">&copy; ${new Date().getFullYear()} Rentora Skyline Housing Solutions. You receive this because you have a Rentora account.</p>
