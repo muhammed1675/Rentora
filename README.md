@@ -15,7 +15,7 @@ Student housing rental platform for LAUTECH — connects students with verified 
 frontend/       React app + Vercel serverless functions (api/)
 backend/        Optional Python service (not required for prod)
 supabase/
-  schema/       Canonical SQL — run 01→06 on a fresh project
+  schema/       Canonical SQL — run 01→20 on a fresh project
   functions/    Edge functions (resolve-bank, send-email)
 ```
 
