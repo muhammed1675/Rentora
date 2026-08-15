@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Navigation } from 'lucide-react';
+import { ImageWatermark } from './ImageWatermark';
 
 export function PropertyCard({ property }) {
   const formatPrice = (price) =>
@@ -24,6 +25,7 @@ export function PropertyCard({ property }) {
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
             loading="lazy" decoding="async" width="800" height="600" />
         </Link>
+        <ImageWatermark size="sm" />
         <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm">
           {typeLabel}
         </span>

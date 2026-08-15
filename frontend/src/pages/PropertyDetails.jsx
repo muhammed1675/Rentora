@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PropertyLocationCard from '../components/PropertyLocationCard';
+import { ImageWatermark } from '../components/ImageWatermark';
 
 function getFavourites() {
   try { return JSON.parse(localStorage.getItem('rentora_favourites') || '[]'); }
@@ -345,6 +346,7 @@ export function PropertyDetails() {
           <div className="relative aspect-video w-full max-w-full overflow-hidden rounded-xl group">
             <img src={property.images?.[currentImageIndex] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
               alt={property.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
+            <ImageWatermark size="lg" />
             {property.images?.length > 1 && (
               <>
                 <Button variant="secondary" size="icon" onClick={prevImage}

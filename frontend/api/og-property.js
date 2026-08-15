@@ -29,6 +29,10 @@ import { createClient } from '@supabase/supabase-js';
 
 const SITE_URL = 'https://www.rentora.com.ng';
 const FALLBACK_IMAGE = `${SITE_URL}/rentora-og.png`;
+// Branded, property-specific preview card rendered by api/og-image.js:
+// the property's own photo with "RENTORA SKYLINE HOUSING SOLUTIONS" on top
+// and the title/price/location along the bottom.
+const cardImage = (id) => `${SITE_URL}/api/og-image?id=${encodeURIComponent(id)}`;
 const FALLBACK_TITLE = 'Rentora — Student Hostels & Accommodation Near LAUTECH Ogbomosho';
 const FALLBACK_DESCRIPTION = "Find verified hostels, self-contains, and apartments near LAUTECH, Ogbomosho. Browse listings, view agent contacts, and book free property viewings — all in one place.";
 
@@ -66,6 +70,9 @@ function renderPage(res, { pageUrl, title, description, image }) {
 <meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:description" content="${escapeHtml(description)}" />
 <meta property="og:image" content="${escapeHtml(image)}" />
+<meta property="og:image:secure_url" content="${escapeHtml(image)}" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:alt" content="${escapeHtml(title)}" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:url" content="${pageUrl}" />
@@ -116,7 +123,9 @@ export default async function handler(req, res) {
     const propertyType = property.property_type ? `${property.property_type} ` : '';
     const title = `${property.title || 'Property'} — Rentora`;
     const description = `${propertyType}near LAUTECH in ${locationName}${priceStr ? ` — ${priceStr}/year` : ''}${taken ? ' (Taken)' : ''}. View photos and details on Rentora.`;
-    const image = (property.images && property.images[0]) || FALLBACK_IMAGE;
+    // Always point at the rendered card so the preview shows the property
+    // photo + details with the Rentora Skyline Housing Solutions banner.
+    const image = cardImage(id);
 
     return renderPage(res, { pageUrl, title, description, image });
   } catch (err) {
