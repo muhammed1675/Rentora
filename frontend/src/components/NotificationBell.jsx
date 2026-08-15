@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bell, CheckCheck, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
@@ -21,16 +22,20 @@ export function NotificationBell() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id, user?.role);
+  const [open, setOpen] = useState(false);
 
   if (!user) return null;
 
   const handleClick = (n) => {
     if (!n.read_at) markAsRead(n);
-    if (n.link) navigate(n.link);
+    if (n.link) {
+      setOpen(false);
+      navigate(n.link);
+    }
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           className="relative rounded-full p-2 text-primary hover:bg-white"
