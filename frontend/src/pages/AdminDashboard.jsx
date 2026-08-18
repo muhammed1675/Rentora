@@ -653,6 +653,24 @@ export function AdminDashboard() {
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // "2h ago" / "3d ago" style label for last_login_at. Falls back to
+  // "Never" for users who've never logged in (e.g. imported/legacy rows)
+  // and to a full date once it's more than a month ago, since "38d ago"
+  // stops being a useful at-a-glance number.
+  const formatLastLogin = (value) => {
+    if (!value) return 'Never';
+    const then = new Date(value);
+    const diffMs = Date.now() - then.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return then.toLocaleDateString();
+  };
+
   const filteredAgents = agents.filter(a =>
     !agentSearch ||
     a.full_name?.toLowerCase().includes(agentSearch.toLowerCase()) ||
@@ -1141,7 +1159,10 @@ export function AdminDashboard() {
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm truncate">{u.full_name}</p>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                    <Badge variant={u.suspended ? 'destructive' : 'outline'} className="mt-2 text-xs">{u.suspended ? 'Suspended' : 'Active'}</Badge>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <Badge variant={u.suspended ? 'destructive' : 'outline'} className="text-xs">{u.suspended ? 'Suspended' : 'Active'}</Badge>
+                      <span className="text-xs text-muted-foreground">Last login: {formatLastLogin(u.last_login_at)}</span>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
@@ -1162,7 +1183,7 @@ export function AdminDashboard() {
           </div>
           <Card className="hidden sm:block overflow-x-auto">
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Last Login</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {filteredUsers.map((u) => (
                   <TableRow key={u.id}>
@@ -1186,6 +1207,7 @@ export function AdminDashboard() {
                       </Select>
                     </TableCell>
                     <TableCell><Badge variant={u.suspended ? 'destructive' : 'outline'}>{u.suspended ? 'Suspended' : 'Active'}</Badge></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatLastLogin(u.last_login_at)}</TableCell>
                     <TableCell>{u.id === user.id ? <span className="text-xs text-muted-foreground italic">You</span> : <Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" onClick={() => handleSuspendUser(u.id, !u.suspended)}><Ban className="w-4 h-4" /></Button>}</TableCell>
                   </TableRow>
                 ))}
