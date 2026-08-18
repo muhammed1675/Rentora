@@ -30,6 +30,7 @@ export function Contact() {
   const [form, setForm] = useState({
     name: user?.full_name || '',
     email: user?.email || '',
+    phone: user?.phone || '',
     subject: '',
     message: '',
   });
@@ -40,7 +41,7 @@ export function Contact() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.subject || !form.message) {
+    if (!form.name || !form.email || !form.phone || !form.subject || !form.message) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -75,7 +76,7 @@ export function Contact() {
           We'll review your message and get back to you at <span className="font-medium text-foreground">{form.email}</span> as soon as possible.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button onClick={() => { setSubmitted(false); setForm({ name: user?.full_name || '', email: user?.email || '', subject: '', message: '' }); }}>
+          <Button onClick={() => { setSubmitted(false); setForm({ name: user?.full_name || '', email: user?.email || '', phone: user?.phone || '', subject: '', message: '' }); }}>
             Send Another Message
           </Button>
           <Button variant="outline" onClick={() => navigate('/')} className="gap-2">
@@ -189,6 +190,17 @@ export function Contact() {
                   placeholder="your@email.com"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+                placeholder="080X XXX XXXX"
+              />
             </div>
 
             <div className="space-y-2">

@@ -1285,24 +1285,35 @@ export const contactAPI = {
       .insert({
         name: data.name,
         email: data.email,
+        phone: data.phone,
         subject: data.subject,
         message: data.message,
         status: 'unread',
       });
     if (error) throw error;
 
-    notifyAdmins({
-      title: `New contact message: ${data.subject || 'No subject'}`,
-      eventLabel: 'Contact message',
-      summary: `${data.name || 'Someone'} sent a message through the contact form.`,
-      breakdown: [
-        ['From', data.name || '—'],
-        ['Email', data.email || '—'],
-        ['Subject', data.subject || '—'],
-        ['Message', data.message || '—'],
-      ],
-      actionUrl: 'https://www.rentora.com.ng/admin',
-    });
+    // Contact page is public — most senders are NOT logged in, so
+    // notifyAdmins() (which auths with the caller's session token, falling
+    // back to the anon key) gets a silent 401 from the send-email edge
+    // function and no email ever goes out. Use the server-side endpoint
+    // instead, which works whether or not the sender has a session.
+    // Best-effort: a failed notification should never block the message
+    // from being saved.
+    try {
+      await fetch('/api/notify-contact-admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          subject: data.subject,
+          message: data.message,
+        }),
+      });
+    } catch (e) {
+      console.warn('notify-contact-admins failed:', e.message);
+    }
 
     return { data: { message: 'Message submitted' } };
   },
@@ -1323,6 +1334,26 @@ export const contactAPI = {
       .eq('id', id);
     if (error) throw error;
     return { data: { message: 'Marked as read' } };
+  },
+
+  // Persists the admin's reply text on the message row so it's still
+  // visible after a refresh/navigation. Call this AFTER the reply email
+  // (frontend/api/send-reply.js) succeeds — this is the "did we actually
+  // record it" step, separate from "did the email send" step.
+  reply: async (id, replyText, adminId) => {
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .update({
+        admin_reply: replyText,
+        replied_at: new Date().toISOString(),
+        replied_by: adminId || null,
+        status: 'read',
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return { data };
   },
 
   delete: async (id) => {

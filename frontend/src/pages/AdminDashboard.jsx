@@ -584,6 +584,15 @@ export function AdminDashboard() {
         }),
       });
       if (!res.ok) throw new Error('Failed to send');
+
+      // Persist the reply so it's still visible after a refresh/navigation
+      // — previously the email sent but nothing was ever saved, so the
+      // reply "disappeared" as far as the admin UI was concerned.
+      const sentReplyText = replyText.trim();
+      const { data: updated } = await contactAPI.reply(msg.id, sentReplyText, user?.id);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...updated } : m));
+      setSelectedMessage(prev => prev && prev.id === msg.id ? { ...prev, ...updated } : prev);
+
       toast.success(`Reply sent to ${msg.name}!`);
       setReplyText('');
     } catch (err) {
@@ -1842,12 +1851,29 @@ export function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 mb-5">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><User className="w-5 h-5 text-primary" /></div>
-                      <div className="min-w-0 flex-1"><p className="font-semibold text-sm">{selectedMessage.name}</p><p className="text-xs text-foreground/55 truncate">{selectedMessage.email}</p></div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm">{selectedMessage.name}</p>
+                        <p className="text-xs text-foreground/55 truncate">{selectedMessage.email}</p>
+                        {selectedMessage.phone && (
+                          <a href={`tel:${selectedMessage.phone}`} className="text-xs text-primary flex items-center gap-1 mt-0.5 hover:underline w-fit">
+                            <Phone className="w-3 h-3" /> {selectedMessage.phone}
+                          </a>
+                        )}
+                      </div>
                     </div>
                     <div className="bg-white border border-border/50 rounded-lg p-4 min-h-[120px]"><p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedMessage.message}</p></div>
+                    {/* Previously-sent admin reply, if any */}
+                    {selectedMessage.admin_reply && (
+                      <div className="mt-4 bg-primary/5 border border-primary/20 rounded-lg p-4">
+                        <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1.5">
+                          Your reply · {selectedMessage.replied_at ? new Date(selectedMessage.replied_at).toLocaleString() : ''}
+                        </p>
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{selectedMessage.admin_reply}</p>
+                      </div>
+                    )}
                     {/* Inline reply composer */}
                     <div className="mt-4 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reply to {selectedMessage.name}</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{selectedMessage.admin_reply ? 'Send another reply' : `Reply to ${selectedMessage.name}`}</p>
                       <Textarea
                         value={replyText}
                         onChange={e => setReplyText(e.target.value)}
