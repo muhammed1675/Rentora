@@ -507,6 +507,41 @@ function emailAdminActivityAlert(d: any) {
   });
 }
 
+// Advertiser-facing status email for the self-serve ads feature. Since
+// advertisers never log in, this (plus the confirmation screen shown right
+// after payment) is the only channel they hear from Rentora on — see
+// section 8 of the ads build spec.
+function emailAdStatus(d: any) {
+  if (d.status === "active") {
+    return baseTemplate({
+      eyebrow: "Ad approved",
+      headline: `Your Ad Is <em>Live</em>!`,
+      subhead: `Hi ${d.contact_name || "there"}, your ${(d.slot_type || "").replace(/_/g, " ")} ad for ${d.business_name} is now live on Rentora and rotating in front of students.`,
+      rowsHtml: [
+        row("tag", "Business", d.business_name || "—"),
+        row("clock", "Runs until", d.end_date || "—"),
+      ].join(""),
+      paragraphs: ["Clicks on your ad open a WhatsApp chat straight to the number you gave us — no further setup needed."],
+    });
+  }
+  if (d.status === "pending_queue") {
+    return baseTemplate({
+      eyebrow: "Payment received",
+      headline: `You're <em>#${d.queue_position || "—"}</em> In Line`,
+      subhead: `Hi ${d.contact_name || "there"}, that ad slot is fully booked right now. We'll message you the moment it opens up.`,
+      rowsHtml: row("tag", "Business", d.business_name || "—"),
+    });
+  }
+  // rejected
+  return baseTemplate({
+    eyebrow: "Ad update",
+    headline: "Your Ad Needs A Change",
+    subhead: `Hi ${d.contact_name || "there"}, your ad for ${d.business_name} wasn't approved as submitted.`,
+    rowsHtml: row("tag", "Reason", d.rejection_reason || "—"),
+    paragraphs: ["Reply to this email or reach out to support to resubmit with an updated creative."],
+  });
+}
+
 async function sendEmail(to: string, subject: string, html: string, emailType: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -685,6 +720,16 @@ serve(async (req) => {
       case "admin_activity_alert": {
         subject = `[Rentora Admin] ${data.title || "New activity"}`;
         html = emailAdminActivityAlert(data);
+        break;
+      }
+      case "ad_status": {
+        const labels: Record<string, string> = {
+          active: "Your Ad Is Live",
+          rejected: "Update On Your Ad",
+          pending_queue: "You're On The Waitlist",
+        };
+        subject = `${labels[data.status] || "Update on your Rentora ad"} — Rentora`;
+        html = emailAdStatus(data);
         break;
       }
       default:

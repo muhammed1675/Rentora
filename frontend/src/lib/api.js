@@ -1102,8 +1102,8 @@ export const paymentAPI = {
   // anything paid — this function no longer trusts the browser's own word
   // that a payment succeeded. Works for token purchases, viewings, and
   // rent (the endpoint auto-detects which one based on the reference).
-  confirmPayment: async (reference) => {
-    const res = await fetch('/api/confirm-payment', {
+  confirmPayment: async (reference, endpoint = '/api/confirm-payment') => {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reference }),
@@ -1111,6 +1111,151 @@ export const paymentAPI = {
     const body = await res.json();
     if (!res.ok) throw new Error(body?.error || 'Failed to confirm payment');
     return { data: body };
+  },
+};
+
+// ============== ADS APIs (self-serve /advertise feature) ==============
+// No advertiser login — every call here is either a public insert/select
+// under the RLS policies in supabase/schema/22_ads.sql, or (for admin
+// actions) gated by is_admin() on the same policies.
+
+export const adsAPI = {
+  // Slot pricing/caps (public) + live availability counts (via the
+  // get_ad_slot_availability() RPC, since RLS only lets anon see
+  // status='active' rows directly — see 22_ads.sql for why).
+  getSlots: async () => {
+    const [{ data: config, error: cfgErr }, { data: availability, error: availErr }] = await Promise.all([
+      supabase.from('ad_slot_config').select('*'),
+      supabase.rpc('get_ad_slot_availability'),
+    ]);
+    if (cfgErr) throw cfgErr;
+    if (availErr) throw availErr;
+    const bySlot = Object.fromEntries((availability || []).map((a) => [a.slot_type, a]));
+    return {
+      data: (config || []).map((c) => ({
+        ...c,
+        active_count: bySlot[c.slot_type]?.active_count || 0,
+        queue_count: bySlot[c.slot_type]?.queue_count || 0,
+      })),
+    };
+  },
+
+  // Currently-active ads for a slot — what <AdSlot /> renders.
+  getActiveAdsForSlot: async (slotType) => {
+    const { data, error } = await supabase
+      .from('ads')
+      .select('id, slot_type, business_name, image_url, whatsapp_number')
+      .eq('slot_type', slotType)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return { data: data || [] };
+  },
+
+  recordClick: async (adId) => {
+    // Fire-and-forget from the caller's side — never blocks navigation.
+    const { error } = await supabase.rpc('increment_ad_click', { ad_id: adId });
+    if (error) console.warn('adsAPI.recordClick failed (non-critical):', error.message);
+  },
+
+  uploadCreative: async (rawFile) => storageAPI.uploadImage(rawFile, 'ads', { maxWidthOrHeight: 2000, maxSizeMB: 1.5 }),
+
+  // Step 3 of the advertiser flow: create the pending_payment row before
+  // charging, so we always have a reference to reconcile against even if
+  // the browser tab closes mid-checkout.
+  createPendingOrder: async ({ slotType, businessName, contactName, whatsappNumber, email, imageUrl, durationType, amount }) => {
+    const reference = generateReference('AD');
+    const { data, error } = await supabase
+      .from('ads')
+      .insert({
+        slot_type: slotType,
+        business_name: businessName,
+        contact_name: contactName,
+        whatsapp_number: whatsappNumber,
+        email: email || null,
+        image_url: imageUrl,
+        duration_type: durationType,
+        amount_paid: amount,
+        payment_reference: reference,
+        status: 'pending_payment',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { data };
+  },
+
+  // ── Admin ──
+  adminListAds: async () => {
+    const { data, error } = await supabase.from('ads').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data: data || [] };
+  },
+
+  adminApprove: async (adId, durationType) => {
+    const endDate = new Date();
+    if (durationType === 'week') endDate.setDate(endDate.getDate() + 7);
+    else endDate.setDate(endDate.getDate() + 30);
+    const { error } = await supabase
+      .from('ads')
+      .update({ status: 'active', start_date: new Date().toISOString(), end_date: endDate.toISOString() })
+      .eq('id', adId);
+    if (error) throw error;
+  },
+
+  adminReject: async (adId, reason) => {
+    const { error } = await supabase.from('ads').update({ status: 'rejected', rejection_reason: reason }).eq('id', adId);
+    if (error) throw error;
+  },
+
+  adminPause: async (adId) => {
+    const { error } = await supabase.from('ads').update({ status: 'paused' }).eq('id', adId);
+    if (error) throw error;
+  },
+
+  adminResume: async (adId) => {
+    const { error } = await supabase.from('ads').update({ status: 'active' }).eq('id', adId);
+    if (error) throw error;
+  },
+
+  adminCancel: async (adId) => {
+    const { error } = await supabase.from('ads').update({ status: 'expired' }).eq('id', adId);
+    if (error) throw error;
+  },
+
+  adminExtend: async (adId, currentEndDate, days) => {
+    const base = currentEndDate ? new Date(currentEndDate) : new Date();
+    base.setDate(base.getDate() + Number(days));
+    const { error } = await supabase.from('ads').update({ end_date: base.toISOString() }).eq('id', adId);
+    if (error) throw error;
+  },
+
+  // Manual "house ad" insert — skips payment entirely, goes straight to
+  // active. Useful for Rentora's own promos.
+  adminAddHouseAd: async ({ slotType, businessName, contactName, whatsappNumber, imageUrl, durationType }) => {
+    const endDate = new Date();
+    if (durationType === 'week') endDate.setDate(endDate.getDate() + 7);
+    else endDate.setDate(endDate.getDate() + 30);
+    const { error } = await supabase.from('ads').insert({
+      slot_type: slotType,
+      business_name: businessName,
+      contact_name: contactName,
+      whatsapp_number: whatsappNumber,
+      image_url: imageUrl,
+      duration_type: durationType,
+      amount_paid: 0,
+      payment_reference: generateReference('HOUSEAD'),
+      payment_status: 'completed',
+      status: 'active',
+      start_date: new Date().toISOString(),
+      end_date: endDate.toISOString(),
+    });
+    if (error) throw error;
+  },
+
+  adminUpdateSlotConfig: async (slotType, patch) => {
+    const { error } = await supabase.from('ad_slot_config').update(patch).eq('slot_type', slotType);
+    if (error) throw error;
   },
 };
 
@@ -1608,6 +1753,7 @@ export default {
   userAPI,
   adminAPI,
   paymentAPI,
+  adsAPI,
   storageAPI,
   balanceAPI,
   withdrawalAPI

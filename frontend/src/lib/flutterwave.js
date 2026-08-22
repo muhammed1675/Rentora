@@ -35,6 +35,12 @@ export async function openFlutterwaveCheckout({
   reference, amount, email, name, phone, narration,
   channels, defaultChannel,
   onSuccess, onFailed, onClose, onPending,
+  // Which server endpoint independently re-verifies the charge and marks
+  // it paid — defaults to the shared /api/confirm-payment (transactions /
+  // inspections / rent / tips). The self-serve ads feature passes
+  // '/api/confirm-ad-payment' here instead, since ads live in their own
+  // table with their own status machine — see confirm-ad-payment.js.
+  confirmEndpoint = '/api/confirm-payment',
 }) {
   await loadScript();
 
@@ -94,12 +100,13 @@ export async function openFlutterwaveCheckout({
       const MAX_ATTEMPTS = 4;
       const DELAYS_MS = [0, 1500, 3000, 5000];
       let confirmed = false;
+      let confirmResult = null;
       let lastErr = null;
 
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         if (DELAYS_MS[attempt]) await new Promise((r) => setTimeout(r, DELAYS_MS[attempt]));
         try {
-          await paymentAPI.confirmPayment(reference);
+          confirmResult = await paymentAPI.confirmPayment(reference, confirmEndpoint);
           confirmed = true;
           break;
         } catch (err) {
@@ -109,7 +116,10 @@ export async function openFlutterwaveCheckout({
       }
 
       if (confirmed) {
-        if (onSuccess) onSuccess(data?.flw_ref || data?.transaction_id || reference);
+        // Second argument (the confirm-endpoint's own response body) is new
+        // and additive — existing onSuccess(kref) callers that only read
+        // the first argument are unaffected.
+        if (onSuccess) onSuccess(data?.flw_ref || data?.transaction_id || reference, confirmResult?.data);
       } else {
         // The customer WAS charged — this is not a failed payment, just an
         // unconfirmed one. Never tell the user the payment failed here (that

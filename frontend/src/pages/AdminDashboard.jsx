@@ -14,12 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { AdsTab } from '../components/admin/AdsTab';
 import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
-  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send, Download, FileDown
+  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send, Download, FileDown, Image
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -953,6 +954,7 @@ export function AdminDashboard() {
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
     { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
     { id: 'broadcasts', label: 'Broadcasts', icon: Megaphone },
+    { id: 'ads', label: 'Ads', icon: Image },
   ];
 
   const navQuery = navSearch.trim().toLowerCase();
@@ -2685,6 +2687,11 @@ export function AdminDashboard() {
               </div>
             </div>
           </Card>
+        </TabsContent>
+
+        {/* ── Ads Tab ── */}
+        <TabsContent value="ads">
+          <AdsTab />
         </TabsContent>
           </Tabs>
         </div>

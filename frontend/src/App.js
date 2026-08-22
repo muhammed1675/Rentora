@@ -28,6 +28,7 @@ import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
 import Notifications from './pages/Notifications';
 import VerifyAccount from './pages/VerifyAccount';
+import Advertise from './pages/Advertise';
 
 // Protected Route wrapper. Browsing is always allowed for everyone —
 // verification is enforced at the specific action, not at the route
@@ -144,6 +145,7 @@ function AppRoutes() {
       <Route path="/contact" element={<Layout><Contact /></Layout>} />
       <Route path="/compare" element={<Layout><Compare /></Layout>} />
       <Route path="/auth/callback" element={<Layout><AuthCallback /></Layout>} />
+      <Route path="/advertise" element={<Layout><Advertise /></Layout>} />
 
       {/* Student verification — reachable any time, never forces browsing */}
       <Route

@@ -89,6 +89,11 @@ export const EMAIL_CATEGORY: Record<string, SenderRole> = {
   // for financial-flavored events (payment alerts, withdrawal requests).
   admin_payment_alert: "noreply",
   admin_activity_alert: "noreply",
+
+  // Advertiser-facing status update for the self-serve ads feature —
+  // not a financial receipt (Flutterwave's own receipt covers that), so
+  // this stays on noreply like other status/confirmation emails.
+  ad_status: "noreply",
 };
 
 /**
