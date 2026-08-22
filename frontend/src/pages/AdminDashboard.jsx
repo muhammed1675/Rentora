@@ -47,6 +47,7 @@ export function AdminDashboard() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [selectedVerification, setSelectedVerification] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
   const [navSearch, setNavSearch] = useState('');
@@ -1147,7 +1148,7 @@ export function AdminDashboard() {
           </div>
           <div className="sm:hidden space-y-3">
             {filteredUsers.map((u) => (
-              <Card key={u.id} className="p-4">
+              <Card key={u.id} className="p-4 cursor-pointer transition-colors hover:bg-muted/40 active:bg-muted/60" onClick={() => setSelectedUser(u)}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
                     {u.avatar_url ? (
@@ -1164,7 +1165,7 @@ export function AdminDashboard() {
                       <span className="text-xs text-muted-foreground">Last login: {formatLastLogin(u.last_login_at)}</span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="flex flex-col items-end gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
                       <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
@@ -1186,7 +1187,7 @@ export function AdminDashboard() {
               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead>Last Login</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {filteredUsers.map((u) => (
-                  <TableRow key={u.id}>
+                  <TableRow key={u.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setSelectedUser(u)}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
@@ -1200,7 +1201,7 @@ export function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{u.email}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
                         <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                         <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
@@ -1208,7 +1209,7 @@ export function AdminDashboard() {
                     </TableCell>
                     <TableCell><Badge variant={u.suspended ? 'destructive' : 'outline'}>{u.suspended ? 'Suspended' : 'Active'}</Badge></TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatLastLogin(u.last_login_at)}</TableCell>
-                    <TableCell>{u.id === user.id ? <span className="text-xs text-muted-foreground italic">You</span> : <Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" onClick={() => handleSuspendUser(u.id, !u.suspended)}><Ban className="w-4 h-4" /></Button>}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>{u.id === user.id ? <span className="text-xs text-muted-foreground italic">You</span> : <Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" onClick={() => handleSuspendUser(u.id, !u.suspended)}><Ban className="w-4 h-4" /></Button>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -2728,6 +2729,99 @@ export function AdminDashboard() {
               <Button onClick={() => setSelectedAgent(null)}>Close</Button>
             </DialogFooter>
           </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── User Detail Dialog ── */}
+      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" /> User Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedUser && (() => {
+            const su = users.find(x => x.id === selectedUser.id) || selectedUser;
+            return (
+              <>
+                <div className="space-y-5">
+                  {/* Profile header */}
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                      {su.avatar_url ? (
+                        <img src={su.avatar_url} alt={su.full_name} className="w-full h-full object-cover" loading="lazy" decoding="async" width="800" height="600" />
+                      ) : (
+                        <User className="w-7 h-7 text-primary" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-base truncate">{su.full_name}</p>
+                      <p className="text-sm text-muted-foreground truncate">{su.email}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <Badge variant="secondary" className="text-xs capitalize">{su.role}</Badge>
+                        <Badge variant={su.suspended ? 'destructive' : 'outline'} className="text-xs">{su.suspended ? 'Suspended' : 'Active'}</Badge>
+                        {su.id === user.id && <span className="text-xs text-muted-foreground italic">You</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detailed information */}
+                  <div className="rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground"><Mail className="w-4 h-4" /> Email</div>
+                      <span className="text-sm font-medium truncate max-w-[220px] text-right">{su.email}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground"><Phone className="w-4 h-4" /> Phone</div>
+                      {su.phone ? (
+                        <a href={`tel:${su.phone}`} className="text-sm font-medium text-primary hover:underline">{su.phone}</a>
+                      ) : (
+                        <span className="text-sm text-muted-foreground/40">—</span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground"><Calendar className="w-4 h-4" /> Joined</div>
+                      <span className="text-sm font-medium">{su.created_at ? new Date(su.created_at).toLocaleDateString() : '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" /> Last login</div>
+                      <span className="text-sm font-medium">{formatLastLogin(su.last_login_at)}</span>
+                    </div>
+                  </div>
+
+                  {/* Role control */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium"><UserCog className="w-4 h-4 text-muted-foreground" /> Role</div>
+                    <Select value={su.role} onValueChange={(value) => handleUpdateRole(su.id, value)} disabled={su.id === user.id}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter className="gap-2 flex-wrap">
+                  {su.phone ? (
+                    <a href={`tel:${su.phone}`}>
+                      <Button variant="outline" className="gap-2"><Phone className="w-4 h-4" /> Call</Button>
+                    </a>
+                  ) : (
+                    <a href={`mailto:${su.email}`} target="_blank" rel="noreferrer">
+                      <Button variant="outline" className="gap-2"><Mail className="w-4 h-4" /> Email</Button>
+                    </a>
+                  )}
+                  {su.id !== user.id && (
+                    <Button
+                      variant={su.suspended ? 'outline' : 'destructive'}
+                      className="gap-2"
+                      onClick={() => { handleSuspendUser(su.id, !su.suspended); setSelectedUser(null); }}
+                    >
+                      <Ban className="w-4 h-4" /> {su.suspended ? 'Unsuspend' : 'Suspend'}
+                    </Button>
+                  )}
+                  <Button onClick={() => setSelectedUser(null)}>Close</Button>
+                </DialogFooter>
+              </>
             );
           })()}
         </DialogContent>
