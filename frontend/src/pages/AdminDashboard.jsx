@@ -770,140 +770,181 @@ export function AdminDashboard() {
     toast.success('Activity CSV downloaded');
   };
 
-  const exportUserActivityPDF = (su) => {
+  // Loads jsPDF + the autotable plugin from a CDN once, then reuses it.
+  // Needed because generating a real, directly-downloadable PDF (rather
+  // than opening the browser print dialog) requires a PDF-writing library.
+  let pdfLibsPromise = null;
+  const loadPdfLibs = () => {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+    if (pdfLibsPromise) return pdfLibsPromise;
+    const loadScript = (src) => new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) { existing.addEventListener('load', resolve); if (existing.dataset.loaded) resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => { s.dataset.loaded = 'true'; resolve(); };
+      s.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+    pdfLibsPromise = loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js')
+      .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'));
+    return pdfLibsPromise;
+  };
+
+  const exportUserActivityPDF = async (su) => {
+    try {
+      await loadPdfLibs();
+    } catch (e) {
+      toast.error('Could not load PDF generator — check your internet connection and try again.');
+      return;
+    }
+    const { jsPDF } = window.jspdf;
     const b = getUserActivityBundle(su.id);
     const money = (n) => n === null || n === undefined ? '—' : formatPrice(n);
     const dt = (v) => v ? new Date(v).toLocaleString() : '—';
-    const section = (title, rows, cols) => `
-      <h3>${title}</h3>
-      ${rows.length === 0 ? '<p class="empty">No records found.</p>' : `
-      <table>
-        <thead><tr>${cols.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
-        <tbody>
-          ${rows.map(r => `<tr>${cols.map(c => `<td>${c.fmt ? c.fmt(r[c.key], r) : (r[c.key] ?? '—')}</td>`).join('')}</tr>`).join('')}
-        </tbody>
-      </table>`}`;
 
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Rentora Activity Report - ${su.full_name}</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a2e; padding: 32px; font-size: 12px; }
-  h1 { font-size: 20px; margin: 0 0 4px; color: #0f172a; }
-  h2 { font-size: 13px; color: #475569; font-weight: normal; margin: 0 0 24px; }
-  h3 { font-size: 13px; margin: 24px 0 8px; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a8a; padding-bottom: 16px; margin-bottom: 16px; }
-  .brand { font-size: 22px; font-weight: bold; color: #1e3a8a; }
-  .meta { text-align: right; font-size: 11px; color: #64748b; }
-  .profile { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; background: #f8fafc; padding: 12px 16px; border-radius: 6px; margin-bottom: 8px; }
-  .profile div span.label { color: #64748b; display: inline-block; min-width: 90px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-  th, td { border: 1px solid #e2e8f0; padding: 5px 8px; text-align: left; font-size: 10.5px; }
-  th { background: #f1f5f9; font-weight: 600; }
-  .empty { color: #94a3b8; font-style: italic; font-size: 11px; }
-  .footer { margin-top: 32px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-  @media print { body { padding: 12mm; } }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="brand">Rentora</div>
-    <div class="meta">
-      Account Activity Report<br/>
-      Generated: ${new Date().toLocaleString()}
-    </div>
-  </div>
-  <h1>${su.full_name || 'User'}</h1>
-  <h2>User ID: ${su.id}</h2>
-  <div class="profile">
-    <div><span class="label">Email</span>${su.email || '—'}</div>
-    <div><span class="label">Phone</span>${su.phone || '—'}</div>
-    <div><span class="label">Role</span>${su.role}</div>
-    <div><span class="label">Status</span>${su.suspended ? 'Suspended' : 'Active'}</div>
-    <div><span class="label">Joined</span>${dt(su.created_at)}</div>
-    <div><span class="label">Last login</span>${dt(su.last_login_at)}</div>
-  </div>
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const marginX = 40;
+    let y = 50;
 
-  ${section('Rent Payments (Escrow)', b.rent, [
-    { key: 'reference', label: 'Reference' },
-    { key: 'total_amount', label: 'Amount', fmt: money },
-    { key: 'status', label: 'Status' },
-    { key: 'held_at', label: 'Held', fmt: dt },
-    { key: 'released_at', label: 'Released', fmt: dt },
-    { key: 'refunded_at', label: 'Refunded', fmt: dt },
-    { key: 'created_at', label: 'Date', fmt: dt },
-  ])}
+    // Header
+    doc.setFontSize(18); doc.setTextColor(30, 58, 138); doc.setFont(undefined, 'bold');
+    doc.text('Rentora', marginX, y);
+    doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.setFont(undefined, 'normal');
+    doc.text('Account Activity Report', pageWidth - marginX, y - 4, { align: 'right' });
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - marginX, y + 10, { align: 'right' });
+    y += 14;
+    doc.setDrawColor(30, 58, 138); doc.setLineWidth(1.5);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 24;
 
-  ${section('Viewing / Inspection Payments', b.viewingPayments, [
-    { key: 'reference', label: 'Reference' },
-    { key: 'amount', label: 'Amount', fmt: money },
-    { key: 'status', label: 'Status' },
-    { key: 'created_at', label: 'Date', fmt: dt },
-  ])}
+    // Profile
+    doc.setFontSize(15); doc.setTextColor(15, 23, 42); doc.setFont(undefined, 'bold');
+    doc.text(su.full_name || 'User', marginX, y);
+    y += 16;
+    doc.setFontSize(9); doc.setTextColor(100, 116, 139); doc.setFont(undefined, 'normal');
+    doc.text(`User ID: ${su.id}`, marginX, y);
+    y += 18;
 
-  ${section('Wallet / Token Transactions', b.walletTopUps, [
-    { key: 'reference', label: 'Reference' },
-    { key: 'amount', label: 'Amount', fmt: money },
-    { key: 'tokens_added', label: 'Tokens' },
-    { key: 'status', label: 'Status' },
-    { key: 'created_at', label: 'Date', fmt: dt },
-  ])}
+    const profileRows = [
+      ['Email', su.email || '—', 'Phone', su.phone || '—'],
+      ['Role', su.role || '—', 'Status', su.suspended ? 'Suspended' : 'Active'],
+      ['Joined', dt(su.created_at), 'Last login', dt(su.last_login_at)],
+    ];
+    doc.autoTable({
+      startY: y,
+      margin: { left: marginX, right: marginX },
+      body: profileRows,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+      columnStyles: { 0: { fontStyle: 'bold', textColor: [100, 116, 139], cellWidth: 70 }, 2: { fontStyle: 'bold', textColor: [100, 116, 139], cellWidth: 70 } },
+    });
+    y = doc.lastAutoTable.finalY + 20;
 
-  ${section('Viewing / Inspection Requests', b.viewingRequests, [
-    { key: 'property_title', label: 'Property' },
-    { key: 'agent_name', label: 'Agent' },
-    { key: 'inspection_date', label: 'Date' },
-    { key: 'status', label: 'Status' },
-    { key: 'payment_status', label: 'Payment' },
-    { key: 'created_at', label: 'Requested', fmt: dt },
-  ])}
+    const addSection = (title, rows, cols) => {
+      if (y > doc.internal.pageSize.getHeight() - 80) { doc.addPage(); y = 50; }
+      doc.setFontSize(11); doc.setTextColor(30, 58, 138); doc.setFont(undefined, 'bold');
+      doc.text(title, marginX, y);
+      doc.setDrawColor(30, 58, 138); doc.setLineWidth(0.75);
+      doc.line(marginX, y + 4, pageWidth - marginX, y + 4);
+      y += 14;
+      if (!rows.length) {
+        doc.setFontSize(9); doc.setTextColor(148, 163, 184); doc.setFont(undefined, 'italic');
+        doc.text('No records found.', marginX, y);
+        y += 20;
+        return;
+      }
+      doc.autoTable({
+        startY: y,
+        margin: { left: marginX, right: marginX },
+        head: [cols.map(c => c.label)],
+        body: rows.map(r => cols.map(c => String(c.fmt ? c.fmt(r[c.key], r) : (r[c.key] ?? '—')))),
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
+        theme: 'grid',
+      });
+      y = doc.lastAutoTable.finalY + 20;
+    };
 
-  ${section('Reports Filed by This User', b.reportsFiled, [
-    { key: 'reason', label: 'Reason' },
-    { key: 'details', label: 'Details' },
-    { key: 'status', label: 'Status' },
-    { key: 'created_at', label: 'Date', fmt: dt },
-  ])}
+    addSection('Rent Payments (Escrow)', b.rent, [
+      { key: 'reference', label: 'Reference' },
+      { key: 'total_amount', label: 'Amount', fmt: money },
+      { key: 'status', label: 'Status' },
+      { key: 'held_at', label: 'Held', fmt: dt },
+      { key: 'released_at', label: 'Released', fmt: dt },
+      { key: 'refunded_at', label: 'Refunded', fmt: dt },
+      { key: 'created_at', label: 'Date', fmt: dt },
+    ]);
 
-  ${su.role === 'agent' ? `
-  ${section('Properties Listed', b.listedProperties, [
-    { key: 'title', label: 'Title' },
-    { key: 'price', label: 'Price', fmt: money },
-    { key: 'status', label: 'Status' },
-    { key: 'created_at', label: 'Listed', fmt: dt },
-  ])}
+    addSection('Viewing / Inspection Payments', b.viewingPayments, [
+      { key: 'reference', label: 'Reference' },
+      { key: 'amount', label: 'Amount', fmt: money },
+      { key: 'status', label: 'Status' },
+      { key: 'created_at', label: 'Date', fmt: dt },
+    ]);
 
-  ${section('Reports Against Listed Properties', b.reportsAgainstListings, [
-    { key: 'reason', label: 'Reason' },
-    { key: 'status', label: 'Status' },
-    { key: 'created_at', label: 'Date', fmt: dt },
-  ])}
+    addSection('Wallet / Token Transactions', b.walletTopUps, [
+      { key: 'reference', label: 'Reference' },
+      { key: 'amount', label: 'Amount', fmt: money },
+      { key: 'tokens_added', label: 'Tokens' },
+      { key: 'status', label: 'Status' },
+      { key: 'created_at', label: 'Date', fmt: dt },
+    ]);
 
-  ${section('Withdrawal Requests (Payouts)', b.withdrawals, [
-    { key: 'amount', label: 'Amount', fmt: money },
-    { key: 'bank_name', label: 'Bank' },
-    { key: 'account_number', label: 'Account No.' },
-    { key: 'status', label: 'Status' },
-    { key: 'requested_at', label: 'Requested', fmt: dt },
-    { key: 'resolved_at', label: 'Resolved', fmt: dt },
-  ])}
-  ` : ''}
+    addSection('Viewing / Inspection Requests', b.viewingRequests, [
+      { key: 'property_title', label: 'Property' },
+      { key: 'agent_name', label: 'Agent' },
+      { key: 'inspection_date', label: 'Date' },
+      { key: 'status', label: 'Status' },
+      { key: 'payment_status', label: 'Payment' },
+      { key: 'created_at', label: 'Requested', fmt: dt },
+    ]);
 
-  <div class="footer">
-    This report was generated by Rentora's admin system on ${new Date().toLocaleString()} at the request of an authorized administrator, for use in compliance, dispute resolution, or legal proceedings.
-  </div>
-  <script>window.onload = () => setTimeout(() => window.print(), 300);</script>
-</body>
-</html>`;
+    addSection('Reports Filed by This User', b.reportsFiled, [
+      { key: 'reason', label: 'Reason' },
+      { key: 'details', label: 'Details' },
+      { key: 'status', label: 'Status' },
+      { key: 'created_at', label: 'Date', fmt: dt },
+    ]);
 
-    const win = window.open('', '_blank');
-    if (!win) { toast.error('Please allow pop-ups to generate the PDF report'); return; }
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
+    if (su.role === 'agent') {
+      addSection('Properties Listed', b.listedProperties, [
+        { key: 'title', label: 'Title' },
+        { key: 'price', label: 'Price', fmt: money },
+        { key: 'status', label: 'Status' },
+        { key: 'created_at', label: 'Listed', fmt: dt },
+      ]);
+
+      addSection('Reports Against Listed Properties', b.reportsAgainstListings, [
+        { key: 'reason', label: 'Reason' },
+        { key: 'status', label: 'Status' },
+        { key: 'created_at', label: 'Date', fmt: dt },
+      ]);
+
+      addSection('Withdrawal Requests (Payouts)', b.withdrawals, [
+        { key: 'amount', label: 'Amount', fmt: money },
+        { key: 'bank_name', label: 'Bank' },
+        { key: 'account_number', label: 'Account No.' },
+        { key: 'status', label: 'Status' },
+        { key: 'requested_at', label: 'Requested', fmt: dt },
+        { key: 'resolved_at', label: 'Resolved', fmt: dt },
+      ]);
+    }
+
+    // Footer note on every page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7.5); doc.setTextColor(148, 163, 184); doc.setFont(undefined, 'normal');
+      doc.text(
+        `Generated by Rentora admin system on ${new Date().toLocaleString()} for compliance, dispute resolution, or legal proceedings. Page ${i} of ${pageCount}`,
+        marginX, doc.internal.pageSize.getHeight() - 20
+      );
+    }
+
+    doc.save(`rentora-activity-${(su.full_name || su.id).replace(/\s+/g, '_')}-${Date.now()}.pdf`);
+    toast.success('Activity PDF downloaded');
   };
 
   if (!isAuthenticated || !isAdmin) return null;
