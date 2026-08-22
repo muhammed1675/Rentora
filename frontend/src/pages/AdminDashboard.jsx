@@ -22,6 +22,10 @@ import {
   Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send, Download, FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import { applyPlugin } from 'jspdf-autotable';
+
+applyPlugin(jsPDF);
 
 export function AdminDashboard() {
   const navigate = useNavigate();
@@ -770,35 +774,7 @@ export function AdminDashboard() {
     toast.success('Activity CSV downloaded');
   };
 
-  // Loads jsPDF + the autotable plugin from a CDN once, then reuses it.
-  // Needed because generating a real, directly-downloadable PDF (rather
-  // than opening the browser print dialog) requires a PDF-writing library.
-  let pdfLibsPromise = null;
-  const loadPdfLibs = () => {
-    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
-    if (pdfLibsPromise) return pdfLibsPromise;
-    const loadScript = (src) => new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${src}"]`);
-      if (existing) { existing.addEventListener('load', resolve); if (existing.dataset.loaded) resolve(); return; }
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload = () => { s.dataset.loaded = 'true'; resolve(); };
-      s.onerror = () => reject(new Error(`Failed to load ${src}`));
-      document.head.appendChild(s);
-    });
-    pdfLibsPromise = loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js')
-      .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'));
-    return pdfLibsPromise;
-  };
-
-  const exportUserActivityPDF = async (su) => {
-    try {
-      await loadPdfLibs();
-    } catch (e) {
-      toast.error('Could not load PDF generator — check your internet connection and try again.');
-      return;
-    }
-    const { jsPDF } = window.jspdf;
+  const exportUserActivityPDF = (su) => {
     const b = getUserActivityBundle(su.id);
     const money = (n) => n === null || n === undefined ? '—' : formatPrice(n);
     const dt = (v) => v ? new Date(v).toLocaleString() : '—';

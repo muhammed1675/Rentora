@@ -30,7 +30,7 @@ export function Layout({ children }) {
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground flex flex-col">
-      <header className="sticky top-0 z-40 w-full border-b border-black/5 bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-40 w-full border-b border-black/5 bg-background/95 backdrop-blur relative">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2 font-heading text-xl font-semibold tracking-tight text-primary" aria-label="Rentora home">
             {/* Direct reference to public folder logo */}
@@ -94,32 +94,41 @@ export function Layout({ children }) {
         </div>
 
         {open && (
-          <nav className="border-t border-black/5 bg-background px-5 py-5 md:hidden">
-            <div className="flex flex-col gap-1">
-              {publicNav.map(item => (
-                <Link key={item.to} to={item.to} onClick={() => setOpen(false)}
-                  className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">{item.label}</Link>
-              ))}
-              {isAuthenticated && (
-                <>
-                  <Link to="/notifications" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Notifications</Link>
-                  <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
-                  {isAgent && <Link to="/agent" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
-                  {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}
-                </>
-              )}
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {!isAuthenticated ? (
+          <>
+            {/* Backdrop: tapping outside the menu closes it, and it sits
+                behind the dropdown without shifting any page content. */}
+            <div
+              className="fixed inset-0 top-20 z-40 bg-black/20 md:hidden"
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+            />
+            <nav className="absolute left-0 right-0 top-full z-50 max-h-[calc(100vh-5rem)] overflow-y-auto border-t border-black/5 bg-background px-5 py-5 shadow-lg md:hidden">
+              <div className="flex flex-col gap-1">
+                {publicNav.map(item => (
+                  <Link key={item.to} to={item.to} onClick={() => setOpen(false)}
+                    className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">{item.label}</Link>
+                ))}
+                {isAuthenticated && (
                   <>
-                    <Link to="/login" onClick={() => setOpen(false)} className="rounded-full border border-primary/20 px-4 py-2.5 text-center text-sm font-medium">Log in</Link>
-                    <Link to="/register" onClick={() => setOpen(false)} className="rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Join Rentora</Link>
+                    <Link to="/notifications" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Notifications</Link>
+                    <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
+                    {isAgent && <Link to="/agent" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
+                    {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}
                   </>
-                ) : (
-                  <button onClick={() => { setOpen(false); handleLogout(); }} className="col-span-2 rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Log out</button>
                 )}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {!isAuthenticated ? (
+                    <>
+                      <Link to="/login" onClick={() => setOpen(false)} className="rounded-full border border-primary/20 px-4 py-2.5 text-center text-sm font-medium">Log in</Link>
+                      <Link to="/register" onClick={() => setOpen(false)} className="rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Join Rentora</Link>
+                    </>
+                  ) : (
+                    <button onClick={() => { setOpen(false); handleLogout(); }} className="col-span-2 rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Log out</button>
+                  )}
+                </div>
               </div>
-            </div>
-          </nav>
+            </nav>
+          </>
         )}
       </header>
 
