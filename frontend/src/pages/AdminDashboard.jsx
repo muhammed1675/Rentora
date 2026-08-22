@@ -19,7 +19,7 @@ import {
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
-  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send
+  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send, Download, FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -677,6 +677,234 @@ export function AdminDashboard() {
     a.full_name?.toLowerCase().includes(agentSearch.toLowerCase()) ||
     a.email?.toLowerCase().includes(agentSearch.toLowerCase())
   );
+
+  // ── Compliance / legal export: pulls every activity trail tied to a
+  // single user id from data already loaded in this dashboard (no extra
+  // network round-trip) so it can be handed to a legal authority on request.
+  const getUserActivityBundle = (userId) => {
+    const rent = rentPayments.filter(p => p.user_id === userId);
+    const viewingPayments = (transactions.inspection_transactions || []).filter(t => t.user_id === userId);
+    const walletTopUps = (transactions.token_transactions || []).filter(t => t.user_id === userId);
+    const viewingRequests = viewings.filter(v => v.user_id === userId);
+    const reportsFiled = reports.filter(r => r.reporter_id === userId);
+    const listedProperties = properties.filter(p => p.uploaded_by_agent_id === userId);
+    const reportsAgainstListings = reports.filter(r => listedProperties.some(p => p.id === r.property_id));
+    const withdrawals = withdrawalRequests.filter(r => r.agent_id === userId);
+    return { rent, viewingPayments, walletTopUps, viewingRequests, reportsFiled, listedProperties, reportsAgainstListings, withdrawals };
+  };
+
+  const csvEscape = (val) => {
+    const s = val === null || val === undefined ? '' : String(val);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const downloadBlob = (content, filename, mime) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportUserActivityCSV = (su) => {
+    const b = getUserActivityBundle(su.id);
+    const lines = [];
+    lines.push(`Rentora - User Activity Export`);
+    lines.push(`Generated,${new Date().toISOString()}`);
+    lines.push(`User ID,${su.id}`);
+    lines.push(`Full Name,${csvEscape(su.full_name)}`);
+    lines.push(`Email,${csvEscape(su.email)}`);
+    lines.push(`Phone,${csvEscape(su.phone || '')}`);
+    lines.push(`Role,${su.role}`);
+    lines.push(`Status,${su.suspended ? 'Suspended' : 'Active'}`);
+    lines.push(`Joined,${su.created_at || ''}`);
+    lines.push(`Last Login,${su.last_login_at || ''}`);
+    lines.push('');
+
+    lines.push('RENT PAYMENTS (property_rent_payments)');
+    lines.push(['id', 'property_id', 'agent_id', 'rent_amount', 'service_fee', 'agent_fee', 'caution_fee', 'total_amount', 'reference', 'koralpay_reference', 'status', 'held_at', 'released_at', 'refunded_at', 'created_at'].join(','));
+    b.rent.forEach(r => lines.push([r.id, r.property_id, r.agent_id, r.rent_amount, r.service_fee, r.agent_fee, r.caution_fee, r.total_amount, r.reference, r.koralpay_reference, r.status, r.held_at, r.released_at, r.refunded_at, r.created_at].map(csvEscape).join(',')));
+    lines.push('');
+
+    lines.push('VIEWING PAYMENTS (inspection_transactions)');
+    lines.push(['id', 'inspection_id', 'amount', 'reference', 'koralpay_reference', 'status', 'created_at'].join(','));
+    b.viewingPayments.forEach(t => lines.push([t.id, t.inspection_id, t.amount, t.reference, t.koralpay_reference, t.status, t.created_at].map(csvEscape).join(',')));
+    lines.push('');
+
+    lines.push('WALLET / TOKEN TRANSACTIONS (transactions)');
+    lines.push(['id', 'amount', 'tokens_added', 'reference', 'koralpay_reference', 'status', 'created_at'].join(','));
+    b.walletTopUps.forEach(t => lines.push([t.id, t.amount, t.tokens_added, t.reference, t.koralpay_reference, t.status, t.created_at].map(csvEscape).join(',')));
+    lines.push('');
+
+    lines.push('VIEWING / INSPECTION REQUESTS (inspections)');
+    lines.push(['id', 'property_id', 'property_title', 'agent_name', 'inspection_date', 'status', 'payment_status', 'payment_reference', 'created_at'].join(','));
+    b.viewingRequests.forEach(v => lines.push([v.id, v.property_id, v.property_title, v.agent_name, v.inspection_date, v.status, v.payment_status, v.payment_reference, v.created_at].map(csvEscape).join(',')));
+    lines.push('');
+
+    lines.push('REPORTS FILED BY USER (property_reports)');
+    lines.push(['id', 'property_id', 'reason', 'details', 'status', 'created_at'].join(','));
+    b.reportsFiled.forEach(r => lines.push([r.id, r.property_id, r.reason, r.details, r.status, r.created_at].map(csvEscape).join(',')));
+    lines.push('');
+
+    if (su.role === 'agent') {
+      lines.push('PROPERTIES LISTED (as agent)');
+      lines.push(['id', 'title', 'price', 'status', 'created_at'].join(','));
+      b.listedProperties.forEach(p => lines.push([p.id, p.title, p.price, p.status, p.created_at].map(csvEscape).join(',')));
+      lines.push('');
+
+      lines.push('REPORTS AGAINST LISTED PROPERTIES');
+      lines.push(['id', 'property_id', 'reason', 'status', 'created_at'].join(','));
+      b.reportsAgainstListings.forEach(r => lines.push([r.id, r.property_id, r.reason, r.status, r.created_at].map(csvEscape).join(',')));
+      lines.push('');
+
+      lines.push('WITHDRAWAL REQUESTS (agent payouts)');
+      lines.push(['id', 'amount', 'bank_name', 'account_number', 'account_name', 'status', 'requested_at', 'resolved_at'].join(','));
+      b.withdrawals.forEach(w => lines.push([w.id, w.amount, w.bank_name, w.account_number, w.account_name, w.status, w.requested_at, w.resolved_at].map(csvEscape).join(',')));
+    }
+
+    downloadBlob(lines.join('\n'), `rentora-activity-${(su.full_name || su.id).replace(/\s+/g, '_')}-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
+    toast.success('Activity CSV downloaded');
+  };
+
+  const exportUserActivityPDF = (su) => {
+    const b = getUserActivityBundle(su.id);
+    const money = (n) => n === null || n === undefined ? '—' : formatPrice(n);
+    const dt = (v) => v ? new Date(v).toLocaleString() : '—';
+    const section = (title, rows, cols) => `
+      <h3>${title}</h3>
+      ${rows.length === 0 ? '<p class="empty">No records found.</p>' : `
+      <table>
+        <thead><tr>${cols.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>${cols.map(c => `<td>${c.fmt ? c.fmt(r[c.key], r) : (r[c.key] ?? '—')}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>`}`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Rentora Activity Report - ${su.full_name}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a2e; padding: 32px; font-size: 12px; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #0f172a; }
+  h2 { font-size: 13px; color: #475569; font-weight: normal; margin: 0 0 24px; }
+  h3 { font-size: 13px; margin: 24px 0 8px; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a8a; padding-bottom: 16px; margin-bottom: 16px; }
+  .brand { font-size: 22px; font-weight: bold; color: #1e3a8a; }
+  .meta { text-align: right; font-size: 11px; color: #64748b; }
+  .profile { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; background: #f8fafc; padding: 12px 16px; border-radius: 6px; margin-bottom: 8px; }
+  .profile div span.label { color: #64748b; display: inline-block; min-width: 90px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  th, td { border: 1px solid #e2e8f0; padding: 5px 8px; text-align: left; font-size: 10.5px; }
+  th { background: #f1f5f9; font-weight: 600; }
+  .empty { color: #94a3b8; font-style: italic; font-size: 11px; }
+  .footer { margin-top: 32px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+  @media print { body { padding: 12mm; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">Rentora</div>
+    <div class="meta">
+      Account Activity Report<br/>
+      Generated: ${new Date().toLocaleString()}
+    </div>
+  </div>
+  <h1>${su.full_name || 'User'}</h1>
+  <h2>User ID: ${su.id}</h2>
+  <div class="profile">
+    <div><span class="label">Email</span>${su.email || '—'}</div>
+    <div><span class="label">Phone</span>${su.phone || '—'}</div>
+    <div><span class="label">Role</span>${su.role}</div>
+    <div><span class="label">Status</span>${su.suspended ? 'Suspended' : 'Active'}</div>
+    <div><span class="label">Joined</span>${dt(su.created_at)}</div>
+    <div><span class="label">Last login</span>${dt(su.last_login_at)}</div>
+  </div>
+
+  ${section('Rent Payments (Escrow)', b.rent, [
+    { key: 'reference', label: 'Reference' },
+    { key: 'total_amount', label: 'Amount', fmt: money },
+    { key: 'status', label: 'Status' },
+    { key: 'held_at', label: 'Held', fmt: dt },
+    { key: 'released_at', label: 'Released', fmt: dt },
+    { key: 'refunded_at', label: 'Refunded', fmt: dt },
+    { key: 'created_at', label: 'Date', fmt: dt },
+  ])}
+
+  ${section('Viewing / Inspection Payments', b.viewingPayments, [
+    { key: 'reference', label: 'Reference' },
+    { key: 'amount', label: 'Amount', fmt: money },
+    { key: 'status', label: 'Status' },
+    { key: 'created_at', label: 'Date', fmt: dt },
+  ])}
+
+  ${section('Wallet / Token Transactions', b.walletTopUps, [
+    { key: 'reference', label: 'Reference' },
+    { key: 'amount', label: 'Amount', fmt: money },
+    { key: 'tokens_added', label: 'Tokens' },
+    { key: 'status', label: 'Status' },
+    { key: 'created_at', label: 'Date', fmt: dt },
+  ])}
+
+  ${section('Viewing / Inspection Requests', b.viewingRequests, [
+    { key: 'property_title', label: 'Property' },
+    { key: 'agent_name', label: 'Agent' },
+    { key: 'inspection_date', label: 'Date' },
+    { key: 'status', label: 'Status' },
+    { key: 'payment_status', label: 'Payment' },
+    { key: 'created_at', label: 'Requested', fmt: dt },
+  ])}
+
+  ${section('Reports Filed by This User', b.reportsFiled, [
+    { key: 'reason', label: 'Reason' },
+    { key: 'details', label: 'Details' },
+    { key: 'status', label: 'Status' },
+    { key: 'created_at', label: 'Date', fmt: dt },
+  ])}
+
+  ${su.role === 'agent' ? `
+  ${section('Properties Listed', b.listedProperties, [
+    { key: 'title', label: 'Title' },
+    { key: 'price', label: 'Price', fmt: money },
+    { key: 'status', label: 'Status' },
+    { key: 'created_at', label: 'Listed', fmt: dt },
+  ])}
+
+  ${section('Reports Against Listed Properties', b.reportsAgainstListings, [
+    { key: 'reason', label: 'Reason' },
+    { key: 'status', label: 'Status' },
+    { key: 'created_at', label: 'Date', fmt: dt },
+  ])}
+
+  ${section('Withdrawal Requests (Payouts)', b.withdrawals, [
+    { key: 'amount', label: 'Amount', fmt: money },
+    { key: 'bank_name', label: 'Bank' },
+    { key: 'account_number', label: 'Account No.' },
+    { key: 'status', label: 'Status' },
+    { key: 'requested_at', label: 'Requested', fmt: dt },
+    { key: 'resolved_at', label: 'Resolved', fmt: dt },
+  ])}
+  ` : ''}
+
+  <div class="footer">
+    This report was generated by Rentora's admin system on ${new Date().toLocaleString()} at the request of an authorized administrator, for use in compliance, dispute resolution, or legal proceedings.
+  </div>
+  <script>window.onload = () => setTimeout(() => window.print(), 300);</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('Please allow pop-ups to generate the PDF report'); return; }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  };
 
   if (!isAuthenticated || !isAdmin) return null;
 
@@ -2716,7 +2944,13 @@ export function AdminDashboard() {
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 flex-wrap">
+              <Button variant="outline" className="gap-2" onClick={() => exportUserActivityPDF(selectedAgentData)}>
+                <FileText className="w-4 h-4" /> PDF Report
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={() => exportUserActivityCSV(selectedAgentData)}>
+                <Download className="w-4 h-4" /> Raw CSV
+              </Button>
               {selectedAgentData?.phone ? (
                 <a href={`tel:${selectedAgentData.phone}`}>
                   <Button variant="outline" className="gap-2"><Phone className="w-4 h-4" /> Call Agent</Button>
@@ -2798,6 +3032,24 @@ export function AdminDashboard() {
                       <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
                     </Select>
+                  </div>
+
+                  {/* Compliance export */}
+                  <div className="rounded-xl border border-border/60 p-3 bg-muted/20">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <FileDown className="w-3.5 h-3.5" /> Activity Export (legal / compliance)
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Download a full activity trail for this account — rent payments, viewing payments, wallet transactions, viewing requests, reports{su.role === 'agent' ? ', listings, and payouts' : ''}.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => exportUserActivityPDF(su)}>
+                        <FileText className="w-3.5 h-3.5" /> PDF Report
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => exportUserActivityCSV(su)}>
+                        <Download className="w-3.5 h-3.5" /> Raw CSV
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 <DialogFooter className="gap-2 flex-wrap">
