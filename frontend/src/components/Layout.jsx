@@ -8,6 +8,7 @@ import {
 } from './ui/dropdown-menu';
 import { ConsentBanner } from './ConsentBanner';
 import { VerificationBanner } from './VerificationBanner';
+import { AddPhoneBanner } from './AddPhoneBanner';
 import { MobileBottomNav } from './MobileBottomNav';
 import { PageMotion } from '../lib/motion';
 import { NotificationBell, NotificationBellLink } from './NotificationBell';
@@ -133,6 +134,7 @@ export function Layout({ children }) {
       </header>
 
       <VerificationBanner />
+      <AddPhoneBanner />
 
       <main className="flex-1 pb-24 md:pb-0">
         <PageMotion>{children}</PageMotion>

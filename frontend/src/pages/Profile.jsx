@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { inspectionAPI, transactionAPI, verificationAPI, paymentAPI, rentAPI, tipAPI, maintenanceAPI, userAPI, storageAPI } from '../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
@@ -33,6 +33,10 @@ import { toast } from 'sonner';
 export function Profile() {
   const navigate = useNavigate();
   const { user, isAuthenticated, refreshUser, isUser, verificationStatus, deleteAccount } = useAuth();
+  const [searchParams] = useSearchParams();
+  const validTabs = ['rent', 'inspections', 'transactions', 'settings'];
+  const requestedTab = searchParams.get('tab');
+  const initialTab = validTabs.includes(requestedTab) ? requestedTab : 'rent';
   
   const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ inspection_transactions: [] });
@@ -254,10 +258,31 @@ export function Profile() {
 
   const [phoneDraft, setPhoneDraft] = useState(user?.phone || '');
   const [savingPhone, setSavingPhone] = useState(false);
+  const [highlightPhoneField, setHighlightPhoneField] = useState(false);
 
   useEffect(() => { setPhoneDraft(user?.phone || ''); }, [user?.phone]);
 
+  // Deep-link support for the "Add your phone number" banner: scroll the
+  // settings tab's phone field into view and briefly highlight it, since
+  // client-side navigation doesn't auto-scroll to a #hash the way a full
+  // page load would.
+  useEffect(() => {
+    if (window.location.hash !== '#phone-number-field') return;
+    const t = setTimeout(() => {
+      const el = document.getElementById('phone-number-field');
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightPhoneField(true);
+      setTimeout(() => setHighlightPhoneField(false), 2000);
+    }, 200); // let the tab content mount first
+    return () => clearTimeout(t);
+  }, []);
+
   const handleSavePhone = async () => {
+    if (!/^[+]?[0-9]{10,15}$/.test(phoneDraft.replace(/\s/g, ''))) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
     setSavingPhone(true);
     try {
       await userAPI.updateProfile(user.id, { phone: phoneDraft });
@@ -386,7 +411,7 @@ export function Profile() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="rent" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="rent" className="gap-2" data-testid="tab-rent">
             <HomeIcon className="w-4 h-4" />
@@ -679,7 +704,7 @@ export function Profile() {
                 <p className="text-sm text-muted-foreground">Email <span className="text-xs italic">(contact support to change)</span></p>
                 <p className="font-medium">{user?.email}</p>
               </div>
-              <div>
+              <div id="phone-number-field" className={highlightPhoneField ? 'rounded-lg ring-2 ring-primary ring-offset-2 transition-shadow' : 'transition-shadow'}>
                 <p className="text-sm text-muted-foreground">Phone Number</p>
                 <div className="flex items-center gap-2 mt-1 max-w-sm">
                   <Input

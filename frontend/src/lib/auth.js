@@ -370,6 +370,11 @@ export function AuthProvider({ children }) {
       isVerifiedStudent: user?.role !== 'user' || user?.verification_status === 'approved',
       isVerifiedAgent: user?.role === 'agent' || user?.role === 'admin',
       needsVerification: !!user && user?.role === 'user' && user?.verification_status !== 'approved',
+      // True when the account has no phone number on file — mainly hits
+      // Google sign-ups, since Google never gives us one. Nudges via a
+      // dismissible banner rather than blocking, since phone is still
+      // collected as a required field on the OTP sign-up form.
+      needsPhone: !!user && !user?.phone,
       // Action-time gates (see components/VerifyGateDialog.jsx). Reads and
       // browsing are never gated — only these specific actions are.
       canPay: user?.role !== 'user' || user?.verification_status === 'approved',
