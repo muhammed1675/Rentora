@@ -22,7 +22,7 @@ export const sections = [
       },
       {
         title: '4. Rent Payments & Escrow',
-        body: `When a renter pays rent for a property through Rentora, the payment includes:\n• The rent amount set by the agent\n• An agent fee, automatically calculated as 10% of the rent\n• A service fee, Rentora's own fee for facilitating the transaction\n\nRentora holds the rent and agent fee in escrow — not released to the agent — until the renter confirms they have moved in, or for a maximum of 5 days after payment, whichever comes first.\n\nOnce released, the agent receives the rent and agent fee in full. Rentora's only revenue from a rent transaction is the service fee; Rentora does not take any share of the rent or agent fee itself.\n\nOnce a rent payment is held for a property, that property is marked unavailable to other renters until the payment is resolved.`
+        body: `When a renter pays rent for a property through Rentora, the payment includes:\n• The rent amount set by the agent\n• An Agency Fee set for the specific property\n• A service fee, Rentora's own fee for facilitating the transaction\n\nRentora holds the rent and agent fee in escrow — not released to the agent — until the renter confirms they have moved in, or for a maximum of 5 days after payment, whichever comes first.\n\nOnce released, the agent receives the rent and agent fee in full. Rentora's only revenue from a rent transaction is the service fee; Rentora does not take any share of the rent or agent fee itself.\n\nOnce a rent payment is held for a property, that property is marked unavailable to other renters until the payment is resolved.`
       },
       {
         title: '5. Property Information Disclaimer',

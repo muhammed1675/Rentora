@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useVerifyGate } from '../components/VerifyGateDialog';
 import { propertyAPI, inspectionAPI, reviewAPI, rentAPI, reportAPI } from '../lib/api';
+import { calculateRentPricing } from '../lib/rentPricing';
 import { openFlutterwaveCheckout } from '../lib/flutterwave';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -259,11 +260,7 @@ export function PropertyDetails() {
 
 
   const [payingRent, setPayingRent] = useState(false);
-  const [serviceFeePct, setServiceFeePct] = useState(5);
-
-  useEffect(() => {
-    rentAPI.getServiceFeePct().then(setServiceFeePct).catch(() => {});
-  }, []);
+  const serviceFeePct = 3.5;
   const handlePayRent = async () => {
     if (!user) { toast.error('Please log in first'); return; }
     if (!requireVerification('pay')) return;
@@ -621,16 +618,14 @@ export function PropertyDetails() {
                 </div>
                 )}
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <p className="text-sm text-muted-foreground min-w-0">Agent Fee <span className="text-xs">(10% of rent)</span></p>
-                  <p className="text-sm font-semibold shrink-0">{formatPrice(Math.round(Number(property.price || 0) * 0.10))}</p>
+                  <p className="text-sm text-muted-foreground min-w-0">Agency Fee</p>
+                  <p className="text-sm font-semibold shrink-0">{formatPrice(calculateRentPricing(property).agencyFee)}</p>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t border-border/40 pt-2">
                   <p className="text-sm font-semibold min-w-0">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground block sm:inline">(+ small service fee at checkout)</span></p>
                   <p className="text-sm font-bold text-primary shrink-0">
                     {formatPrice(
-                      Number(property.price || 0) +
-                      Number(property.caution_fee || 0) +
-                      Math.round(Number(property.price || 0) * 0.10)
+                      calculateRentPricing(property).total - calculateRentPricing(property).serviceFee
                     )}
                   </p>
                 </div>
@@ -650,15 +645,11 @@ export function PropertyDetails() {
                 )}
               </div>
               {property?.price > 0 && (() => {
-                const rent = Number(property.price);
-                const agentFee = Math.round(rent * 0.10);
-                const cautionFee = Number(property.caution_fee) || 0;
-                const serviceFee = Math.round((rent + agentFee) * (serviceFeePct / 100));
-                const total = rent + agentFee + cautionFee + serviceFee;
+                const { rent, agencyFee, cautionFee, inspectionFee, agreementFee, serviceFee, total } = calculateRentPricing(property);
                 return (
                   <div className="text-sm space-y-1 mb-3">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rent</span><span className="shrink-0 text-right">{formatPrice(rent)}</span></div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agent fee (10%)</span><span className="shrink-0 text-right">{formatPrice(agentFee)}</span></div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agency Fee</span><span className="shrink-0 text-right">{formatPrice(agencyFee)}</span></div>
                     {cautionFee > 0 && (
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>
                     )}
