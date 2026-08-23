@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { adsAPI } from '../lib/api';
+import { normalizeNgPhone } from '../lib/utils';
 
 // Fixed aspect ratios per slot, matching ad_slot_config.image_width /
 // image_height in supabase/schema/22_ads.sql — kept here as a fallback so
@@ -16,10 +17,12 @@ const AUTO_ADVANCE_MS = 5000;
 /**
  * <AdSlot slotType="header_billboard" />
  *
- * Renders nothing when the slot has no active ads (space collapses), a
- * static image when there's exactly one, or an auto-sliding carousel when
- * there are several. Every ad links out to a WhatsApp chat — there's no
- * advertiser dashboard anywhere in this feature.
+ * Renders a static "Advertise here" invite when the slot has no active
+ * ads, or an auto-sliding carousel when there are one or more — the
+ * invite always stays in the rotation as the last slide, so it never
+ * disappears once real ads start filling the slot. Every real ad links
+ * out to a WhatsApp chat — there's no advertiser dashboard anywhere in
+ * this feature.
  */
 export function AdSlot({ slotType }) {
   const [ads, setAds] = useState([]);
@@ -30,26 +33,37 @@ export function AdSlot({ slotType }) {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     adsAPI.getActiveAdsForSlot(slotType)
       .then(({ data }) => { if (!cancelled) setAds(data); })
-      .catch(() => { if (!cancelled) setAds([]); })
+      .catch((err) => {
+        // Fail open: even if the query errors (network blip, RLS hiccup),
+        // still show the "advertise here" invite rather than nothing —
+        // an empty slot with no explanation looks like a bug, not ads.
+        console.error(`AdSlot(${slotType}): failed to load active ads`, err);
+        if (!cancelled) setAds([]);
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [slotType]);
 
+  // Real ads first, then a permanent "advertise here" slide so the invite
+  // never gets crowded out entirely once a slot fills up.
+  const slides = [...ads.map((ad) => ({ type: 'ad', ad })), { type: 'house' }];
+
   const goTo = useCallback((i) => {
     setIndex((prev) => {
-      if (!ads.length) return prev;
-      return (i + ads.length) % ads.length;
+      if (!slides.length) return prev;
+      return (i + slides.length) % slides.length;
     });
-  }, [ads.length]);
+  }, [slides.length]);
 
   // Auto-advance
   useEffect(() => {
-    if (ads.length < 2) return;
+    if (slides.length < 2) return;
     const t = setInterval(() => goTo(index + 1), AUTO_ADVANCE_MS);
     return () => clearInterval(t);
-  }, [ads.length, index, goTo]);
+  }, [slides.length, index, goTo]);
 
   const handleClick = (ad) => {
     adsAPI.recordClick(ad.id); // fire-and-forget, never blocks navigation
@@ -63,25 +77,10 @@ export function AdSlot({ slotType }) {
     touchStartX.current = null;
   };
 
-  if (loading || !ads.length) {
-    // House ad: quietly invite agents/businesses instead of collapsing to
-    // nothing on an otherwise-empty page. Loading state also renders
-    // nothing so the page never flashes an empty box.
-    if (loading) return null;
-    return (
-      <div style={{ aspectRatio: aspect }} className="w-full">
-        <Link
-          to="/advertise"
-          className="flex h-full w-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/30 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50"
-        >
-          Advertise here
-        </Link>
-      </div>
-    );
-  }
+  if (loading) return null; // avoid a flash of empty/placeholder before the first fetch resolves
 
-  const ad = ads[index];
-  const digitsOnly = (ad.whatsapp_number || '').replace(/\D/g, '');
+  const safeIndex = index % slides.length;
+  const slide = slides[safeIndex];
 
   return (
     <div
@@ -90,23 +89,32 @@ export function AdSlot({ slotType }) {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <a
-        href={`https://wa.me/${digitsOnly}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => handleClick(ad)}
-        className="block h-full w-full"
-      >
-        <img
-          src={ad.image_url}
-          alt={ad.business_name}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-      </a>
+      {slide.type === 'house' ? (
+        <Link
+          to="/advertise"
+          className="flex h-full w-full items-center justify-center border border-dashed border-border/70 bg-muted/30 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50"
+        >
+          Advertise here
+        </Link>
+      ) : (
+        <a
+          href={`https://wa.me/${normalizeNgPhone(slide.ad.whatsapp_number)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => handleClick(slide.ad)}
+          className="block h-full w-full overflow-hidden"
+        >
+          <img
+            src={slide.ad.image_url}
+            alt={slide.ad.business_name}
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+      )}
 
-      {ads.length > 1 && (
+      {slides.length > 1 && (
         <>
           <button
             type="button"
@@ -125,13 +133,13 @@ export function AdSlot({ slotType }) {
             ›
           </button>
           <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-            {ads.map((_, i) => (
+            {slides.map((_, i) => (
               <button
                 key={i}
                 type="button"
-                aria-label={`Show ad ${i + 1}`}
+                aria-label={`Show slide ${i + 1}`}
                 onClick={(e) => { e.preventDefault(); goTo(i); }}
-                className={`h-1.5 rounded-full transition-all ${i === index ? 'w-4 bg-white' : 'w-1.5 bg-white/60'}`}
+                className={`h-1.5 rounded-full transition-all ${i === safeIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/60'}`}
               />
             ))}
           </div>

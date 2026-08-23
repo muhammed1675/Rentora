@@ -33,6 +33,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyByReference, readCharge, getSecretKey } from './_flutterwave.js';
 import { applyCors } from './_cors.js';
+import { confirmAdPaymentByReference, findAdByReference } from './_ads.js';
 
 // Admin notification wrapper: every attempt to confirm a payment (success or
 // failure) is reported by email to every user with role='admin' in Supabase,
@@ -100,6 +101,13 @@ async function handlePayment(req, res) {
     const tipTx = tipRes.data;
 
     if (!tokenTx && !inspTx && !rentTx && !tipTx) {
+      // Not one of the four "core" payment types — check ads before
+      // giving up. Flutterwave's server-side webhook has one fixed URL
+      // for the whole merchant account and doesn't know /advertise has
+      // its own sibling endpoint, so ad payments can legitimately land
+      // here too. See the comment at the top of _ads.js.
+      const adResult = await confirmAdPaymentByReference(supabase, reference);
+      if (adResult) return res.status(adResult.status).json(adResult.body);
       return res.status(404).json({ error: 'No transaction found for this reference' });
     }
 
@@ -640,6 +648,21 @@ async function notifyAdminsOfPaymentAttempt(req, captured) {
       ['Property', inspection?.property_title || '—'],
       ['Agent', inspection?.agent_name || '—'],
     ];
+  } else {
+    // Not one of the four core types — check ads before giving up (same
+    // fallback confirm-payment.js's handler uses; see _ads.js).
+    const adTx = await findAdByReference(supabase, reference).catch(() => null);
+    if (adTx) {
+      paymentType = 'Ad order';
+      amount = adTx.amount_paid;
+      purpose = `${adTx.business_name} paid for the ${adTx.slot_type.replace(/_/g, ' ')} ad slot (${adTx.duration_type}).`;
+      breakdown = [
+        ['Business', adTx.business_name],
+        ['Slot', adTx.slot_type.replace(/_/g, ' ')],
+        ['Duration', adTx.duration_type],
+        ['WhatsApp', adTx.whatsapp_number],
+      ];
+    }
   }
 
   let payer = null;

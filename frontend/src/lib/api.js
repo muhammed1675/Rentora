@@ -1011,6 +1011,7 @@ export const adminAPI = {
       { data: inspTxs },
       { data: rentPayments },
       { data: paidWithdrawals },
+      { data: adOrders },
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'agent'),
@@ -1025,6 +1026,7 @@ export const adminAPI = {
       supabase.from('inspection_transactions').select('amount').eq('status', 'completed'),
       supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, service_fee, total_amount'),
       supabase.from('withdrawal_requests').select('fee_amount').eq('status', 'paid'),
+      supabase.from('ads').select('amount_paid, payment_status'),
     ]);
 
     const tokenRevenue = tokenTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
@@ -1046,6 +1048,10 @@ export const adminAPI = {
 
     const withdrawalFeeRevenue = paidWithdrawals?.reduce((s, w) => s + Number(w.fee_amount || 0), 0) || 0;
 
+    // Ads: 100% platform revenue — no agent/owner cut, unlike rent or
+    // token sales — counted once payment actually cleared.
+    const adRevenue = (adOrders || []).filter(a => a.payment_status === 'completed').reduce((s, a) => s + Number(a.amount_paid || 0), 0);
+
     return {
       data: {
         total_users: totalUsers || 0,
@@ -1061,9 +1067,10 @@ export const adminAPI = {
         inspection_fees_processed: inspectionFeesProcessed,
         rent_service_fee_revenue: rentServiceFeeRevenue,
         withdrawal_fee_revenue: withdrawalFeeRevenue,
+        ad_revenue: adRevenue,
         // Rentora's actual revenue: token sales + rent service fee +
-        // withdrawal fee. Viewing fees are excluded — 100% goes to agents.
-        total_revenue: tokenRevenue + rentServiceFeeRevenue + withdrawalFeeRevenue,
+        // withdrawal fee + ads. Viewing fees are excluded — 100% goes to agents.
+        total_revenue: tokenRevenue + rentServiceFeeRevenue + withdrawalFeeRevenue + adRevenue,
         total_escrow_held: totalEscrowHeld,
         total_rent_payments: rentRows.length,
         held_rent_payments: heldRows.length,

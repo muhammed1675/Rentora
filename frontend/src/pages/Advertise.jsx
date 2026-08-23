@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, Users } from 'lucide-react';
 import { useSubmitGuard } from '../hooks/useSubmitGuard';
+import { normalizeNgPhone } from '../lib/utils';
 
 const SLOT_LABELS = {
   header_billboard: 'Header Billboard',
@@ -87,11 +88,12 @@ export function Advertise() {
 
     try {
       const { data: uploaded } = await adsAPI.uploadCreative(imageFile);
+      const normalizedWhatsapp = normalizeNgPhone(form.whatsappNumber);
       const { data: order } = await adsAPI.createPendingOrder({
         slotType: selectedSlot.slot_type,
         businessName: form.businessName,
         contactName: form.contactName,
-        whatsappNumber: form.whatsappNumber,
+        whatsappNumber: normalizedWhatsapp,
         email: form.email,
         imageUrl: uploaded.url,
         durationType: duration,
@@ -233,8 +235,13 @@ export function Advertise() {
             </div>
             <div className="space-y-2">
               <Label>WhatsApp number *</Label>
-              <Input value={form.whatsappNumber} onChange={(e) => set('whatsappNumber', e.target.value)} placeholder="+234..." />
-              <p className="text-xs text-muted-foreground">This is where clicks on your ad will go — double check it.</p>
+              <Input value={form.whatsappNumber} onChange={(e) => set('whatsappNumber', e.target.value)} placeholder="e.g. 0801 234 5678 or +234..." />
+              <p className="text-xs text-muted-foreground">
+                This is where clicks on your ad will go — double check it.
+                {form.whatsappNumber && normalizeNgPhone(form.whatsappNumber) && (
+                  <> We'll save it as <span className="font-medium text-foreground">+{normalizeNgPhone(form.whatsappNumber)}</span>.</>
+                )}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Email (optional backup contact)</Label>

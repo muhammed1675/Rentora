@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI, adsAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { normalizeNgPhone } from '../lib/utils';
 import { sendBroadcast, sendBroadcastEmail } from '../lib/notifications';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -59,6 +60,8 @@ export function AdminDashboard() {
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, property: null, deleting: false });
   const [messages, setMessages] = useState([]);
   const [reports, setReports] = useState([]);
+  const [ads, setAds] = useState([]);
+  const [adSlots, setAdSlots] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [bankRequests, setBankRequests] = useState([]);
   const [bankRejectNote, setBankRejectNote] = useState('');
@@ -293,11 +296,12 @@ export function AdminDashboard() {
     setLoading(true);
     await maintenanceAPI.expireStalePending().catch(() => {});
     try {
-      const [statsRes, usersRes, verificationsRes, studentVerifsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, rentPaymentsRes, reportsRes] = await Promise.all([
+      const [statsRes, usersRes, verificationsRes, studentVerifsRes, propertiesRes, inspectionsRes, txRes, messagesRes, withdrawalsRes, balancesRes, rentPaymentsRes, reportsRes, adsRes, adSlotsRes] = await Promise.all([
         adminAPI.getStats(), userAPI.getAll(), verificationAPI.getAll(), studentVerificationAPI.getAll(),
         propertyAPI.getAllAdmin(), inspectionAPI.getAll(), transactionAPI.getAll(),
         contactAPI.getAll(), withdrawalAPI.getAll(), balanceAPI.getAllBalances(),
         rentAPI.getAllForAdmin(), reportAPI.getAll(),
+        adsAPI.adminListAds(), adsAPI.getSlots(),
       ]);
       const allUsers = usersRes.data || [];
       setStats(statsRes.data);
@@ -315,6 +319,8 @@ export function AdminDashboard() {
       setTransactions(txRes.data);
       setMessages(messagesRes.data);
       if (reportsRes?.data) setReports(reportsRes.data);
+      if (adsRes?.data) setAds(adsRes.data);
+      if (adSlotsRes?.data) setAdSlots(adSlotsRes.data);
       if (withdrawalsRes?.data) setWithdrawalRequests(withdrawalsRes.data);
       if (balancesRes?.data) setAgentBalances(balancesRes.data);
       if (rentPaymentsRes?.data) setRentPayments(rentPaymentsRes.data);
@@ -695,7 +701,17 @@ export function AdminDashboard() {
     const listedProperties = properties.filter(p => p.uploaded_by_agent_id === userId);
     const reportsAgainstListings = reports.filter(r => listedProperties.some(p => p.id === r.property_id));
     const withdrawals = withdrawalRequests.filter(r => r.agent_id === userId);
-    return { rent, viewingPayments, walletTopUps, viewingRequests, reportsFiled, listedProperties, reportsAgainstListings, withdrawals };
+    // Ads have no user_id — the /advertise flow is self-serve with no
+    // login — so we match by the account's own email or phone instead.
+    // Best-effort: only catches ads this person placed using contact info
+    // that also matches their Rentora account.
+    const matchedUser = users.find(u => u.id === userId);
+    const userPhoneNormalized = matchedUser?.phone ? normalizeNgPhone(matchedUser.phone) : null;
+    const adsRun = ads.filter(a =>
+      (matchedUser?.email && a.email && a.email.toLowerCase() === matchedUser.email.toLowerCase()) ||
+      (userPhoneNormalized && normalizeNgPhone(a.whatsapp_number) === userPhoneNormalized)
+    );
+    return { rent, viewingPayments, walletTopUps, viewingRequests, reportsFiled, listedProperties, reportsAgainstListings, withdrawals, adsRun };
   };
 
   const csvEscape = (val) => {
@@ -769,7 +785,12 @@ export function AdminDashboard() {
       lines.push('WITHDRAWAL REQUESTS (agent payouts)');
       lines.push(['id', 'amount', 'bank_name', 'account_number', 'account_name', 'status', 'requested_at', 'resolved_at'].join(','));
       b.withdrawals.forEach(w => lines.push([w.id, w.amount, w.bank_name, w.account_number, w.account_name, w.status, w.requested_at, w.resolved_at].map(csvEscape).join(',')));
+      lines.push('');
     }
+
+    lines.push('ADS RUN (matched by this account\'s email/phone — the self-serve /advertise flow has no login)');
+    lines.push(['id', 'slot_type', 'business_name', 'duration_type', 'amount_paid', 'status', 'payment_reference', 'click_count', 'start_date', 'end_date', 'created_at'].join(','));
+    b.adsRun.forEach(a => lines.push([a.id, a.slot_type, a.business_name, a.duration_type, a.amount_paid, a.status, a.payment_reference, a.click_count, a.start_date, a.end_date, a.created_at].map(csvEscape).join(',')));
 
     downloadBlob(lines.join('\n'), `rentora-activity-${(su.full_name || su.id).replace(/\s+/g, '_')}-${Date.now()}.csv`, 'text/csv;charset=utf-8;');
     toast.success('Activity CSV downloaded');
@@ -909,6 +930,16 @@ export function AdminDashboard() {
       ]);
     }
 
+    addSection('Ads Run (matched by this account\'s email/phone)', b.adsRun, [
+      { key: 'slot_type', label: 'Slot' },
+      { key: 'business_name', label: 'Business' },
+      { key: 'duration_type', label: 'Duration' },
+      { key: 'amount_paid', label: 'Amount', fmt: money },
+      { key: 'status', label: 'Status' },
+      { key: 'click_count', label: 'Clicks' },
+      { key: 'created_at', label: 'Placed', fmt: dt },
+    ]);
+
     // Footer note on every page
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -954,7 +985,7 @@ export function AdminDashboard() {
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
     { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
     { id: 'broadcasts', label: 'Broadcasts', icon: Megaphone },
-    { id: 'ads', label: 'Ads', icon: Image },
+    { id: 'ads', label: 'Ads', icon: Image, count: ads.filter(a => a.status === 'pending_review').length, urgent: true },
   ];
 
   const navQuery = navSearch.trim().toLowerCase();
@@ -1293,6 +1324,14 @@ export function AdminDashboard() {
                       </div>
                       <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
                       <p className="text-[10px] text-slate-400 mt-1">1.3% of every agent withdrawal, once paid</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Image className="w-4 h-4 text-slate-400" />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Ads</p>
+                      </div>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.ad_revenue || 0)}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">100% platform revenue — no agent/owner cut</p>
                     </div>
                     <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
                       <div className="flex items-center gap-2 mb-2">
@@ -2652,10 +2691,10 @@ export function AdminDashboard() {
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
             <p className="text-sm opacity-90 mb-1">Total Revenue (All-Time)</p>
             <p className="text-4xl sm:text-5xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p>
-            <p className="text-xs opacity-80 mt-2">Rent service fee + withdrawal fee</p>
+            <p className="text-xs opacity-80 mt-2">Rent service fee + withdrawal fee + ads</p>
           </Card>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className="p-6 border-2 border-secondary/20">
               <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
                 <Wallet className="w-6 h-6 text-secondary" />
@@ -2671,6 +2710,14 @@ export function AdminDashboard() {
               <p className="text-sm text-muted-foreground mb-1">Withdrawal Fee</p>
               <p className="text-3xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
               <p className="text-xs text-muted-foreground mt-2">1.3% of every agent withdrawal, once paid</p>
+            </Card>
+            <Card className="p-6 border-2 border-secondary/20">
+              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
+                <Image className="w-6 h-6 text-secondary" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">Ads</p>
+              <p className="text-3xl font-bold">{formatPrice(stats?.ad_revenue || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-2">100% platform revenue — no agent/owner cut</p>
             </Card>
           </div>
 
@@ -2691,7 +2738,7 @@ export function AdminDashboard() {
 
         {/* ── Ads Tab ── */}
         <TabsContent value="ads">
-          <AdsTab />
+          <AdsTab ads={ads} slots={adSlots} onReload={fetchData} />
         </TabsContent>
           </Tabs>
         </div>

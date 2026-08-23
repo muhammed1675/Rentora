@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { adsAPI } from '../../lib/api';
+import { normalizeNgPhone } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
@@ -30,10 +31,7 @@ const STATUS_STYLES = {
 
 const formatNaira = (n) => `₦${Number(n || 0).toLocaleString('en-NG')}`;
 
-export function AdsTab() {
-  const [ads, setAds] = useState([]);
-  const [slots, setSlots] = useState([]);
-  const [loading, setLoading] = useState(true);
+export function AdsTab({ ads = [], slots = [], onReload, loading = false }) {
   const [busyId, setBusyId] = useState(null);
 
   const [filterSlot, setFilterSlot] = useState('all');
@@ -48,24 +46,15 @@ export function AdsTab() {
 
   const [houseAdOpen, setHouseAdOpen] = useState(false);
   const [houseAdForm, setHouseAdForm] = useState({ slotType: 'header_billboard', businessName: '', contactName: '', whatsappNumber: '', imageUrl: '', durationType: 'week' });
+  // Local, editable copy of slot config — synced from props whenever the
+  // parent refetches, but kept separate so in-progress edits in the Slot
+  // Config inputs below don't get clobbered by an unrelated reload.
+  const [slotDrafts, setSlotDrafts] = useState(slots);
+  useEffect(() => { setSlotDrafts(slots); }, [slots]);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [{ data: adsData }, { data: slotsData }] = await Promise.all([
-        adsAPI.adminListAds(),
-        adsAPI.getSlots(),
-      ]);
-      setAds(adsData);
-      setSlots(slotsData);
-    } catch (e) {
-      toast.error(e.message || 'Failed to load ads');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+    if (onReload) await onReload();
+  }, [onReload]);
 
   const pendingReview = ads.filter((a) => a.status === 'pending_review');
 
@@ -132,7 +121,7 @@ export function AdsTab() {
       return;
     }
     try {
-      await adsAPI.adminAddHouseAd(houseAdForm);
+      await adsAPI.adminAddHouseAd({ ...houseAdForm, whatsappNumber: normalizeNgPhone(houseAdForm.whatsappNumber) });
       toast.success('House ad added and live');
       setHouseAdOpen(false);
       setHouseAdForm({ slotType: 'header_billboard', businessName: '', contactName: '', whatsappNumber: '', imageUrl: '', durationType: 'week' });
@@ -143,7 +132,7 @@ export function AdsTab() {
   };
 
   const handleSlotConfigChange = (slotType, field, value) => {
-    setSlots((prev) => prev.map((s) => (s.slot_type === slotType ? { ...s, [field]: value } : s)));
+    setSlotDrafts((prev) => prev.map((s) => (s.slot_type === slotType ? { ...s, [field]: value } : s)));
   };
 
   const saveSlotConfig = async (slot) => {
@@ -324,7 +313,7 @@ export function AdsTab() {
       <div>
         <h3 className="font-semibold mb-3">Slot Config</h3>
         <div className="grid gap-4 sm:grid-cols-3">
-          {slots.map((slot) => (
+          {slotDrafts.map((slot) => (
             <Card key={slot.slot_type} className="p-4">
               <p className="font-semibold text-sm mb-3">{SLOT_LABELS[slot.slot_type]}</p>
               <div className="space-y-2">
