@@ -271,14 +271,28 @@ async function handlePayment(req, res) {
         .update({ status: 'held', held_at: new Date().toISOString(), koralpay_reference: charge.flwRef || reference })
         .eq('reference', reference)
         .eq('status', 'pending');
-      if (rentErr) throw rentErr;
+      if (rentErr) {
+        // The unique successful-claim index makes this the losing payment in
+        // a concurrent checkout. The charge succeeded, so preserve it for the
+        // existing admin/manual-refund recovery flow instead of crediting an
+        // agent or reporting a false successful entitlement.
+        if (rentErr.code === '23505') {
+          await supabase
+            .from('property_rent_payments')
+            .update({ status: 'refund_processing', refund_reason: 'concurrent_property_claim' })
+            .eq('reference', reference)
+            .eq('status', 'pending');
+          return res.status(409).json({
+            error: 'This property was paid for by another student first. The payment is queued for manual refund.',
+            concurrentClaim: true,
+          });
+        }
+        throw rentErr;
+      }
 
-      // Lock the property the instant rent is actually held — otherwise
-      // nothing stops a second student from also successfully paying for
-      // the same property before the agent notices and marks it taken by
-      // hand. This is best-effort: the payment itself already succeeded
-      // and must not be rolled back just because this follow-up update
-      // fails, so log and move on rather than throwing.
+      // Lock the property after the database claim succeeds. The unique
+      // successful-claim index above is the actual race protection; this
+      // availability update is the public listing state.
       try {
         const { error: availErr } = await supabase
           .from('properties')

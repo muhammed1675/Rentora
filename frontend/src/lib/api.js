@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { notifyUser } from './notifications';
 import { compressImage } from './imageCompression';
+import { calculateRentPricing, RENTORA_SERVICE_FEE_RATE } from './rentPricing';
 
 // Helper to generate payment reference
 const generateReference = (prefix) => {
@@ -1024,7 +1025,7 @@ export const adminAPI = {
       supabase.from('agent_verification_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('transactions').select('amount').eq('status', 'completed'),
       supabase.from('inspection_transactions').select('amount').eq('status', 'completed'),
-      supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, service_fee, total_amount'),
+      supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, caution_fee, inspection_fee, agreement_fee, service_fee, total_amount'),
       supabase.from('withdrawal_requests').select('fee_amount').eq('status', 'paid'),
       supabase.from('ads').select('amount_paid, payment_status'),
     ]);
@@ -1618,15 +1619,10 @@ export const balanceAPI = {
 // ============== WITHDRAWAL APIs ==============
 
 export const withdrawalAPI = {
-  WITHDRAWAL_FEE_PCT: 1.3,
   MIN_WITHDRAWAL_AMOUNT: 3000, // minimum per request
 
-  // Preview the fee/net split for a given withdrawal amount (used by the UI
-  // to show "you'll receive ₦X" before the agent submits).
-  previewFee: (amount) => {
-    const fee = Math.round(Number(amount || 0) * (withdrawalAPI.WITHDRAWAL_FEE_PCT / 100));
-    return { fee, net: Number(amount || 0) - fee };
-  },
+  // Withdrawals are manually processed and have no platform fee.
+  previewFee: (amount) => ({ fee: 0, net: Number(amount || 0) }),
 
   request: async ({ agentId, agentName, agentEmail, amount, bankName, accountNumber, accountName }) => {
     if (amount < withdrawalAPI.MIN_WITHDRAWAL_AMOUNT) {
@@ -1642,11 +1638,9 @@ export const withdrawalAPI = {
     const available = Number(bal?.total_earned || 0) - Number(bal?.total_withdrawn || 0);
     if (amount > available) throw new Error(`Amount exceeds available balance (₦${available.toLocaleString('en-NG')})`);
 
-    // Rentora takes a 1.3% fee on every withdrawal. The agent's balance is
-    // still debited by the full requested amount (that's what leaves their
-    // available balance) — the fee is what Rentora keeps out of it, and
-    // net_amount is what actually gets paid out to their bank account.
-    const { fee, net } = withdrawalAPI.previewFee(amount);
+    // Withdrawals are manually processed by admins. No withdrawal fee is charged.
+    const fee = 0;
+    const net = amount;
 
     const insertRes = await supabase
       .from('withdrawal_requests')
@@ -1673,7 +1667,7 @@ export const withdrawalAPI = {
         ['Agent', agentName || '—'],
         ['Agent email', agentEmail || '—'],
         ['Amount requested', `NGN ${Number(amount).toLocaleString('en-NG')}`],
-        ['Fee (1.3%)', `NGN ${fee.toLocaleString('en-NG')}`],
+        ['Fee', 'NGN 0 (manually processed)'],
         ['Net payout', `NGN ${net.toLocaleString('en-NG')}`],
         ['Bank', bankName || '—'],
         ['Account number', accountNumber || '—'],
@@ -1768,26 +1762,13 @@ export default {
 
 
 // ============== RENT (ESCROW) APIs ==============
-// Rentora holds the rent until the user confirms move-in. A configurable
-// service fee (default 5%) is added on top of the rent price.
+// Rentora holds the rent until the user confirms move-in. New transactions
+// use a fixed 3.5% service fee calculated from rent only.
 
 export const rentAPI = {
-  // Read the platform service fee percentage (default 5).
-  getServiceFeePct: async () => {
-    const { data } = await supabase
-      .from('platform_settings')
-      .select('value')
-      .eq('key', 'rent_service_fee_pct')
-      .maybeSingle();
-    const pct = Number(data?.value);
-    return Number.isFinite(pct) && pct > 0 ? pct : 5;
-  },
+  // New rent transactions always use the fixed rent-only rate.
+  getServiceFeePct: async () => RENTORA_SERVICE_FEE_RATE * 100,
 
-  // Initiate a rent payment. Rentora holds (rent + agent_fee) until move-in,
-  // then releases the FULL amount to the agent — Rentora's only cut is the
-  // service_fee, added on top, never a percentage of the rent itself.
-  // Agent fee is always 10% of rent, computed here — it is not a value
-  // agents type into the listing form.
   initiate: async (propertyId, user) => {
     const { data: property, error: propErr } = await supabase
       .from('properties')
@@ -1802,13 +1783,8 @@ export const rentAPI = {
     // agent's wallet — the property owner is no longer paid directly, so
     // no bank details are required to start a rent payment.
 
-    const feePct = await rentAPI.getServiceFeePct();
-    const rentAmount    = Number(property.price);
-    const agentFee      = Math.round(rentAmount * 0.10);      // 10% of rent, always
-    const cautionFee    = Number(property.caution_fee) || 0;  // pass-through, no service fee applied
-    const baseAmount    = rentAmount + agentFee;               // rent + agent fee — both go to the agent on release
-    const serviceFee    = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut — never applied to the caution fee
-    const totalAmount   = baseAmount + serviceFee + cautionFee;
+    const pricing = calculateRentPricing(property);
+    const { rent: rentAmount, agencyFee: agentFee, cautionFee, inspectionFee, agreementFee, serviceFee, total: totalAmount } = pricing;
     const reference     = generateReference('RENT');
 
     // 5-day auto-release window from now
@@ -1824,6 +1800,8 @@ export const rentAPI = {
         rent_amount: rentAmount,
         agent_fee: agentFee,
         caution_fee: cautionFee,
+        inspection_fee: inspectionFee,
+        agreement_fee: agreementFee,
         service_fee: serviceFee,
         total_amount: totalAmount,
         reference,
@@ -1846,8 +1824,10 @@ export const rentAPI = {
         agent_fee: agentFee,
         caution_fee: cautionFee,
         service_fee: serviceFee,
+        inspection_fee: inspectionFee,
+        agreement_fee: agreementFee,
         amount: totalAmount,
-        service_fee_pct: feePct,
+        service_fee_pct: RENTORA_SERVICE_FEE_RATE * 100,
         payment_type: 'rent',
       },
     };
@@ -1864,7 +1844,7 @@ export const rentAPI = {
     // Dashboard too, instead of just disappearing from view.
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
+      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, inspection_fee, agreement_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .eq('agent_id', agentId)
       .in('status', ['held', 'released', 'refunded'])
       .order('created_at', { ascending: false });
