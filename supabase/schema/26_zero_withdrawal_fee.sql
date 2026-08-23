@@ -24,7 +24,15 @@ FOR EACH ROW EXECUTE FUNCTION public.set_withdrawal_fee();
 COMMENT ON FUNCTION public.set_withdrawal_fee() IS
 'New withdrawal requests have fee_amount 0 and net_amount equal to amount; historical rows are unchanged.';
 
--- Concurrency support for active rent claims. Existing rows are not changed.
+-- Concurrency support for successful rent claims. Pending rows are intentionally
+-- excluded so an abandoned checkout does not permanently block a property.
+-- Existing data is not changed; this fails safely if duplicate successful claims
+-- already exist and must be reviewed before applying.
+CREATE UNIQUE INDEX IF NOT EXISTS property_rent_payments_one_successful_claim_idx
+ON public.property_rent_payments(property_id)
+WHERE status IN ('held', 'move_in_reported', 'released');
+
+-- Keep the non-unique lookup index for pending/active payment administration.
 CREATE INDEX IF NOT EXISTS property_rent_payments_active_property_idx_v2
 ON public.property_rent_payments(property_id)
 WHERE status IN ('pending', 'held', 'move_in_reported', 'released');

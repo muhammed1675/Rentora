@@ -1025,7 +1025,7 @@ export const adminAPI = {
       supabase.from('agent_verification_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('transactions').select('amount').eq('status', 'completed'),
       supabase.from('inspection_transactions').select('amount').eq('status', 'completed'),
-      supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, service_fee, total_amount'),
+      supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, caution_fee, inspection_fee, agreement_fee, service_fee, total_amount'),
       supabase.from('withdrawal_requests').select('fee_amount').eq('status', 'paid'),
       supabase.from('ads').select('amount_paid, payment_status'),
     ]);
@@ -1844,7 +1844,7 @@ export const rentAPI = {
     // Dashboard too, instead of just disappearing from view.
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
+      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, inspection_fee, agreement_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .eq('agent_id', agentId)
       .in('status', ['held', 'released', 'refunded'])
       .order('created_at', { ascending: false });
