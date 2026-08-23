@@ -747,8 +747,8 @@ export function AdminDashboard() {
     lines.push('');
 
     lines.push('RENT PAYMENTS (property_rent_payments)');
-    lines.push(['id', 'property_id', 'agent_id', 'rent_amount', 'service_fee', 'agent_fee', 'caution_fee', 'total_amount', 'reference', 'koralpay_reference', 'status', 'held_at', 'released_at', 'refunded_at', 'created_at'].join(','));
-    b.rent.forEach(r => lines.push([r.id, r.property_id, r.agent_id, r.rent_amount, r.service_fee, r.agent_fee, r.caution_fee, r.total_amount, r.reference, r.koralpay_reference, r.status, r.held_at, r.released_at, r.refunded_at, r.created_at].map(csvEscape).join(',')));
+lines.push(['id', 'property_id', 'agent_id', 'rent_amount', 'agent_fee', 'inspection_fee', 'agreement_fee', 'caution_fee', 'other_fees', 'service_fee', 'total_amount', 'reference', 'koralpay_reference', 'status', 'held_at', 'released_at', 'refunded_at', 'created_at'].join(','));
+  b.rent.forEach(r => lines.push([r.id, r.property_id, r.agent_id, r.rent_amount, r.agent_fee, r.inspection_fee, r.agreement_fee, r.caution_fee, JSON.stringify(r.other_fees || []), r.service_fee, r.total_amount, r.reference, r.koralpay_reference, r.status, r.held_at, r.released_at, r.refunded_at, r.created_at].map(csvEscape).join(',')));
     lines.push('');
 
     lines.push('VIEWING PAYMENTS (inspection_transactions)');
@@ -2537,7 +2537,7 @@ export function AdminDashboard() {
                           {payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span>
                         </button>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)}{payment.caution_fee > 0 ? ` + Caution fee ${formatPrice(payment.caution_fee)}` : ''} + Service fee {formatPrice(payment.service_fee)}
+                          Rent {formatPrice(payment.rent_amount)}{payment.agent_fee > 0 ? ` + Agency fee ${formatPrice(payment.agent_fee)}` : ''}{payment.inspection_fee > 0 ? ` + Inspection fee ${formatPrice(payment.inspection_fee)}` : ''}{payment.agreement_fee > 0 ? ` + Agreement fee ${formatPrice(payment.agreement_fee)}` : ''}{payment.caution_fee > 0 ? ` + Caution fee ${formatPrice(payment.caution_fee)}` : ''}{Array.isArray(payment.other_fees) ? payment.other_fees.map(f => ` + ${f.name} ${formatPrice(f.amount)}`).join('') : ''} + Rentora Service fee {formatPrice(payment.service_fee)} — Total {formatPrice(payment.total_amount)}
                         </p>
                         {stuck ? (
                           <p className="text-xs text-red-700 mt-1">A previous refund attempt didn't finish — resolve it to record the refund and remove the listing.</p>
@@ -2605,9 +2605,13 @@ export function AdminDashboard() {
                 <TableRow>
                   <TableHead>Property</TableHead>
                   <TableHead>Rent</TableHead>
-                  <TableHead>Agent Fee</TableHead>
+                  <TableHead>Agency Fee</TableHead>
+                  <TableHead>Inspection Fee</TableHead>
+                  <TableHead>Agreement Fee</TableHead>
                   <TableHead>Caution Fee</TableHead>
-                  <TableHead>Service Fee</TableHead>
+                  <TableHead>Other Fees</TableHead>
+                  <TableHead>Rentora Service Fee</TableHead>
+                  <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Released</TableHead>
                   <TableHead>Move-in Photo</TableHead>
@@ -2615,7 +2619,7 @@ export function AdminDashboard() {
               </TableHeader>
               <TableBody>
                 {rentPayments.filter(p => p.status === 'released').length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">No released payments yet</TableCell></TableRow>
                 ) : rentPayments.filter(p => p.status === 'released').slice(0, 25).map(payment => (
                   <TableRow key={payment.id}>
                     <TableCell className="font-medium">
@@ -2625,8 +2629,12 @@ export function AdminDashboard() {
                     </TableCell>
                     <TableCell>{formatPrice(payment.rent_amount)}</TableCell>
                     <TableCell>{formatPrice(payment.agent_fee)}</TableCell>
+                    <TableCell>{payment.inspection_fee > 0 ? formatPrice(payment.inspection_fee) : '—'}</TableCell>
+                    <TableCell>{payment.agreement_fee > 0 ? formatPrice(payment.agreement_fee) : '—'}</TableCell>
                     <TableCell>{payment.caution_fee > 0 ? formatPrice(payment.caution_fee) : '—'}</TableCell>
+                    <TableCell>{Array.isArray(payment.other_fees) && payment.other_fees.length ? payment.other_fees.map(f => `${f.name}: ${formatPrice(f.amount)}`).join(', ') : '—'}</TableCell>
                     <TableCell>{formatPrice(payment.service_fee)}</TableCell>
+                    <TableCell>{formatPrice(payment.total_amount)}</TableCell>
                     <TableCell><Badge className="capitalize bg-green-100 text-green-800">{payment.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{payment.released_at ? new Date(payment.released_at).toLocaleDateString('en-NG') : '—'}</TableCell>
                     <TableCell>

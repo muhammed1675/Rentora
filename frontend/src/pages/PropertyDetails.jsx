@@ -617,10 +617,10 @@ export function PropertyDetails() {
                   <p className="text-sm font-semibold shrink-0">{formatPrice(property.caution_fee)}</p>
                 </div>
                 )}
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <p className="text-sm text-muted-foreground min-w-0">Agency Fee</p>
-                  <p className="text-sm font-semibold shrink-0">{formatPrice(calculateRentPricing(property).agencyFee)}</p>
-                </div>
+{calculateRentPricing(property).agencyFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+  <p className="text-sm text-muted-foreground min-w-0">Agency Fee</p>
+  <p className="text-sm font-semibold shrink-0">{formatPrice(calculateRentPricing(property).agencyFee)}</p>
+  </div>}
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t border-border/40 pt-2">
                   <p className="text-sm font-semibold min-w-0">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground block sm:inline">(+ small service fee at checkout)</span></p>
                   <p className="text-sm font-bold text-primary shrink-0">
@@ -645,12 +645,15 @@ export function PropertyDetails() {
                 )}
               </div>
               {property?.price > 0 && (() => {
-                const { rent, agencyFee, cautionFee, inspectionFee, agreementFee, serviceFee, total } = calculateRentPricing(property);
+                const { rent, agencyFee, cautionFee, inspectionFee, agreementFee, otherFees, serviceFee, total } = calculateRentPricing(property);
                 return (
                   <div className="text-sm space-y-1 mb-3">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rent</span><span className="shrink-0 text-right">{formatPrice(rent)}</span></div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agency Fee</span><span className="shrink-0 text-right">{formatPrice(agencyFee)}</span></div>
-                    {cautionFee > 0 && (
+{agencyFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agency Fee</span><span className="shrink-0 text-right">{formatPrice(agencyFee)}</span></div>}
+  {inspectionFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Inspection Fee</span><span className="shrink-0 text-right">{formatPrice(inspectionFee)}</span></div>}
+  {agreementFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agreement Fee</span><span className="shrink-0 text-right">{formatPrice(agreementFee)}</span></div>}
+  {otherFees.map((fee) => <div key={fee.name} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">{fee.name}</span><span className="shrink-0 text-right">{formatPrice(fee.amount)}</span></div>)}
+  {cautionFee > 0 && (
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>
                     )}
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Service fee ({serviceFeePct}%)</span><span className="shrink-0 text-right">{formatPrice(serviceFee)}</span></div>

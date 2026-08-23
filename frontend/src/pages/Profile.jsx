@@ -474,9 +474,12 @@ export function Profile() {
                         {rp.agent_fee > 0 && (
                           <div>Agent fee: <span className="font-medium">{formatPrice(rp.agent_fee)}</span></div>
                         )}
+                        {rp.inspection_fee > 0 && <div>Inspection fee: <span className="font-medium">{formatPrice(rp.inspection_fee)}</span></div>}
+                        {rp.agreement_fee > 0 && <div>Agreement fee: <span className="font-medium">{formatPrice(rp.agreement_fee)}</span></div>}
                         {rp.caution_fee > 0 && (
                           <div>Caution fee: <span className="font-medium">{formatPrice(rp.caution_fee)}</span></div>
                         )}
+                        {(Array.isArray(rp.other_fees) ? rp.other_fees : []).filter(f => Number(f.amount) > 0 && f.name).map(f => <div key={f.name}>{f.name}: <span className="font-medium">{formatPrice(f.amount)}</span></div>)}
                         <div>Service fee: <span className="font-medium">{formatPrice(rp.service_fee)}</span></div>
                         <div>Total paid: <span className="font-semibold">{formatPrice(rp.total_amount)}</span></div>
                         {rp.status === 'held' && rp.auto_release_at && (
@@ -616,8 +619,11 @@ export function Profile() {
                                 { label: 'Property', value: rp.property?.title || 'Property' },
                                 { label: 'Location', value: rp.property?.location || '—' },
                                 { label: 'Rent', value: formatPrice(rp.rent_amount) },
-                                { label: 'Agent Fee', value: formatPrice(rp.agent_fee) },
+                                ...(rp.agent_fee > 0 ? [{ label: 'Agency Fee', value: formatPrice(rp.agent_fee) }] : []),
+                                ...(rp.inspection_fee > 0 ? [{ label: 'Inspection Fee', value: formatPrice(rp.inspection_fee) }] : []),
+                                ...(rp.agreement_fee > 0 ? [{ label: 'Agreement Fee', value: formatPrice(rp.agreement_fee) }] : []),
                                 ...(rp.caution_fee > 0 ? [{ label: 'Caution Fee', value: formatPrice(rp.caution_fee) }] : []),
+                                ...(Array.isArray(rp.other_fees) ? rp.other_fees.filter(f => Number(f.amount) > 0 && f.name).map(f => ({ label: f.name, value: formatPrice(f.amount) })) : []),
                                 { label: 'Service Fee', value: formatPrice(rp.service_fee) },
                                 ...(rp.status === 'refunded' ? [{ label: 'Refunded', value: rp.refunded_at ? new Date(rp.refunded_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Yes' }] : []),
                               ],

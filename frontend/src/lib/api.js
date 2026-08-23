@@ -1784,7 +1784,7 @@ export const rentAPI = {
     // no bank details are required to start a rent payment.
 
     const pricing = calculateRentPricing(property);
-    const { rent: rentAmount, agencyFee: agentFee, cautionFee, inspectionFee, agreementFee, serviceFee, total: totalAmount } = pricing;
+    const { rent: rentAmount, agencyFee: agentFee, cautionFee, inspectionFee, agreementFee, otherFees, otherFeesTotal, serviceFee, total: totalAmount } = pricing;
     const reference     = generateReference('RENT');
 
     // 5-day auto-release window from now
@@ -1801,8 +1801,9 @@ export const rentAPI = {
         agent_fee: agentFee,
         caution_fee: cautionFee,
         inspection_fee: inspectionFee,
-        agreement_fee: agreementFee,
-        service_fee: serviceFee,
+agreement_fee: agreementFee,
+  other_fees: otherFees,
+  service_fee: serviceFee,
         total_amount: totalAmount,
         reference,
         status: 'pending',
@@ -1825,8 +1826,10 @@ export const rentAPI = {
         caution_fee: cautionFee,
         service_fee: serviceFee,
         inspection_fee: inspectionFee,
-        agreement_fee: agreementFee,
-        amount: totalAmount,
+agreement_fee: agreementFee,
+  other_fees: otherFees,
+  other_fees_total: otherFeesTotal,
+  amount: totalAmount,
         service_fee_pct: RENTORA_SERVICE_FEE_RATE * 100,
         payment_type: 'rent',
       },
@@ -1844,7 +1847,7 @@ export const rentAPI = {
     // Dashboard too, instead of just disappearing from view.
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, inspection_fee, agreement_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
+      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, inspection_fee, agreement_fee, other_fees, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .eq('agent_id', agentId)
       .in('status', ['held', 'released', 'refunded'])
       .order('created_at', { ascending: false });

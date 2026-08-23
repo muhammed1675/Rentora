@@ -4,6 +4,7 @@
 //
 // Replaces the old api/korapay-init.js.
 
+import { createClient } from '@supabase/supabase-js';
 import { flwFetch } from './_flutterwave.js';
 import { applyCors } from './_cors.js';
 
@@ -17,6 +18,16 @@ export default async function handler(req, res) {
 
   if (!reference || !amount || !customer?.email) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return res.status(500).json({ error: 'Payment service is not configured' });
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const { data: rentPayment, error: rentError } = await supabase.from('property_rent_payments').select('total_amount,status').eq('reference', reference).maybeSingle();
+  if (rentError) return res.status(500).json({ error: 'Could not validate payment total' });
+  if (rentPayment && (rentPayment.status !== 'pending' || Math.abs(Number(rentPayment.total_amount) - Number(amount)) > 0.01)) {
+    return res.status(409).json({ error: 'Payment amount does not match the stored transaction total' });
   }
 
   try {
