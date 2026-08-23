@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { propertyAPI, locationAPI } from '../lib/api';
 import { PropertyCard, PropertyCardSkeleton } from '../components/PropertyCard';
+import { AdSlot } from '../components/AdSlot';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -229,6 +230,13 @@ export function Browse() {
               <RecentCard key={item.id} item={item} isFav={favourites.includes(item.id)} onToggleFav={handleToggleFav} />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Ad slot — shares the in-feed banner pool with Home */}
+      {!showFavsOnly && !searchTerm && (
+        <div className="mb-6">
+          <AdSlot slotType="in_feed_banner" />
         </div>
       )}
 

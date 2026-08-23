@@ -171,6 +171,11 @@ export function Home() {
         </div>
       </section>
 
+      {/* Ad slot — mid page content */}
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+        <AdSlot slotType="mid_page_content" />
+      </div>
+
       {/* Ad slot — in-feed banner */}
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <AdSlot slotType="in_feed_banner" />

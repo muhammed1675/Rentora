@@ -13,6 +13,7 @@ const SLOT_ASPECT = {
 };
 
 const AUTO_ADVANCE_MS = 5000;
+const SLIDE_TRANSITION_MS = 500;
 
 /**
  * <AdSlot slotType="header_billboard" />
@@ -23,6 +24,10 @@ const AUTO_ADVANCE_MS = 5000;
  * disappears once real ads start filling the slot. Every real ad links
  * out to a WhatsApp chat — there's no advertiser dashboard anywhere in
  * this feature.
+ *
+ * Slides are laid out in a horizontal track and moved with a CSS
+ * transform, so switching slides is a genuine slide-in/slide-out motion
+ * rather than one slide disappearing and the next popping in.
  */
 export function AdSlot({ slotType }) {
   const [ads, setAds] = useState([]);
@@ -80,7 +85,6 @@ export function AdSlot({ slotType }) {
   if (loading) return null; // avoid a flash of empty/placeholder before the first fetch resolves
 
   const safeIndex = index % slides.length;
-  const slide = slides[safeIndex];
 
   return (
     <div
@@ -89,30 +93,44 @@ export function AdSlot({ slotType }) {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {slide.type === 'house' ? (
-        <Link
-          to="/advertise"
-          className="flex h-full w-full items-center justify-center border border-dashed border-border/70 bg-muted/30 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50"
-        >
-          Advertise here
-        </Link>
-      ) : (
-        <a
-          href={`https://wa.me/${normalizeNgPhone(slide.ad.whatsapp_number)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => handleClick(slide.ad)}
-          className="block h-full w-full overflow-hidden"
-        >
-          <img
-            src={slide.ad.image_url}
-            alt={slide.ad.business_name}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
-            loading="lazy"
-            decoding="async"
-          />
-        </a>
-      )}
+      {/* Sliding track — holds every slide side by side and moves as a
+          whole, so advancing feels like a slide-in rather than a swap. */}
+      <div
+        className="flex h-full w-full"
+        style={{
+          transform: `translateX(-${safeIndex * 100}%)`,
+          transition: `transform ${SLIDE_TRANSITION_MS}ms ease-out`,
+        }}
+      >
+        {slides.map((slide, i) => (
+          <div key={i} className="h-full w-full shrink-0 overflow-hidden">
+            {slide.type === 'house' ? (
+              <Link
+                to="/advertise"
+                className="flex h-full w-full items-center justify-center border border-dashed border-border/70 bg-muted/30 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50"
+              >
+                Advertise here
+              </Link>
+            ) : (
+              <a
+                href={`https://wa.me/${normalizeNgPhone(slide.ad.whatsapp_number)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => handleClick(slide.ad)}
+                className="block h-full w-full overflow-hidden"
+              >
+                <img
+                  src={slide.ad.image_url}
+                  alt={slide.ad.business_name}
+                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 group-active:scale-110"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
 
       {slides.length > 1 && (
         <>

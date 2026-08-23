@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PropertyLocationCard from '../components/PropertyLocationCard';
+import { AdSlot } from '../components/AdSlot';
 import { ImageWatermark } from '../components/ImageWatermark';
 import { downloadWatermarkedImage } from '../lib/watermarkDownload';
 
@@ -489,6 +490,9 @@ export function PropertyDetails() {
               )}
             </div>
           </Card>
+
+          {/* Ad slot — shares the mid-page-content pool with Home */}
+          <AdSlot slotType="mid_page_content" />
 
           {similarProperties.length > 0 && (
             <div>
