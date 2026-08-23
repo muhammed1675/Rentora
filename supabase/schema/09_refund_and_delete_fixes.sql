@@ -34,6 +34,7 @@ ALTER TABLE public.property_rent_payments
 CREATE OR REPLACE FUNCTION public.reserve_property_on_rent_hold()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public
 AS $function$
 BEGIN
   IF NEW.status = 'held' AND (OLD.status IS DISTINCT FROM 'held') THEN
@@ -53,6 +54,7 @@ $function$;
 CREATE OR REPLACE FUNCTION public.prevent_reopening_reserved_property()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public
 AS $function$
 BEGIN
   -- Admins are trusted to relist a property after a tenancy legitimately ends.

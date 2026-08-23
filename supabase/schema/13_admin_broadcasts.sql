@@ -121,6 +121,7 @@ GRANT EXECUTE ON FUNCTION public.send_broadcast(text, text, text, text) TO authe
 CREATE OR REPLACE FUNCTION public.mark_broadcast_read(p_broadcast_id uuid) RETURNS void
 LANGUAGE sql
 SECURITY INVOKER
+SET search_path = public
 AS $$
   INSERT INTO public.broadcast_reads (broadcast_id, user_id)
   VALUES (p_broadcast_id, auth.uid())

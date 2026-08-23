@@ -97,6 +97,7 @@ CREATE POLICY "inspection_tips_select_admin" ON public.inspection_tips FOR SELEC
 CREATE OR REPLACE FUNCTION public.credit_agent_tip_balance()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public
 AS $function$
 BEGIN
   IF NEW.status = 'completed' AND (OLD.status IS DISTINCT FROM 'completed') THEN

@@ -49,15 +49,9 @@ CREATE POLICY "admin_can_update" ON public.contact_messages FOR UPDATE
 CREATE POLICY "anyone_can_submit" ON public.contact_messages FOR INSERT
   WITH CHECK (true);
 -- ── inspection_transactions ──────────────────────────────
-CREATE POLICY "Allow all read" ON public.inspection_transactions FOR SELECT
-  USING (true);
-CREATE POLICY "Allow insert" ON public.inspection_transactions FOR INSERT
-  WITH CHECK (true);
 CREATE POLICY "insp_tx_insert_own" ON public.inspection_transactions FOR INSERT
   WITH CHECK ((auth.uid() = user_id));
 CREATE POLICY "insp_tx_select_own" ON public.inspection_transactions FOR SELECT
-  USING ((auth.uid() = user_id));
-CREATE POLICY "inspection_transactions_select_own" ON public.inspection_transactions FOR SELECT
   USING ((auth.uid() = user_id));
 -- ── inspections ──────────────────────────────
 CREATE POLICY "inspections_insert_own" ON public.inspections FOR INSERT

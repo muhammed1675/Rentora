@@ -177,7 +177,11 @@ END;
 -- "phone not saving" bug. Full runnable statement (not just a body,
 -- since SETUP.md has new buyers run this file directly):
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
     INSERT INTO public.users (id, email, full_name, phone, role, suspended)
     VALUES (
@@ -199,7 +203,7 @@ EXCEPTION WHEN OTHERS THEN
     -- Never let trigger errors block signup
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- ── set_withdrawal_fee ──────────────────────────────
 BEGIN

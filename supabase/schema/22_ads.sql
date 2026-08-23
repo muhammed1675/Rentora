@@ -68,6 +68,7 @@ create or replace function increment_ad_click(ad_id uuid)
 returns void
 language sql
 security definer
+set search_path = public
 as $$
   update ads set click_count = click_count + 1 where id = ad_id and status = 'active';
 $$;
@@ -81,6 +82,7 @@ returns table(slot_type text, active_count integer, queue_count integer)
 language sql
 security definer
 stable
+set search_path = public
 as $$
   select
     c.slot_type,
@@ -136,6 +138,7 @@ create or replace function process_ad_lifecycle()
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_slot record;

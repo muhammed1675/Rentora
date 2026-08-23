@@ -1,58 +1,52 @@
 -- =========================================================
--- Rentora — In-app notifications + Login/signup rate limiting
---
--- HOW TO APPLY: paste this whole file into Supabase Dashboard →
--- SQL Editor → New query → Run. It's idempotent-ish (CREATE TABLE
--- IF NOT EXISTS, CREATE OR REPLACE FUNCTION) so it's safe to re-run.
+-- Rentora — Supabase security-linter follow-up
 -- =========================================================
+-- Run this directly in the Supabase SQL editor (it's not part of a
+-- fresh-install run, since two of the ALTERs below target functions
+-- whose full CREATE statement isn't in this repo — see
+-- 02_functions_reference.sql's header for why).
 
+-- ── search_path: the 2 functions this repo can't fully redefine ──
+-- sync_location_text and set_withdrawal_fee only exist in this repo as
+-- body-only fragments (02_functions_reference.sql), not full CREATE
+-- statements, so we can't safely re-run CREATE OR REPLACE for them here.
+-- ALTER FUNCTION only needs the name + arg types, not the body, so this
+-- closes the search_path warning without touching their logic.
+ALTER FUNCTION public.sync_location_text() SET search_path = public;
+ALTER FUNCTION public.set_withdrawal_fee() SET search_path = public;
 
--- =========================================================
--- PART 1 — In-app notifications
--- =========================================================
+-- ── Move pg_trgm out of the public schema ──
+-- pg_trgm (fuzzy text matching, powers find_possible_duplicate_properties
+-- and the two trgm GIN indexes on properties) was installed straight into
+-- public, the same schema as your app's own tables/functions. That's the
+-- same class of risk as an unpinned search_path (see the ALTER FUNCTION
+-- statements above) — anything in public is reachable by an unqualified
+-- name, which is exactly what a hijack relies on. Moving it to its own
+-- schema keeps public to just your own code.
+CREATE SCHEMA IF NOT EXISTS extensions;
+ALTER EXTENSION pg_trgm SET SCHEMA extensions;
 
--- ── user_notifications ──────────────────────────────
--- One row per notification shown in a user's bell dropdown / /notifications
--- page. Deliberately separate from the existing `notification_queue` table,
--- which is an internal email-retry log, not something users ever see.
-CREATE TABLE IF NOT EXISTS public.user_notifications (
-    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    type text NOT NULL,
-    title text NOT NULL,
-    body text NOT NULL,
-    link text,
-    read_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT now()
-);
+-- Existing GIN indexes (idx_properties_title_trgm, idx_properties_location_trgm)
+-- keep working with no rebuild needed — Postgres tracks the operator
+-- class by internal id, not by schema name.
 
-CREATE INDEX IF NOT EXISTS user_notifications_user_id_created_at_idx
-  ON public.user_notifications (user_id, created_at DESC);
+-- find_possible_duplicate_properties() calls similarity() unqualified, so
+-- now that pg_trgm has moved, it needs "extensions" added to its
+-- search_path or that call stops resolving. Same body-only-fragment
+-- situation as sync_location_text/set_withdrawal_fee above, so this is
+-- ALTER FUNCTION rather than CREATE OR REPLACE.
+ALTER FUNCTION public.find_possible_duplicate_properties(
+  p_title text, p_location text, p_price integer, p_property_type text,
+  p_exclude_agent_id uuid, p_exclude_property_id uuid
+) SET search_path = public, extensions;
 
-ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "user_notifications_select_own" ON public.user_notifications;
-CREATE POLICY "user_notifications_select_own" ON public.user_notifications FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Users may only flip read_at on their own rows (used for mark-as-read).
-DROP POLICY IF EXISTS "user_notifications_update_own" ON public.user_notifications;
-CREATE POLICY "user_notifications_update_own" ON public.user_notifications FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- Deliberately NO insert policy for anon/authenticated — every insert goes
--- through create_notification() below (SECURITY DEFINER) or the server-side
--- service_role key. Otherwise any logged-in user could write directly into
--- another user's notification feed.
-
--- Let the bell update live without polling.
-DO $$
-BEGIN
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.user_notifications;
-EXCEPTION WHEN duplicate_object THEN
-  NULL; -- already added, fine
-END $$;
+-- ── Rewritten logic (not just search_path): create_notification,
+-- check_rate_limit, reset_rate_limit ──
+-- These three had real authorization gaps, not just the mutable-
+-- search_path warning — see the comments inside each function body
+-- below for what was wrong and why. This is CREATE OR REPLACE (full
+-- logic swap), not ALTER, since the fix changes behavior, not just a
+-- config setting.
 
 -- ── create_notification ──────────────────────────────
 -- The one and only way client code creates a notification for ANY user
@@ -105,88 +99,6 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.create_notification(uuid, text, text, text, text) TO authenticated;
-
--- ── mark_all_notifications_read ──────────────────────────────
-CREATE OR REPLACE FUNCTION public.mark_all_notifications_read() RETURNS void
-LANGUAGE sql
-SECURITY INVOKER
-SET search_path = public
-AS $$
-  UPDATE public.user_notifications SET read_at = now()
-  WHERE user_id = auth.uid() AND read_at IS NULL;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.mark_all_notifications_read() TO authenticated;
-
--- ── queue_rent_held_notification ──────────────────────────────
--- Enhancing the EXISTING trigger function (same name, same trigger
--- trg_queue_rent_held_notification already wired to it — no need to
--- touch 03_triggers.sql) so the agent also gets an in-app notification
--- at the same moment the email-queue row is written.
-CREATE OR REPLACE FUNCTION public.queue_rent_held_notification() RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = public
-AS $$
-DECLARE
-  v_agent_email TEXT;
-  v_agent_name TEXT;
-  v_agent_id uuid;
-  v_property_title TEXT;
-BEGIN
-  IF NEW.status = 'held' AND (OLD.status IS DISTINCT FROM 'held') THEN
-    SELECT id, email, full_name INTO v_agent_id, v_agent_email, v_agent_name
-      FROM public.users WHERE id = NEW.agent_id;
-    SELECT title INTO v_property_title FROM public.properties WHERE id = NEW.property_id;
-
-    INSERT INTO public.notification_queue (
-      type, recipient_email, recipient_name, subject, body_text,
-      related_property_id, related_payment_id
-    ) VALUES (
-      'rent_payment_held',
-      v_agent_email,
-      v_agent_name,
-      'A student has paid rent for ' || COALESCE(v_property_title, 'your property'),
-      'Hi ' || COALESCE(v_agent_name, 'there') || ', a student has paid rent for "' || COALESCE(v_property_title, 'your property') ||
-      '". The full amount (₦' || NEW.total_amount || ') is currently held safely by Rentora — it has NOT been released to you yet. ' ||
-      'It will be released once the student confirms they have moved in, or automatically after 5 days if they do not respond. ' ||
-      'You do not need to do anything right now. We will notify you again once it is released.',
-      NEW.property_id,
-      NEW.id
-    );
-
-    IF v_agent_id IS NOT NULL THEN
-      PERFORM public.create_notification(
-        v_agent_id,
-        'rent_payment_held',
-        'Rent paid for ' || COALESCE(v_property_title, 'your property'),
-        'A student has paid rent — ₦' || NEW.total_amount || ' is held by Rentora and will be released once move-in is confirmed.',
-        '/agent'
-      );
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-
--- =========================================================
--- PART 2 — Login / signup rate limiting
--- =========================================================
-
--- ── auth_rate_limits ──────────────────────────────
-CREATE TABLE IF NOT EXISTS public.auth_rate_limits (
-    identifier text NOT NULL,
-    action text NOT NULL,
-    attempt_count integer NOT NULL DEFAULT 0,
-    window_start timestamptz NOT NULL DEFAULT now(),
-    blocked_until timestamptz,
-    PRIMARY KEY (identifier, action)
-);
-
--- RLS on with NO policies at all: the table is only ever touched through
--- the SECURITY DEFINER functions below, so anon/authenticated get zero
--- direct access to it (defense in depth, not the primary protection).
-ALTER TABLE public.auth_rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- ── check_rate_limit ──────────────────────────────
 -- Call this BEFORE attempting a login or signup. It both checks and
@@ -318,3 +230,23 @@ $$;
 GRANT EXECUTE ON FUNCTION public.reset_rate_limit(text, text) TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.reset_rate_limit(text, text) FROM anon;
 
+-- ── inspection_transactions: drop legacy wide-open policies ──
+-- "Allow all read" / "Allow insert" predate the properly-scoped
+-- insp_tx_*_own policies below. Because RLS policies are OR'd together,
+-- these two silently overrode the scoped ones — anyone (including
+-- unauthenticated callers) could insert or read any row. The scoped
+-- policies (insp_tx_insert_own, insp_tx_select_own) already cover the
+-- legitimate cases, so it's safe to drop the old ones outright.
+DROP POLICY IF EXISTS "Allow all read" ON public.inspection_transactions;
+DROP POLICY IF EXISTS "Allow insert" ON public.inspection_transactions;
+-- inspection_transactions_select_own duplicates insp_tx_select_own
+-- exactly (same USING clause) — keep one, drop the redundant copy.
+DROP POLICY IF EXISTS "inspection_transactions_select_own" ON public.inspection_transactions;
+
+-- ── Public buckets: drop the broad SELECT policies ──
+-- these SELECT policies aren't needed for normal display and only add
+-- the ability to LIST every file in the bucket. Safe to drop.
+DROP POLICY IF EXISTS "Anyone can view ad images" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
+DROP POLICY IF EXISTS "move_in_photos_read" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view property images" ON storage.objects;
