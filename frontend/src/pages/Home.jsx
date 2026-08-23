@@ -171,12 +171,7 @@ export function Home() {
         </div>
       </section>
 
-      {/* Ad slot — mid page content */}
-      <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <AdSlot slotType="mid_page_content" />
-      </div>
-
-      {/* Ad slot — in-feed banner */}
+      {/* Ad slot — in-feed banner, right after the browse-by-type grid */}
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <AdSlot slotType="in_feed_banner" />
       </div>
@@ -229,6 +224,11 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      {/* Ad slot — mid page content, right before "How it works" */}
+      <div className="mx-auto max-w-7xl px-5 pt-16 sm:px-8 md:pt-24">
+        <AdSlot slotType="mid_page_content" />
+      </div>
 
       {/* How it works */}
       <section className="bg-white py-20 md:py-28">

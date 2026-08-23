@@ -14,6 +14,7 @@ const SLOT_ASPECT = {
 
 const AUTO_ADVANCE_MS = 5000;
 const SLIDE_TRANSITION_MS = 500;
+const ZOOM_TRANSITION_MS = 400;
 
 /**
  * <AdSlot slotType="header_billboard" />
@@ -28,11 +29,17 @@ const SLIDE_TRANSITION_MS = 500;
  * Slides are laid out in a horizontal track and moved with a CSS
  * transform, so switching slides is a genuine slide-in/slide-out motion
  * rather than one slide disappearing and the next popping in.
+ *
+ * The zoom-on-hover/press effect is driven by explicit React state
+ * (onMouseEnter/Leave, onTouchStart/End) rather than only a CSS
+ * `:hover` pseudo-class, so it works reliably on both desktop hover
+ * and mobile press regardless of how deeply the image is nested.
  */
 export function AdSlot({ slotType }) {
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
+  const [pressed, setPressed] = useState(false);
   const touchStartX = useRef(null);
   const aspect = SLOT_ASPECT[slotType] || 970 / 250;
 
@@ -74,8 +81,12 @@ export function AdSlot({ slotType }) {
     adsAPI.recordClick(ad.id); // fire-and-forget, never blocks navigation
   };
 
-  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    setPressed(true); // trigger the zoom the instant a finger touches down
+  };
   const handleTouchEnd = (e) => {
+    setPressed(false);
     if (touchStartX.current === null) return;
     const delta = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(delta) > 40) goTo(index + (delta < 0 ? 1 : -1));
@@ -85,13 +96,20 @@ export function AdSlot({ slotType }) {
   if (loading) return null; // avoid a flash of empty/placeholder before the first fetch resolves
 
   const safeIndex = index % slides.length;
+  const zoomStyle = {
+    transform: pressed ? 'scale(1.1)' : 'scale(1)',
+    transition: `transform ${ZOOM_TRANSITION_MS}ms ease-out`,
+  };
 
   return (
     <div
       className="group relative w-full overflow-hidden rounded-xl bg-muted/20"
       style={{ aspectRatio: aspect }}
+      onMouseEnter={() => setPressed(true)}
+      onMouseLeave={() => setPressed(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={() => setPressed(false)}
     >
       {/* Sliding track — holds every slide side by side and moves as a
           whole, so advancing feels like a slide-in rather than a swap. */}
@@ -122,7 +140,8 @@ export function AdSlot({ slotType }) {
                 <img
                   src={slide.ad.image_url}
                   alt={slide.ad.business_name}
-                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 group-active:scale-110"
+                  className="h-full w-full object-cover"
+                  style={i === safeIndex ? zoomStyle : undefined}
                   loading="lazy"
                   decoding="async"
                 />
