@@ -1762,8 +1762,8 @@ export default {
 
 
 // ============== RENT (ESCROW) APIs ==============
-// Rentora holds the rent until the user confirms move-in. A configurable
-// service fee (default 5%) is added on top of the rent price.
+// Rentora holds the rent until the user confirms move-in. New transactions
+// use a fixed 3.5% service fee calculated from rent only.
 
 export const rentAPI = {
   // New rent transactions always use the fixed rent-only rate.
@@ -1800,6 +1800,8 @@ export const rentAPI = {
         rent_amount: rentAmount,
         agent_fee: agentFee,
         caution_fee: cautionFee,
+        inspection_fee: inspectionFee,
+        agreement_fee: agreementFee,
         service_fee: serviceFee,
         total_amount: totalAmount,
         reference,

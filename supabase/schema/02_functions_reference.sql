@@ -207,12 +207,9 @@ $$;
 
 -- ── set_withdrawal_fee ──────────────────────────────
 BEGIN
-  IF NEW.fee_amount IS NULL OR NEW.fee_amount = 0 THEN
-    NEW.fee_amount := ROUND(NEW.amount * 0.013);  -- was 0.035
-  END IF;
-  IF NEW.net_amount IS NULL OR NEW.net_amount = 0 THEN
-    NEW.net_amount := NEW.amount - NEW.fee_amount;
-  END IF;
+  -- New withdrawals are manually processed with no platform fee.
+  NEW.fee_amount := 0;
+  NEW.net_amount := NEW.amount;
   RETURN NEW;
 END;
 
