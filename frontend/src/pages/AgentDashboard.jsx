@@ -1251,9 +1251,17 @@ export function AgentDashboard() {
                     {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.10)) : '₦0'} <span className="ml-1">(10% of rent, auto-calculated)</span>
                   </div>
                 </div>
-                {/* Viewing fee field removed — property viewings are now free. The
-                    inspection_fee column is kept in the database with its default
-                    so historical records stay intact. */}
+                <div className="space-y-2">
+                  <Label>Inspection Fee (₦)</Label>
+                  <Input
+                    type="number"
+                    min="1000"
+                    value={formData.inspection_fee}
+                    onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })}
+                    placeholder="e.g. 3000"
+                  />
+                  <p className="text-xs text-muted-foreground">Fee a student pays to book an inspection/viewing of this property.</p>
+                </div>
                 <div className="space-y-2">
                   <Label>Recurring Payment (₦/year)</Label>
                   <Input type="number" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" />
