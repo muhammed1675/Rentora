@@ -712,7 +712,12 @@ export function PropertyDetails() {
               <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting viewing requests.</p>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground mb-4">Schedule a physical viewing with our verified agent.</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Schedule a physical viewing with our verified agent.
+                  {Number(property?.inspection_fee) > 0 && (
+                    <> <span className="font-semibold text-primary">Viewing fee: {formatPrice(Number(property.inspection_fee))}</span></>
+                  )}
+                </p>
                 <Button variant="outline" onClick={() => {
                   if (!isAuthenticated) { toast.error('Please login to request a viewing'); navigate('/login'); return; }
                   if (!requireVerification('book')) return;
@@ -734,7 +739,12 @@ export function PropertyDetails() {
         <DialogContent className="max-w-[calc(100vw-1.5rem)] overflow-hidden sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Request a Property Viewing</DialogTitle>
-            <DialogDescription className="break-words">Schedule a physical viewing with our verified agent. The viewing fee is set by the agent for this property.</DialogDescription>
+            <DialogDescription className="break-words">
+              Schedule a physical viewing with our verified agent.
+              {Number(property?.inspection_fee) > 0 && (
+                <> <span className="font-semibold text-primary">Viewing fee: {formatPrice(Number(property.inspection_fee))}</span></>
+              )}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

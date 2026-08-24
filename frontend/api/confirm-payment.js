@@ -117,7 +117,7 @@ async function handlePayment(req, res) {
     const chargeStatus = charge.status;
     const chargedAmount = charge.amount;
 
-    if (chargeStatus !== 'successful') {
+    if (!['success', 'successful', 'completed'].includes(chargeStatus)) {
       return res.status(402).json({ error: `Payment not successful (Korapay status: ${chargeStatus || 'unknown'})` });
     }
     if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) {
