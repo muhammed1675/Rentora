@@ -311,7 +311,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', agency_fee: '', agreement_fee: '', caution_fee: '', documentation_fee: '', other_fees: [], recurring_payment: '', inspection_fee: '3000', location_id: '', address: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
+    setFormData({ title: '', description: '', price: '', agency_fee: '', agreement_fee: '', caution_fee: '', documentation_fee: '', other_fees: [], recurring_payment: '', inspection_fee: '', location_id: '', address: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
     setEditingProperty(null);
   };
 
@@ -326,7 +326,7 @@ export function AgentDashboard() {
         documentation_fee: property.documentation_fee ? String(property.documentation_fee) : '',
         other_fees: Array.isArray(property.other_fees) ? property.other_fees.map(f => ({ name: String(f?.name || ''), amount: String(f?.amount || '') })) : [],
         recurring_payment: property.recurring_payment ? property.recurring_payment.toString() : '',
-        inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
+        inspection_fee: property.inspection_fee !== null && property.inspection_fee !== undefined && property.inspection_fee !== '' ? property.inspection_fee.toString() : '',
         location_id: property.location_id ? String(property.location_id) : '', address: property.address || '', property_type: property.property_type, images: property.images || [],
         contact_name: property.contact_name, contact_phone: property.contact_phone,
         owner_full_name: property.owner_full_name || '', owner_phone: property.owner_phone || '',
@@ -348,7 +348,7 @@ export function AgentDashboard() {
     submittingPropertyRef.current = true;
     setSubmittingProperty(true);
     try {
-      const inspectionFeeVal = Math.max(1000, parseInt(formData.inspection_fee || '3000', 10) || 3000);
+      const inspectionFeeVal = formData.inspection_fee === '' || formData.inspection_fee === null || formData.inspection_fee === undefined ? 0 : Math.max(0, parseInt(formData.inspection_fee, 10) || 0);
       const priceVal = parseInt(formData.price);
       const locationIdVal = parseInt(formData.location_id, 10);
       const locationName = locations.find(l => l.id === locationIdVal)?.name || '';
@@ -1268,6 +1268,7 @@ export function AgentDashboard() {
                 <div className="space-y-2"><Label>Agreement Fee (₦)</Label><Input type="number" min="0" value={formData.agreement_fee} onChange={(e) => setFormData({ ...formData, agreement_fee: e.target.value })} placeholder="e.g. 10000" /></div>
                 <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" min="0" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
                 <div className="space-y-2"><Label>Documentation Fee (₦)</Label><Input type="number" min="0" value={formData.documentation_fee} onChange={(e) => setFormData({ ...formData, documentation_fee: e.target.value })} placeholder="e.g. 5000" /></div>
+                <div className="space-y-2"><Label>Inspection Fee (₦)</Label><Input type="number" min="0" value={formData.inspection_fee} onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })} placeholder="e.g. 3000" /><p className="text-xs text-muted-foreground">Amount students pay to request an inspection for this property.</p></div>
                 <div className="space-y-2"><Label>Recurring Payment (₦/year)</Label><Input type="number" min="0" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" /><p className="text-xs text-muted-foreground">Not collected by Rentora.</p></div>
               </div>
               <div className="space-y-3 rounded-lg border p-3">
