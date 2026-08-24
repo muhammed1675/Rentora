@@ -34,10 +34,9 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyByReference, readCharge, getSecretKey } from './_korapay.js';
 import { applyCors } from './_cors.js';
 
-// Admin notification wrapper: every attempt to confirm a payment (success or
-// failure) is reported by email to every user with role='admin' in Supabase,
-// with the reason/outcome spelled out. Adding/removing an admin in the users
-// table is all that's needed to change who gets alerted.
+// Admin notification wrapper: called only for the first successful payment-state
+// transition for a reference. Retries and already-processed confirmations are
+// intentionally silent so one payment produces one admin email.
 export default async function handler(req, res) {
   const captured = { status: 200, body: null, headers: {} };
   const shim = {
@@ -50,11 +49,15 @@ export default async function handler(req, res) {
 
   await handlePayment(req, shim);
 
-  // Never let a notification problem change the payment outcome.
-  try {
-    await notifyAdminsOfPaymentAttempt(req, captured);
-  } catch (e) {
-    console.error('[admin payment alert] failed:', e?.message || e);
+  // Admin email is sent only when this request actually performed the first
+  // successful payment-state transition. Retries, webhook replays, and
+  // already-processed confirmations must never send another admin email.
+  if (captured.body?.adminNotify === true) {
+    try {
+      await notifyAdminsOfPaymentAttempt(req, captured);
+    } catch (e) {
+      console.error('[admin payment alert] failed:', e?.message || e);
+    }
   }
 
   for (const [k, v] of Object.entries(captured.headers)) res.setHeader(k, v);
@@ -160,8 +163,17 @@ async function handlePayment(req, res) {
         return res.status(409).json({ error: 'Charged amount does not match the expected token purchase amount.' });
       }
 
-      const { error: txErr } = await supabase.from('transactions').update({ status: 'completed' }).eq('reference', reference).eq('status', 'pending');
+      const { data: claimedToken, error: txErr } = await supabase
+        .from('transactions')
+        .update({ status: 'completed' })
+        .eq('reference', reference)
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
       if (txErr) throw txErr;
+      if (!claimedToken) {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'token_purchase' });
+      }
 
       const { data: wallet } = await supabase.from('wallets').select('token_balance').eq('user_id', tokenTx.user_id).maybeSingle();
       const newBalance = (wallet?.token_balance || 0) + tokenTx.tokens_added;
@@ -191,7 +203,7 @@ async function handlePayment(req, res) {
         console.error(`[token receipt email] exception for reference=${reference}:`, emailErr?.message || emailErr);
       }
 
-      return res.status(200).json({ ok: true, type: 'token_purchase', amount: tokenTx.amount, tokens: tokenTx.tokens_added });
+      return res.status(200).json({ ok: true, type: 'token_purchase', amount: tokenTx.amount, tokens: tokenTx.tokens_added, adminNotify: true });
     }
 
     if (inspTx) {
@@ -212,8 +224,17 @@ async function handlePayment(req, res) {
         return res.status(409).json({ error: 'Charged amount does not match the expected inspection fee.' });
       }
 
-      const { error: itxErr } = await supabase.from('inspection_transactions').update({ status: 'completed' }).eq('reference', reference).eq('status', 'pending');
+      const { data: claimedInspection, error: itxErr } = await supabase
+        .from('inspection_transactions')
+        .update({ status: 'completed' })
+        .eq('reference', reference)
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
       if (itxErr) throw itxErr;
+      if (!claimedInspection) {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection' });
+      }
 
       const { error: inspErr } = await supabase.from('inspections').update({ payment_status: 'completed', status: 'assigned' }).eq('id', inspTx.inspection_id).eq('payment_status', 'pending');
       if (inspErr) throw inspErr;
@@ -246,7 +267,7 @@ async function handlePayment(req, res) {
         console.error(`[inspection email] exception for reference=${reference}:`, emailErr?.message || emailErr);
       }
 
-      return res.status(200).json({ ok: true, type: 'inspection', amount: inspTx.amount, agent_name: inspection?.agent_name, property_title: inspection?.property_title });
+      return res.status(200).json({ ok: true, type: 'inspection', amount: inspTx.amount, agent_name: inspection?.agent_name, property_title: inspection?.property_title, adminNotify: true });
     }
 
     if (rentTx) {
@@ -258,12 +279,17 @@ async function handlePayment(req, res) {
         return res.status(409).json({ error: 'Charged amount does not match the expected rent total.' });
       }
 
-      const { error: rentErr } = await supabase
+      const { data: claimedRent, error: rentErr } = await supabase
         .from('property_rent_payments')
         .update({ status: 'held', held_at: new Date().toISOString(), koralpay_reference: charge.flwRef || reference })
         .eq('reference', reference)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
       if (rentErr) throw rentErr;
+      if (!claimedRent) {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'rent', status: rentTx.status });
+      }
 
       // Lock the property the instant rent is actually held — otherwise
       // nothing stops a second student from also successfully paying for
@@ -306,7 +332,7 @@ async function handlePayment(req, res) {
         console.error(`[rent held email] exception for reference=${reference}:`, emailErr?.message || emailErr);
       }
 
-      return res.status(200).json({ ok: true, type: 'rent', amount: rentTx.total_amount, agent_fee: rentTx.agent_fee });
+      return res.status(200).json({ ok: true, type: 'rent', amount: rentTx.total_amount, agent_fee: rentTx.agent_fee, adminNotify: true });
     }
 
     if (tipTx) {
