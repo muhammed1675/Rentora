@@ -2250,7 +2250,7 @@ export function AdminDashboard() {
                           {payment.property?.title || 'Unknown property'} <span className="text-xs font-normal text-muted-foreground">— {payment.property?.location}</span>
                         </button>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Rent {formatPrice(payment.rent_amount)} + Agent fee {formatPrice(payment.agent_fee)}{payment.caution_fee > 0 ? ` + Caution fee ${formatPrice(payment.caution_fee)}` : ''} + Service fee {formatPrice(payment.service_fee)}
+                          Rent {formatPrice(payment.rent_amount)} + Agency fee {formatPrice(payment.agent_fee)}{payment.agreement_fee > 0 ? ` + Agreement ${formatPrice(payment.agreement_fee)}` : ''}{payment.caution_fee > 0 ? ` + Caution ${formatPrice(payment.caution_fee)}` : ''}{payment.inspection_fee > 0 ? ` + Inspection ${formatPrice(payment.inspection_fee)}` : ''}{payment.documentation_fee > 0 ? ` + Documentation ${formatPrice(payment.documentation_fee)}` : ''}{payment.other_fees_total > 0 ? ` + Other ${formatPrice(payment.other_fees_total)}` : ''} + Service fee {formatPrice(payment.service_fee)}
                         </p>
                         {stuck ? (
                           <p className="text-xs text-red-700 mt-1">A previous refund attempt didn't finish — resolve it to record the refund and remove the listing.</p>
@@ -2874,9 +2874,12 @@ export function AdminDashboard() {
                     <p className="font-semibold">{formatPrice(previewProperty.price)}</p>
                   </div>
                   <div className="p-3 rounded-lg border border-blue-200">
-                    <p className="text-xs text-muted-foreground">Viewing Fee</p>
-                    <p className="font-semibold">{formatPrice(previewProperty.inspection_fee || 3000)}</p>
+                    <p className="text-xs text-muted-foreground">Viewing</p>
+                    <p className="font-semibold">Free</p>
                   </div>
+                  <div className="p-3 rounded-lg border border-blue-200"><p className="text-xs text-muted-foreground">Agreement Fee</p><p className="font-semibold">{formatPrice(previewProperty.agreement_fee || 0)}</p></div>
+                  <div className="p-3 rounded-lg border border-blue-200"><p className="text-xs text-muted-foreground">Documentation Fee</p><p className="font-semibold">{formatPrice(previewProperty.documentation_fee || 0)}</p></div>
+                  {(previewProperty.other_fees || []).map((fee, i) => <div key={i} className="p-3 rounded-lg border border-blue-200"><p className="text-xs text-muted-foreground">{fee.name || 'Other Fee'}</p><p className="font-semibold">{formatPrice(fee.amount || 0)}</p></div>)}
                   <div className="p-3 rounded-lg border border-blue-200">
                     <p className="text-xs text-muted-foreground">Recurring Payment</p>
                     <p className="font-semibold">{formatPrice(previewProperty.recurring_payment)}</p>

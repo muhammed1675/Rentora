@@ -341,8 +341,8 @@ function emailInspectionAgentNotify(agentName: string, userName: string, userEma
 // releases ALL of it to the agent on confirmed move-in (or auto-release).
 // Rentora's only cut is the separate service fee, added on top at checkout —
 // property owners are never paid through the platform. See Agent Agreement §4.
-function emailRentPaymentHeld(agentName: string, propertyTitle: string, totalPaid: number, rentAmount: number, agentFee: number, cautionFee: number, reference: string, studentName: string, studentEmail: string, studentPhone: string) {
-  const payout = Number(rentAmount) + Number(agentFee) + Number(cautionFee || 0);
+function emailRentPaymentHeld(agentName: string, propertyTitle: string, totalPaid: number, rentAmount: number, agentFee: number, agreementFee: number, cautionFee: number, inspectionFee: number, documentationFee: number, otherFeesTotal: number, reference: string, studentName: string, studentEmail: string, studentPhone: string) {
+  const payout = Number(rentAmount) + Number(agentFee) + Number(agreementFee || 0) + Number(cautionFee || 0) + Number(inspectionFee || 0) + Number(documentationFee || 0) + Number(otherFeesTotal || 0);
   return baseTemplate({
     eyebrow: "Rent paid — held by Rentora",
     headline: `A Student Has Paid Rent for <em>${propertyTitle}</em>`,
@@ -351,12 +351,16 @@ function emailRentPaymentHeld(agentName: string, propertyTitle: string, totalPai
       row("home", "Property", propertyTitle),
       row("money", "Total Paid by Student", `₦${Number(totalPaid).toLocaleString()}`),
       row("target", "You'll Receive (once released)", `₦${payout.toLocaleString()}`),
+      agreementFee > 0 ? row("tag", "Agreement Fee", `₦${Number(agreementFee).toLocaleString()}`) : "",
+      inspectionFee > 0 ? row("home", "Inspection Fee", `₦${Number(inspectionFee).toLocaleString()}`) : "",
+      documentationFee > 0 ? row("tag", "Documentation Fee", `₦${Number(documentationFee).toLocaleString()}`) : "",
+      otherFeesTotal > 0 ? row("tag", "Other Fees", `₦${Number(otherFeesTotal).toLocaleString()}`) : "",
       row("tag", "Reference", reference),
       row("user", "Student Name", studentName),
       studentEmail ? row("mail", "Student Email", studentEmail, { valueColor: "#2E86D8" }) : "",
       studentPhone ? row("phone", "Student Phone", studentPhone) : "",
     ].join(""),
-    paragraphs: ["The full rent, your agent fee, and the caution fee are released together to your Rentora balance once confirmed — Rentora's only cut is a separate service fee, which is not part of your payout. You'll get another email once it's released."],
+    paragraphs: ["The full rent and all disclosed property-related charges are released together to your Rentora balance once confirmed — Rentora's only cut is a separate service fee, which is not part of your payout. You'll get another email once it's released."],
     cta: { buttons: [{ text: "View on Agent Dashboard", href: "https://www.rentora.com.ng/agent?tab=rent-payments" }] },
   });
 }
@@ -379,8 +383,8 @@ function emailRentPaymentReceipt(studentName: string, propertyTitle: string, amo
 // The agent receives the FULL amount on release — rent + agent fee +
 // caution fee, all together. Rentora's cut (the service fee) was already
 // deducted at checkout and never appears in the agent's payout.
-function emailRentPaymentReleasedAgent(agentName: string, propertyTitle: string, rentAmount: number, agentFee: number, cautionFee: number, reference: string) {
-  const totalCredited = Number(rentAmount) + Number(agentFee) + Number(cautionFee || 0);
+function emailRentPaymentReleasedAgent(agentName: string, propertyTitle: string, rentAmount: number, agentFee: number, agreementFee: number, cautionFee: number, inspectionFee: number, documentationFee: number, otherFeesTotal: number, reference: string) {
+  const totalCredited = Number(rentAmount) + Number(agentFee) + Number(agreementFee || 0) + Number(cautionFee || 0) + Number(inspectionFee || 0) + Number(documentationFee || 0) + Number(otherFeesTotal || 0);
   return baseTemplate({
     eyebrow: "Funds released",
     headline: `Your Funds Have Been <em>Released</em>`,
@@ -390,6 +394,10 @@ function emailRentPaymentReleasedAgent(agentName: string, propertyTitle: string,
       row("money", "Rent", `₦${Number(rentAmount).toLocaleString()}`),
       row("target", "Agent Fee", `₦${Number(agentFee).toLocaleString()}`),
       cautionFee ? row("lock", "Caution Fee", `₦${Number(cautionFee).toLocaleString()}`) : "",
+      agreementFee > 0 ? row("tag", "Agreement Fee", `₦${Number(agreementFee).toLocaleString()}`) : "",
+      inspectionFee > 0 ? row("home", "Inspection Fee", `₦${Number(inspectionFee).toLocaleString()}`) : "",
+      documentationFee > 0 ? row("tag", "Documentation Fee", `₦${Number(documentationFee).toLocaleString()}`) : "",
+      otherFeesTotal > 0 ? row("tag", "Other Fees", `₦${Number(otherFeesTotal).toLocaleString()}`) : "",
       row("check", "Total Credited", `₦${totalCredited.toLocaleString()}`, { color: "#1f7a43" }),
       row("tag", "Reference", reference),
     ].join(""),
@@ -630,7 +638,7 @@ serve(async (req) => {
         break;
       case "rent_payment_held":
         subject = `Rent Paid for ${data.property_title} — Held by Rentora`;
-        html = emailRentPaymentHeld(data.agent_name, data.property_title, data.amount, data.rent_amount, data.agent_fee, data.caution_fee, data.reference, data.student_name, data.student_email, data.student_phone);
+        html = emailRentPaymentHeld(data.agent_name, data.property_title, data.amount, data.rent_amount, data.agent_fee, data.agreement_fee, data.caution_fee, data.inspection_fee, data.documentation_fee, data.other_fees_total, data.reference, data.student_name, data.student_email, data.student_phone);
         break;
       case "rent_payment_receipt":
         subject = `Rent Payment Received — ${data.property_title}`;
@@ -638,7 +646,7 @@ serve(async (req) => {
         break;
       case "rent_payment_released":
         subject = `Funds Released — ${data.property_title}`;
-        html = emailRentPaymentReleasedAgent(data.agent_name, data.property_title, data.rent_amount, data.agent_fee, data.caution_fee, data.reference);
+        html = emailRentPaymentReleasedAgent(data.agent_name, data.property_title, data.rent_amount, data.agent_fee, data.agreement_fee, data.caution_fee, data.inspection_fee, data.documentation_fee, data.other_fees_total, data.reference);
         break;
       case "rent_payment_released_student":
         subject = `Move-In Confirmed — ${data.property_title}`;

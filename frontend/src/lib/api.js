@@ -1658,7 +1658,7 @@ export const rentAPI = {
     const agentFee = Number(property.agency_fee ?? property.agent_fee) || 0;
     const agreementFee = Number(property.agreement_fee) || 0;
     const cautionFee = Number(property.caution_fee) || 0;
-    const inspectionFee = Number(property.inspection_fee) || 0;
+    const inspectionFee = 0; // Rental checkout does not charge the legacy viewing/inspection fee.
     const documentationFee = Number(property.documentation_fee) || 0;
     const otherFees = Array.isArray(property.other_fees)
       ? property.other_fees.map((fee) => ({ name: String(fee.name || 'Other Fee'), amount: Math.max(0, Math.round(Number(fee.amount) || 0)) })).filter((fee) => fee.amount > 0)
@@ -1680,7 +1680,6 @@ export const rentAPI = {
         agent_id: property.uploaded_by_agent_id,
         rent_amount: rentAmount,
         agent_fee: agentFee,
-        agency_fee: agentFee,
         agreement_fee: agreementFee,
         caution_fee: cautionFee,
         inspection_fee: inspectionFee,
@@ -1733,7 +1732,7 @@ export const rentAPI = {
     // Dashboard too, instead of just disappearing from view.
     const { data, error } = await supabase
       .from('property_rent_payments')
-      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
+      .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, agreement_fee, inspection_fee, documentation_fee, other_fees, other_fees_total, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at, property:properties(title, locations(name)), student:users!property_rent_payments_user_id_fkey(full_name, email, phone)')
       .eq('agent_id', agentId)
       .in('status', ['held', 'released', 'refunded'])
       .order('created_at', { ascending: false });
@@ -1741,7 +1740,7 @@ export const rentAPI = {
       // Fall back to the narrower shape if the join name differs — never break the dashboard.
       const fallback = await supabase
         .from('property_rent_payments')
-        .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at')
+        .select('id, property_id, user_id, status, rent_amount, agent_fee, caution_fee, agreement_fee, inspection_fee, documentation_fee, other_fees, other_fees_total, service_fee, total_amount, reference, held_at, released_at, auto_release_at, refunded_at, refund_reason, admin_note, created_at')
         .eq('agent_id', agentId)
         .in('status', ['held', 'released', 'refunded'])
         .order('created_at', { ascending: false });

@@ -107,7 +107,7 @@ export function AgentDashboard() {
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
   const [locations, setLocations] = useState([]);
   const [formData, setFormData] = useState({
-    title: '', description: '', price: '', caution_fee: '', recurring_payment: '', inspection_fee: '', location_id: '', address: '',
+    title: '', description: '', price: '', agency_fee: '', agreement_fee: '', caution_fee: '', documentation_fee: '', other_fees: [], recurring_payment: '', inspection_fee: '', location_id: '', address: '',
     property_type: 'hostel', images: [], contact_name: '', contact_phone: '',
     owner_full_name: '', owner_phone: '',
     google_maps_link: '', amenities: [],
@@ -311,7 +311,7 @@ export function AgentDashboard() {
   const handleRemoveImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', price: '', caution_fee: '', recurring_payment: '', inspection_fee: '3000', location_id: '', address: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
+    setFormData({ title: '', description: '', price: '', agency_fee: '', agreement_fee: '', caution_fee: '', documentation_fee: '', other_fees: [], recurring_payment: '', inspection_fee: '3000', location_id: '', address: '', property_type: 'hostel', images: [], contact_name: '', contact_phone: '', owner_full_name: '', owner_phone: '', google_maps_link: '', amenities: [] });
     setEditingProperty(null);
   };
 
@@ -320,7 +320,11 @@ export function AgentDashboard() {
       setEditingProperty(property);
       setFormData({
         title: property.title, description: property.description, price: property.price.toString(),
+        agency_fee: (property.agency_fee ?? property.agent_fee) ? String(property.agency_fee ?? property.agent_fee) : '',
+        agreement_fee: property.agreement_fee ? String(property.agreement_fee) : '',
         caution_fee: property.caution_fee ? property.caution_fee.toString() : '',
+        documentation_fee: property.documentation_fee ? String(property.documentation_fee) : '',
+        other_fees: Array.isArray(property.other_fees) ? property.other_fees.map(f => ({ name: String(f?.name || ''), amount: String(f?.amount || '') })) : [],
         recurring_payment: property.recurring_payment ? property.recurring_payment.toString() : '',
         inspection_fee: property.inspection_fee ? property.inspection_fee.toString() : '3000',
         location_id: property.location_id ? String(property.location_id) : '', address: property.address || '', property_type: property.property_type, images: property.images || [],
@@ -371,7 +375,27 @@ export function AgentDashboard() {
         }
       }
 
-      const data = { ...formData, location_id: locationIdVal, price: priceVal, caution_fee: formData.caution_fee ? parseInt(formData.caution_fee) : null, recurring_payment: formData.recurring_payment ? parseInt(formData.recurring_payment) : null, inspection_fee: inspectionFeeVal, images: formData.images };
+      const normalizeOtherFees = (Array.isArray(formData.other_fees) ? formData.other_fees : [])
+        .map((fee) => ({ name: String(fee?.name || '').trim(), amount: Math.max(0, parseInt(fee?.amount || '0', 10) || 0) }))
+        .filter((fee) => fee.name && fee.amount > 0);
+      const agencyFeeVal = Math.max(0, parseInt(formData.agency_fee || '0', 10) || 0);
+      const agreementFeeVal = Math.max(0, parseInt(formData.agreement_fee || '0', 10) || 0);
+      const cautionFeeVal = Math.max(0, parseInt(formData.caution_fee || '0', 10) || 0);
+      const documentationFeeVal = Math.max(0, parseInt(formData.documentation_fee || '0', 10) || 0);
+      const data = {
+        ...formData,
+        location_id: locationIdVal,
+        price: priceVal,
+        agency_fee: agencyFeeVal,
+        agent_fee: agencyFeeVal,
+        agreement_fee: agreementFeeVal,
+        caution_fee: cautionFeeVal,
+        documentation_fee: documentationFeeVal,
+        other_fees: normalizeOtherFees,
+        recurring_payment: formData.recurring_payment ? parseInt(formData.recurring_payment) : null,
+        inspection_fee: inspectionFeeVal,
+        images: formData.images,
+      };
       if (editingProperty) {
         // Any edit to an existing listing's details must go back through admin
         // approval — status: 'pending' is enough to pull it out of "approved"
@@ -1086,23 +1110,19 @@ export function AgentDashboard() {
                           )}
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                            <div>
-                              <p className="text-xs text-muted-foreground">Rent</p>
-                              <p className="font-semibold">₦{Number(p.rent_amount || 0).toLocaleString('en-NG')}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Agent Fee</p>
-                              <p className="font-semibold">₦{Number(p.agent_fee || 0).toLocaleString('en-NG')}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Caution Fee</p>
-                              <p className="font-semibold">₦{Number(p.caution_fee || 0).toLocaleString('en-NG')}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">{totalLabel}</p>
-                              <p className={`font-bold ${totalColorClass}`}>₦{Number(p.total_amount || 0).toLocaleString('en-NG')}</p>
-                            </div>
+                            <div><p className="text-xs text-muted-foreground">Rent</p><p className="font-semibold">₦{Number(p.rent_amount || 0).toLocaleString('en-NG')}</p></div>
+                            <div><p className="text-xs text-muted-foreground">Agency Fee</p><p className="font-semibold">₦{Number(p.agent_fee || 0).toLocaleString('en-NG')}</p></div>
+                            <div><p className="text-xs text-muted-foreground">Caution Fee</p><p className="font-semibold">₦{Number(p.caution_fee || 0).toLocaleString('en-NG')}</p></div>
+                            <div><p className="text-xs text-muted-foreground">{totalLabel}</p><p className={`font-bold ${totalColorClass}`}>₦{Number(p.total_amount || 0).toLocaleString('en-NG')}</p></div>
                           </div>
+                          {(Number(p.agreement_fee || 0) > 0 || Number(p.inspection_fee || 0) > 0 || Number(p.documentation_fee || 0) > 0 || Number(p.other_fees_total || 0) > 0) && (
+                            <div className="mb-3 rounded-md border bg-muted/20 p-3 text-xs grid grid-cols-2 md:grid-cols-4 gap-2">
+                              {Number(p.agreement_fee || 0) > 0 && <div><span className="text-muted-foreground">Agreement:</span> ₦{Number(p.agreement_fee).toLocaleString('en-NG')}</div>}
+                              {Number(p.inspection_fee || 0) > 0 && <div><span className="text-muted-foreground">Inspection:</span> ₦{Number(p.inspection_fee).toLocaleString('en-NG')}</div>}
+                              {Number(p.documentation_fee || 0) > 0 && <div><span className="text-muted-foreground">Documentation:</span> ₦{Number(p.documentation_fee).toLocaleString('en-NG')}</div>}
+                              {Array.isArray(p.other_fees) && p.other_fees.map((f, i) => <div key={i}><span className="text-muted-foreground">{f.name}:</span> ₦{Number(f.amount || 0).toLocaleString('en-NG')}</div>)}
+                            </div>
+                          )}
 
                           <div className="border-t pt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
                             <div>
@@ -1243,20 +1263,16 @@ export function AgentDashboard() {
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-primary uppercase tracking-wide border-b pb-2">Pricing &amp; Fees</h3>
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
-                <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
-                <div className="space-y-2">
-                  <Label>Agency Fee (₦)</Label>
-                  <Input type="number" min="0" value={formData.agency_fee || ''} onChange={(e) => setFormData({ ...formData, agency_fee: e.target.value })} placeholder="Enter the fee for this property, or 0" />
-                </div>
-                {/* Viewing fee field removed — property viewings are now free. The
-                    inspection_fee column is kept in the database with its default
-                    so historical records stay intact. */}
-                <div className="space-y-2">
-                  <Label>Recurring Payment (₦/year)</Label>
-                  <Input type="number" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" />
-                  <p className="text-xs text-muted-foreground">Shown to students as what they'll pay after their first payment (e.g. next year's rent). Not collected by Rentora.</p>
-                </div>
+                <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" min="0" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
+                <div className="space-y-2"><Label>Agency Fee (₦)</Label><Input type="number" min="0" value={formData.agency_fee} onChange={(e) => setFormData({ ...formData, agency_fee: e.target.value })} placeholder="e.g. 50000" /></div>
+                <div className="space-y-2"><Label>Agreement Fee (₦)</Label><Input type="number" min="0" value={formData.agreement_fee} onChange={(e) => setFormData({ ...formData, agreement_fee: e.target.value })} placeholder="e.g. 10000" /></div>
+                <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" min="0" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
+                <div className="space-y-2"><Label>Documentation Fee (₦)</Label><Input type="number" min="0" value={formData.documentation_fee} onChange={(e) => setFormData({ ...formData, documentation_fee: e.target.value })} placeholder="e.g. 5000" /></div>
+                <div className="space-y-2"><Label>Recurring Payment (₦/year)</Label><Input type="number" min="0" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" /><p className="text-xs text-muted-foreground">Not collected by Rentora.</p></div>
+              </div>
+              <div className="space-y-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-3"><div><Label>Other Fees</Label><p className="text-xs text-muted-foreground">Add a clear name and amount for each legitimate additional charge.</p></div><Button type="button" variant="outline" size="sm" onClick={() => setFormData(prev => ({ ...prev, other_fees: [...(prev.other_fees || []), { name: '', amount: '' }] }))}><Plus className="h-4 w-4 mr-1" />Add Fee</Button></div>
+                {(formData.other_fees || []).map((fee, i) => <div key={i} className="grid grid-cols-[minmax(0,1fr)_140px_auto] gap-2 items-end"><Input value={fee.name} onChange={(e) => setFormData(prev => ({ ...prev, other_fees: prev.other_fees.map((f, j) => j === i ? { ...f, name: e.target.value } : f) }))} placeholder="Fee name" /><Input type="number" min="0" value={fee.amount} onChange={(e) => setFormData(prev => ({ ...prev, other_fees: prev.other_fees.map((f, j) => j === i ? { ...f, amount: e.target.value } : f) }))} placeholder="Amount" /><Button type="button" variant="ghost" size="icon" onClick={() => setFormData(prev => ({ ...prev, other_fees: prev.other_fees.filter((_, j) => j !== i) }))}><X className="h-4 w-4" /></Button></div>)}
               </div>
             </div>
 

@@ -611,19 +611,15 @@ export function PropertyDetails() {
                   <p className="text-sm font-semibold shrink-0">{formatPrice(property.caution_fee)}</p>
                 </div>
                 )}
-                {Number(property.agency_fee || 0) > 0 && (
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <p className="text-sm text-muted-foreground min-w-0">Agency Fee</p>
-                  <p className="text-sm font-semibold shrink-0">{formatPrice(property.agency_fee)}</p>
-                </div>
-                )}
+                {Number(property.agency_fee ?? property.agent_fee ?? 0) > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><p className="text-sm text-muted-foreground min-w-0">Agency Fee</p><p className="text-sm font-semibold shrink-0">{formatPrice(property.agency_fee ?? property.agent_fee)}</p></div>}
+                {Number(property.agreement_fee || 0) > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><p className="text-sm text-muted-foreground min-w-0">Agreement Fee</p><p className="text-sm font-semibold shrink-0">{formatPrice(property.agreement_fee)}</p></div>}
+                {Number(property.documentation_fee || 0) > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><p className="text-sm text-muted-foreground min-w-0">Documentation Fee</p><p className="text-sm font-semibold shrink-0">{formatPrice(property.documentation_fee)}</p></div>}
+                {Array.isArray(property.other_fees) && property.other_fees.filter(f => Number(f?.amount) > 0).map((fee,i)=><div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><p className="text-sm text-muted-foreground min-w-0">{fee.name || 'Other Fee'}</p><p className="text-sm font-semibold shrink-0">{formatPrice(fee.amount)}</p></div>)}
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t border-border/40 pt-2">
                   <p className="text-sm font-semibold min-w-0">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground block sm:inline">(+ small service fee at checkout)</span></p>
                   <p className="text-sm font-bold text-primary shrink-0">
                     {formatPrice(
-                      Number(property.price || 0) +
-                      Number(property.caution_fee || 0) +
-                      Number(property.agency_fee || 0)
+                      Number(property.price || 0) + Number(property.agency_fee ?? property.agent_fee ?? 0) + Number(property.agreement_fee || 0) + Number(property.caution_fee || 0) + Number(property.documentation_fee || 0) + (Array.isArray(property.other_fees) ? property.other_fees.reduce((sum, f) => sum + (Number(f?.amount) || 0), 0) : 0)
                     )}
                   </p>
                 </div>
@@ -645,23 +641,30 @@ export function PropertyDetails() {
               {property?.price > 0 && (() => {
                 const rent = Number(property.price);
                 const agentFee = Number(property.agency_fee ?? property.agent_fee) || 0;
+                const agreementFee = Number(property.agreement_fee) || 0;
                 const cautionFee = Number(property.caution_fee) || 0;
+                const documentationFee = Number(property.documentation_fee) || 0;
+                const inspectionFee = 0; // Viewings are free; inspection_fee is retained only for legacy/history.
+                const otherFees = Array.isArray(property.other_fees) ? property.other_fees.filter(f => Number(f?.amount) > 0) : [];
+                const otherFeesTotal = otherFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
                 const serviceFee = Math.round(rent * 0.035);
-                const total = rent + agentFee + cautionFee + serviceFee;
+                const total = rent + agentFee + agreementFee + cautionFee + documentationFee + inspectionFee + otherFeesTotal + serviceFee;
                 return (
                   <div className="text-sm space-y-1 mb-3">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rent</span><span className="shrink-0 text-right">{formatPrice(rent)}</span></div>
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agency Fee</span><span className="shrink-0 text-right">{formatPrice(agentFee)}</span></div>
-                    {cautionFee > 0 && (
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>
-                    )}
+                    {agreementFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agreement fee</span><span className="shrink-0 text-right">{formatPrice(agreementFee)}</span></div>}
+                    {cautionFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>}
+                    {inspectionFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Inspection fee</span><span className="shrink-0 text-right">{formatPrice(inspectionFee)}</span></div>}
+                    {documentationFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Documentation fee</span><span className="shrink-0 text-right">{formatPrice(documentationFee)}</span></div>}
+                    {otherFees.map((fee,i)=><div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">{fee.name || 'Other fee'}</span><span className="shrink-0 text-right">{formatPrice(fee.amount)}</span></div>}
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rentora service fee (3.5% of rent)</span><span className="shrink-0 text-right">{formatPrice(serviceFee)}</span></div>
                     <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t pt-1.5 font-semibold"><span className="min-w-0">Total to pay</span><span className="shrink-0 text-right text-primary">{formatPrice(total)}</span></div>
                   </div>
                 );
               })()}
               <p className="text-xs text-muted-foreground mb-3">
-                Rentora holds your rent, agent fee, and caution fee safely until you confirm you've moved in, then releases them to the listing agent.
+                Rentora holds your rent and all disclosed property charges safely until you confirm you've moved in, then releases the applicable agent/property funds to the listing agent.
               </p>
               <Button
                 onClick={handlePayRent}
