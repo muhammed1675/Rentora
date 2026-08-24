@@ -207,12 +207,83 @@ export const propertyAPI = {
   },
 
   update: async (id, data) => {
+    // Capture the existing listing before the update so we can send an
+    // accurate admin notification after an agent changes an existing
+    // property. The notification is best-effort and must never block the
+    // actual property update.
+    let existingProperty = null;
+    try {
+      const { data: currentProperty } = await supabase
+        .from('properties')
+        .select('id, title, price, status, uploaded_by_agent_id, uploaded_by_agent_name')
+        .eq('id', id)
+        .maybeSingle();
+      existingProperty = currentProperty || null;
+    } catch (_) {
+      existingProperty = null;
+    }
+
     const { error } = await supabase
       .from('properties')
       .update(data)
       .eq('id', id);
-    
+
     if (error) throw error;
+
+    // If this is an existing listing being edited by a normal user/agent,
+    // notify every admin that the listing needs review. This deliberately
+    // runs after the DB update so admins never receive an alert for an
+    // update that actually failed.
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const isAdmin = authUser?.user_metadata?.role === 'admin';
+      const newStatus = data?.status || 'pending';
+
+      if (!isAdmin) {
+        const agentName = authUser?.user_metadata?.full_name || existingProperty?.uploaded_by_agent_name || authUser?.email || 'An agent';
+        const changed = [];
+
+        const labels = {
+          title: 'Title',
+          price: 'Rent',
+          agency_fee: 'Agency fee',
+          agent_fee: 'Agency fee',
+          agreement_fee: 'Agreement fee',
+          caution_fee: 'Caution fee',
+          inspection_fee: 'Inspection fee',
+          documentation_fee: 'Documentation fee',
+          other_fees: 'Other fees',
+          availability: 'Availability',
+          address: 'Address',
+          description: 'Description',
+          property_type: 'Property type',
+          location_id: 'Location',
+          images: 'Images',
+          status: 'Status',
+        };
+
+        Object.keys(data || {}).forEach((key) => {
+          if (labels[key] && key !== 'status') changed.push([labels[key], 'Updated']);
+        });
+
+        notifyAdmins({
+          title: `Property updated: ${data?.title || existingProperty?.title || 'Untitled listing'}`,
+          eventLabel: 'Property update',
+          summary: `${agentName} updated an existing property listing. The listing has been submitted for admin review.`,
+          breakdown: [
+            ['Property', data?.title || existingProperty?.title || '—'],
+            ['Agent', agentName],
+            ['Agent email', authUser?.email || '—'],
+            ['New status', newStatus],
+            ...(changed.length ? changed : [['Changes', 'Listing details updated']]),
+          ],
+          actionUrl: 'https://www.rentora.com.ng/admin',
+        });
+      }
+    } catch (notifyError) {
+      console.warn('Property update admin notification failed:', notifyError?.message || notifyError);
+    }
+
     return { data: { message: 'Property updated' } };
   },
 

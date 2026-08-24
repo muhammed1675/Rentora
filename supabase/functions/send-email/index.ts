@@ -515,6 +515,29 @@ function emailAdminActivityAlert(d: any) {
   });
 }
 
+// Admin notification specifically for an existing property that an agent/user
+// has edited. The caller can pass a list of changed fields in `breakdown`.
+// This is intentionally kept separate from property_approved so an edit that
+// sends the listing back to pending review has its own clear email trail.
+function emailPropertyUpdatedAdmin(d: any) {
+  const breakdownRows = (d.breakdown || []).map((r: any[]) => row("tag", r[0], r[1])).join("");
+  return baseTemplate({
+    eyebrow: "Property update",
+    headline: "A Property Listing Was Updated",
+    subhead: d.property_title ? `\"${d.property_title}\" was updated and needs admin review.` : "A property listing was updated and may need admin review.",
+    rowsHtml: [
+      row("home", "Property", d.property_title || "—"),
+      row("user", "Updated By", d.agent_name || d.user_name || "—"),
+      d.agent_email ? row("mail", "Agent Email", d.agent_email, { valueColor: "#2E86D8" }) : "",
+      d.status ? row("check", "New Status", d.status) : "",
+      d.property_id ? row("tag", "Property ID", d.property_id) : "",
+      breakdownRows,
+    ].join(""),
+    paragraphs: [d.summary || "Please review the updated listing in the Admin Dashboard before approving it again."],
+    cta: { buttons: [{ text: "Review Property", href: d.action_url || "https://www.rentora.com.ng/admin" }] },
+  });
+}
+
 async function sendEmail(to: string, subject: string, html: string, emailType: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -693,6 +716,11 @@ serve(async (req) => {
       case "admin_activity_alert": {
         subject = `[Rentora Admin] ${data.title || "New activity"}`;
         html = emailAdminActivityAlert(data);
+        break;
+      }
+      case "property_updated_admin": {
+        subject = `[Rentora Admin] Property updated — ${data.property_title || "listing"}`;
+        html = emailPropertyUpdatedAdmin(data);
         break;
       }
       default:
