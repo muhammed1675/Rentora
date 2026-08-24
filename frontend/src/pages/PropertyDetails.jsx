@@ -712,7 +712,7 @@ export function PropertyDetails() {
               <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting viewing requests.</p>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground mb-4">Schedule a physical viewing with our verified agent.</p>
+                <p className="text-sm text-muted-foreground mb-4">Schedule a physical viewing with our verified agent. <span className="font-semibold text-primary">Viewing fee: {formatPrice(Number(property?.inspection_fee) || 0)}</span></p>
                 <Button variant="outline" onClick={() => {
                   if (!isAuthenticated) { toast.error('Please login to request a viewing'); navigate('/login'); return; }
                   if (!requireVerification('book')) return;
