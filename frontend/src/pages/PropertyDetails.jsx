@@ -265,7 +265,7 @@ export function PropertyDetails() {
             setRequestingInspection(false);
           },
           onPending: () => {
-            toast.message('Viewing payment received — we are confirming it now. Your request will update automatically once confirmed.');
+            toast.message('Viewing payment window opened. Complete your payment in the KoraPay window; your request will update automatically after Rentora confirms the payment.');
             setShowInspectionDialog(false);
             setRequestingInspection(false);
           },
@@ -712,7 +712,7 @@ export function PropertyDetails() {
               <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting viewing requests.</p>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground mb-4">Schedule a physical viewing with our verified agent. <span className="font-semibold text-primary">Viewing fee: {formatPrice(Number(property?.inspection_fee) || 0)}</span></p>
+                <p className="text-sm text-muted-foreground mb-4">Schedule a physical viewing with our verified agent.</p>
                 <Button variant="outline" onClick={() => {
                   if (!isAuthenticated) { toast.error('Please login to request a viewing'); navigate('/login'); return; }
                   if (!requireVerification('book')) return;

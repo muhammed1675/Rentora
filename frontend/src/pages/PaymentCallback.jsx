@@ -23,21 +23,37 @@ export function PaymentCallback() {
         return;
       }
 
-      try {
-        const response = await paymentAPI.confirmPayment(reference);
-        setPaymentDetails(response.data);
-        
-        // complete() always returns 'completed' or throws
-        if (response.data.status === 'completed') {
-          setStatus('success');
-          await refreshUser();
-        } else {
-          setStatus('failed');
+      let lastError = null;
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          const response = await paymentAPI.confirmPayment(reference);
+          setPaymentDetails(response.data);
+
+          if (response.data?.status === 'completed' || response.data?.ok === true) {
+            setStatus('success');
+            await refreshUser();
+            return;
+          }
+
+          lastError = new Error('Payment confirmation returned an unexpected status.');
+        } catch (error) {
+          lastError = error;
+          console.warn(`Payment verification attempt ${attempt}/5 failed:`, error);
+
+          // KoraPay can redirect back before its charge record is immediately
+          // queryable. Retry short, transient verification failures instead of
+          // telling a student that a legitimate payment failed. The webhook
+          // remains the server-side source of truth.
+          const retryable = [404, 402, 409, 500, 502].includes(error?.status)
+            || /no transaction found|not successful|could not verify payment/i.test(error?.message || '');
+
+          if (!retryable || attempt === 5) break;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
         }
-      } catch (error) {
-        console.error('Payment verification failed:', error);
-        setStatus('failed');
       }
+
+      console.error('Payment verification still pending:', lastError);
+      setStatus('pending');
     };
 
     verifyPayment();

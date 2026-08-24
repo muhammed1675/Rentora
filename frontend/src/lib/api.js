@@ -381,6 +381,37 @@ export const inspectionAPI = {
       throw insertError;
     }
 
+    // A paid viewing must have a matching inspection_transactions row before
+    // KoraPay checkout starts. The server-side /api/confirm-payment endpoint
+    // uses this row to verify the amount and only then marks the viewing paid.
+    // Without it, checkout could succeed while Rentora has nothing to match
+    // the payment reference against, producing "No transaction found".
+    if (inspectionFee > 0) {
+      const { error: txInsertError } = await supabase
+        .from('inspection_transactions')
+        .insert({
+          id: uuidv4(),
+          inspection_id: inspectionId,
+          user_id: user.id,
+          reference,
+          amount: inspectionFee,
+          status: 'pending',
+          koralpay_reference: null,
+        });
+
+      if (txInsertError) {
+        // Do not leave a viewing request behind when its payment ledger row
+        // could not be created. This keeps the request/transaction pair in
+        // sync and prevents a checkout with an unconfirmable reference.
+        try {
+          await supabase.from('inspections').delete().eq('id', inspectionId).eq('user_id', user.id);
+        } catch (cleanupError) {
+          console.warn('Failed to clean up orphaned viewing request:', cleanupError?.message || cleanupError);
+        }
+        throw new Error(txInsertError.message || 'Failed to create the viewing payment record.');
+      }
+    }
+
     const sendMail = sendTransactionalEmail;
 
     // Free viewing: notify immediately. Paid viewing: confirmation emails are
@@ -532,6 +563,22 @@ export const inspectionAPI = {
   },
 
   update: async (id, updateData) => {
+    // A viewing can only be marked physically completed after its payment
+    // has been confirmed (or the viewing was explicitly free). Never allow
+    // an agent/UI call to turn a pending-payment viewing into `completed`.
+    if (updateData?.status === 'completed') {
+      const { data: current, error: currentError } = await supabase
+        .from('inspections')
+        .select('payment_status, status')
+        .eq('id', id)
+        .single();
+
+      if (currentError) throw currentError;
+      if (!['completed', 'not_required'].includes(current?.payment_status)) {
+        throw new Error('This viewing cannot be marked completed until the payment is confirmed.');
+      }
+    }
+
     const { error } = await supabase
       .from('inspections')
       .update(updateData)
@@ -1125,8 +1172,13 @@ export const paymentAPI = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reference }),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body?.error || 'Failed to confirm payment');
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const error = new Error(body?.error || 'Failed to confirm payment');
+      error.status = res.status;
+      error.body = body;
+      throw error;
+    }
     return { data: body };
   },
 };
