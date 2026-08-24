@@ -440,7 +440,7 @@ export const inspectionAPI = {
         ['Student', user.full_name || '—'],
         ['Student email', user.email || '—'],
         ['Agent', property.uploaded_by_agent_name || '—'],
-        ['Date', data.inspection_date || '—'],
+        ['Date', data.inspection_date || '���'],
       ],
       actionUrl: 'https://www.rentora.com.ng/admin',
     });
@@ -1096,6 +1096,12 @@ export const adminAPI = {
 // ============== PAYMENT APIs ==============
 
 export const paymentAPI = {
+  initializeKorapay: async (payload) => {
+    const res = await fetch('/api/korapay-init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body?.error || 'Failed to initialize payment');
+    return body;
+  },
   // Calls the server-side verified confirmation endpoint (/api/confirm-payment)
   // instead of writing to the database directly. That endpoint independently
   // verifies the charge with Flutterwave using the secret key before marking
@@ -1466,7 +1472,7 @@ export const balanceAPI = {
 // ============== WITHDRAWAL APIs ==============
 
 export const withdrawalAPI = {
-  WITHDRAWAL_FEE_PCT: 1.3,
+  WITHDRAWAL_FEE_PCT: 0,
   MIN_WITHDRAWAL_AMOUNT: 3000, // minimum per request
 
   // Preview the fee/net split for a given withdrawal amount (used by the UI

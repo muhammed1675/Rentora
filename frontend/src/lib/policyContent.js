@@ -22,7 +22,7 @@ export const sections = [
       },
       {
         title: '4. Rent Payments & Escrow',
-        body: `When a renter pays rent for a property through Rentora, the payment includes:\n• The rent amount set by the agent\n• An agent fee, automatically calculated as 10% of the rent\n• A service fee, Rentora's own fee for facilitating the transaction\n\nRentora holds the rent and agent fee in escrow — not released to the agent — until the renter confirms they have moved in, or for a maximum of 5 days after payment, whichever comes first.\n\nOnce released, the agent receives the rent and agent fee in full. Rentora's only revenue from a rent transaction is the service fee; Rentora does not take any share of the rent or agent fee itself.\n\nOnce a rent payment is held for a property, that property is marked unavailable to other renters until the payment is resolved.`
+        body: `When a renter pays rent for a property through Rentora, the payment includes:\n• The rent amount set by the agent\n• An agent fee, entered by the agent for that property and may be ₦0\n• A service fee, Rentora's own fee for facilitating the transaction\n\nRentora holds the rent and agent fee in escrow — not released to the agent — until the renter confirms they have moved in, or for a maximum of 5 days after payment, whichever comes first.\n\nOnce released, the agent receives the rent and agent fee in full. Rentora's only revenue from a rent transaction is the service fee; Rentora does not take any share of the rent or agent fee itself.\n\nOnce a rent payment is held for a property, that property is marked unavailable to other renters until the payment is resolved.`
       },
       {
         title: '5. Property Information Disclaimer',
@@ -59,11 +59,11 @@ export const sections = [
       },
       {
         title: '3. Payment Information',
-        body: `All payments on Rentora are processed securely through third-party payment providers (currently Flutterwave).\n\nRentora does NOT store:\n• Card numbers\n• CVV details\n• Bank card credentials\n\nAgent payout bank details (account name, number, bank name) are stored by Rentora, restricted to that agent and Rentora admins, in order to send payouts.`
+        body: `All payments on Rentora are processed securely through third-party payment providers (currently Korapay Hosted Checkout).\n\nRentora does NOT store:\n• Card numbers\n• CVV details\n• Bank card credentials\n\nAgent payout bank details (account name, number, bank name) are stored by Rentora, restricted to that agent and Rentora admins, in order to send payouts.`
       },
       {
         title: '4. Data Sharing',
-        body: `Rentora does not sell user data.\n\nInformation may be shared:\n• With assigned agents for viewing purposes\n• Publicly on a listing, for an agent's name and contact details specifically (so renters can reach out about that property) — this does not apply to renter/student accounts, whose information is not made public\n• With payment providers (Flutterwave) and email providers (Resend) solely to carry out payments and send you emails\n• With analytics providers (Google Analytics, PostHog), only if you accept the cookie/analytics consent banner\n• When required by law\n• To prevent fraud or abuse`
+        body: `Rentora does not sell user data.\n\nInformation may be shared:\n• With assigned agents for viewing purposes\n• Publicly on a listing, for an agent's name and contact details specifically (so renters can reach out about that property) — this does not apply to renter/student accounts, whose information is not made public\n• With payment providers (Korapay) and email providers (Resend) solely to carry out payments and send you emails\n• With analytics providers (Google Analytics, PostHog), only if you accept the cookie/analytics consent banner\n• When required by law\n• To prevent fraud or abuse`
       },
       {
         title: '5. Data Security',

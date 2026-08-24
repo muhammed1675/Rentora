@@ -31,7 +31,7 @@
 // Also needs SUPABASE_URL (should already exist).
 
 import { createClient } from '@supabase/supabase-js';
-import { verifyByReference, readCharge, getSecretKey } from './_flutterwave.js';
+import { verifyByReference, readCharge, getSecretKey } from './_korapay.js';
 import { applyCors } from './_cors.js';
 
 // Admin notification wrapper: every attempt to confirm a payment (success or
@@ -103,17 +103,17 @@ async function handlePayment(req, res) {
       return res.status(404).json({ error: 'No transaction found for this reference' });
     }
 
-    // ---- 2. Verify with Flutterwave server-side ----
-    const { ok: flwOk, body: flwBody } = await verifyByReference(reference);
+    // ---- 2. Verify with Korapay server-side ----
+    const { ok: korapayOk, body: korapayBody } = await verifyByReference(reference);
 
-    if (!flwOk || flwBody?.status !== 'success') {
-      console.error('confirm-payment: Flutterwave verify failed', flwBody);
-      return res.status(402).json({ error: 'Could not verify payment with Flutterwave', detail: flwBody?.message });
+    if (!korapayOk || (korapayBody?.status !== 'success' && korapayBody?.status !== true)) {
+      console.error('confirm-payment: Flutterwave verify failed', korapayBody);
+      return res.status(402).json({ error: 'Could not verify payment with Flutterwave', detail: korapayBody?.message });
     }
 
     // Flutterwave marks a completed payment as data.status === "successful".
     // Never assume success from the mere presence of a response.
-    const charge = readCharge(flwBody);
+    const charge = readCharge(korapayBody);
     const chargeStatus = charge.status;
     const chargedAmount = charge.amount;
 
@@ -121,7 +121,7 @@ async function handlePayment(req, res) {
       return res.status(402).json({ error: `Payment not successful (Flutterwave status: ${chargeStatus || 'unknown'})` });
     }
     if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) {
-      console.error('confirm-payment: could not parse charged amount', flwBody);
+      console.error('confirm-payment: could not parse charged amount', korapayBody);
       return res.status(502).json({ error: 'Could not confirm the charged amount with Flutterwave — payment not completed.' });
     }
     if (charge.currency && charge.currency !== 'NGN') {

@@ -972,7 +972,7 @@ export function AgentDashboard() {
                           status: req.status,
                           rows: [
                             { label: 'Amount Requested', value: `₦${Number(req.amount).toLocaleString('en-NG')}` },
-                            { label: 'Withdrawal Fee (1.3%)', value: `-₦${Number(req.fee_amount || 0).toLocaleString('en-NG')}` },
+                            { label: 'Withdrawal Fee', value: `-₦${Number(req.fee_amount || 0).toLocaleString('en-NG')}` },
                           ],
                           total: { label: 'Paid Out', value: `₦${Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}` },
                           filename: `rentora-withdrawal-receipt-${req.id}.png`,

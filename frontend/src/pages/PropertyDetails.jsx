@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useVerifyGate } from '../components/VerifyGateDialog';
 import { propertyAPI, inspectionAPI, reviewAPI, rentAPI, reportAPI } from '../lib/api';
-import { openFlutterwaveCheckout } from '../lib/flutterwave';
+import { openKorapayCheckout } from '../lib/korapay';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -258,11 +258,6 @@ export function PropertyDetails() {
 
 
   const [payingRent, setPayingRent] = useState(false);
-  const [serviceFeePct, setServiceFeePct] = useState(5);
-
-  useEffect(() => {
-    rentAPI.getServiceFeePct().then(setServiceFeePct).catch(() => {});
-  }, []);
   const handlePayRent = async () => {
     if (!user) { toast.error('Please log in first'); return; }
     if (!requireVerification('pay')) return;
@@ -270,15 +265,15 @@ export function PropertyDetails() {
     setPayingRent(true);
     try {
       const res = await rentAPI.initiate(id, user);
-      const { openFlutterwaveCheckout } = await import('../lib/flutterwave');
-      await openFlutterwaveCheckout({
+      const { openKorapayCheckout } = await import('../lib/korapay');
+      await openKorapayCheckout({
         reference: res.data.reference,
         amount: res.data.amount,
         email: user.email,
         name: user?.full_name || user?.email,
         narration: `Rent (held by Rentora) — ${property?.title}`,
         onSuccess: async (kref) => {
-          // Note: openFlutterwaveCheckout already called and confirmed
+          // Note: openKorapayCheckout already called and confirmed
           // /api/confirm-payment itself before invoking this — calling
           // rentAPI.markHeld() again here was a redundant second request
           // to the same endpoint, and wrapping it in an empty catch meant
