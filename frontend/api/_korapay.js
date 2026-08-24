@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 const API_URL = 'https://api.korapay.com/merchant/api/v1';
 
 export function getSecretKey() { return process.env.KORAPAY_SECRET_KEY || ''; }
@@ -20,6 +22,10 @@ export function readCharge(body) {
 }
 
 export function isValidSignature(payload, signature) {
-  const configured = process.env.KORAPAY_WEBHOOK_SECRET || process.env.KORAPAY_SECRET_KEY;
-  return Boolean(configured && signature && signature === configured);
+  const secretKey = process.env.KORAPAY_SECRET_KEY;
+  if (!secretKey || !signature || !payload) return false;
+  const expected = crypto.createHmac('sha256', secretKey).update(JSON.stringify(payload)).digest('hex');
+  const a = Buffer.from(String(expected), 'utf8');
+  const b = Buffer.from(String(signature), 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }

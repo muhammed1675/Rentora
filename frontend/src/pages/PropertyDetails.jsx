@@ -657,7 +657,12 @@ export function PropertyDetails() {
                     {cautionFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>}
                     {inspectionFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Inspection fee</span><span className="shrink-0 text-right">{formatPrice(inspectionFee)}</span></div>}
                     {documentationFee > 0 && <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Documentation fee</span><span className="shrink-0 text-right">{formatPrice(documentationFee)}</span></div>}
-                    {otherFees.map((fee,i)=><div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">{fee.name || 'Other fee'}</span><span className="shrink-0 text-right">{formatPrice(fee.amount)}</span></div>}
+                    {otherFees.map((fee, i) => (
+                      <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                        <span className="min-w-0 text-muted-foreground">{fee.name || 'Other fee'}</span>
+                        <span className="shrink-0 text-right">{formatPrice(fee.amount)}</span>
+                      </div>
+                    ))}
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rentora service fee (3.5% of rent)</span><span className="shrink-0 text-right">{formatPrice(serviceFee)}</span></div>
                     <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t pt-1.5 font-semibold"><span className="min-w-0">Total to pay</span><span className="shrink-0 text-right text-primary">{formatPrice(total)}</span></div>
                   </div>
