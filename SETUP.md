@@ -1,6 +1,6 @@
 # Rentora — Setup Guide
 
-Complete instructions to run, deploy, or hand off this project from zero. The app is a student‑housing platform (React + Supabase + Flutterwave) currently live at https://www.rentora.com.ng.
+Complete instructions to run, deploy, or hand off this project from zero. The app is a student‑housing platform (React + Supabase + Korapay) currently live at https://www.rentora.com.ng.
 
 ---
 
@@ -10,7 +10,7 @@ Complete instructions to run, deploy, or hand off this project from zero. The ap
 Rentora/
 ├── frontend/                 # React 19 app (CRACO). This is what Vercel deploys.
 │   ├── src/                  # Pages, components, lib (supabase client, auth, api)
-│   ├── api/                  # Vercel serverless functions (Flutterwave, contact form)
+│   ├── api/                  # Vercel serverless functions (Korapay, contact form)
 │   ├── plugins/              # Dev-only webpack/CRACO tooling (health check, visual
 │   │                         #   edits). Not required to understand for normal dev.
 │   └── .env.example          # Frontend env vars (REACT_APP_*)
@@ -39,7 +39,7 @@ Rentora/
 │   │   └── add_recurring_payment.sql    # Optional, no numeric prefix — see §4
 │   └── functions/            # Edge Functions (Deno)
 │       ├── _shared/          # email-config.ts — centralized sender/reply-to config
-│       ├── resolve-bank/     # Verifies bank accounts via Flutterwave
+│       ├── resolve-bank/     # Verifies bank accounts via Korapay
 │       ├── send-email/       # Transactional email via Resend
 │       ├── delete-account/   # Account deletion + confirmation email
 │       └── send-push/        # Delivers real OS/browser push — see §11
@@ -60,7 +60,7 @@ You will need accounts and credentials for:
 | Service    | Why                                     | Where to get it                                      |
 |------------|-----------------------------------------|--------------------------------------------------------|
 | Supabase   | Database, auth, storage, edge functions | https://supabase.com → new project                   |
-| Flutterwave    | Payments (rent, optional agent tips)    | https://flutterwave.com → dashboard → API keys           |
+| Korapay    | Payments (rent, optional agent tips)    | https://dashboard.korapay.com → API keys           |
 | Resend     | Transactional email (contact, receipts) | https://resend.com → API keys                        |
 | Vercel     | Frontend + serverless hosting           | https://vercel.com                                   |
 | GitHub     | Source hosting / CI                     | https://github.com                                   |
@@ -94,16 +94,16 @@ yarn start                       # http://localhost:3000
 ### 3.3 Create the env files
 Copy every `.env.example` to a real `.env` in the same folder and fill it in:
 
-- `frontend/.env` — client‑side (Supabase URL, anon key, Flutterwave PUBLIC key,
+- `frontend/.env` — client‑side (Supabase URL, anon key, Korapay PUBLIC key,
   VAPID public key). Everything here ships inside the public JS bundle —
   never put a secret key in this file. Two variables referenced in the code
   (`REACT_APP_RESEND_API_KEY`, `REACT_APP_BASE_URL`) are used only by
   `src/lib/emailService.js`, which is dead code (nothing imports it) — leave
   them unset. See `frontend/.env.example` for the full annotated list.
-- `frontend/api/.env` — Vercel functions (Supabase service role, Flutterwave SECRET, Resend)
+- `frontend/api/.env` — Vercel functions (Supabase service role, Korapay SECRET, Resend)
 - `supabase/functions/.env` — Edge Function secrets (or use `supabase secrets set`)
 - `backend/.env` — only if you run the Python service. Its variable names
-  (`SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `FLW_PUBLIC_KEY`, `CORS_ORIGINS`)
+  (`SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `KORAPAY_PUBLIC_KEY`, `CORS_ORIGINS`)
   are **different** from the ones used in `frontend/api/.env` — don't copy
   values across assuming the names line up.
 
@@ -168,7 +168,7 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
    supabase functions deploy resolve-bank
    supabase functions deploy send-email
    supabase functions deploy delete-account
-   supabase secrets set FLW_SECRET_KEY=sk_live_xxx RESEND_API_KEY=re_xxx \
+   supabase secrets set KORAPAY_SECRET_KEY=sk_live_xxx RESEND_API_KEY=re_xxx \
      EMAIL_ADDR_SUPPORT=support@yourdomain.com \
      EMAIL_ADDR_BILLING=billing@yourdomain.com \
      EMAIL_ADDR_NOREPLY=noreply@yourdomain.com
@@ -229,16 +229,16 @@ None of these `.env` files are committed (`.gitignore` blocks them). Only the `.
 
 ---
 
-## 7. Flutterwave setup
+## 7. Korapay setup
 
-1. In Flutterwave dashboard → **API Keys**, copy the **public** key (for the browser) and **secret** key (for Vercel functions + Supabase edge functions).
-2. Configure the webhook: Flutterwave Dashboard → Settings → Webhooks. Set the URL to `https://yourdomain.com/api/flutterwave-webhook` and copy the **Secret Hash** into Vercel env as `FLW_WEBHOOK_HASH` — this must match exactly (case-sensitive) or every webhook delivery is rejected as an invalid signature.
-3. Click **Test Webhook** in the Flutterwave dashboard and confirm it returns `200 OK`. If it doesn't:
+1. In Korapay dashboard → **API Keys**, copy the **public** key (for the browser) and **secret** key (for Vercel functions + Supabase edge functions).
+2. Configure the webhook: Korapay Dashboard → Settings → Webhooks. Set the URL to `https://yourdomain.com/api/korapay-webhook` and copy the **Secret Hash** into Vercel env as `KORAPAY_WEBHOOK_HASH` — this must match exactly (case-sensitive) or every webhook delivery is rejected as an invalid signature.
+3. Click **Test Webhook** in the Korapay dashboard and confirm it returns `200 OK`. If it doesn't:
    - Confirm the domain has a valid SSL certificate (the URL loads over HTTPS in a browser).
-   - Confirm `FLW_WEBHOOK_HASH` is set in Vercel and the project has been redeployed since adding it.
+   - Confirm `KORAPAY_WEBHOOK_HASH` is set in Vercel and the project has been redeployed since adding it.
    - Check `vercel logs | grep webhook` for `[webhook] ERROR:` lines — the message there points at the specific failure.
 4. Test with the built‑in "Simulate Payment Success" button before flipping to live keys.
-5. **Settlement is not instant.** Local (NGN) transactions settle from Flutterwave's collection balance into your payout balance / bank account on a T+1 schedule — money collected today lands the next business day, later if it lands on a weekend. This is normal Flutterwave behavior, not a bug in the integration; it only affects when Rentora's own revenue reaches its bank account, not when a student's payment is marked as received in the app (that happens as soon as the webhook + `confirm-payment.js` verify the charge).
+5. **Settlement is not instant.** Local (NGN) transactions settle from Korapay's collection balance into your payout balance / bank account on a T+1 schedule — money collected today lands the next business day, later if it lands on a weekend. This is normal Korapay behavior, not a bug in the integration; it only affects when Rentora's own revenue reaches its bank account, not when a student's payment is marked as received in the app (that happens as soon as the webhook + `confirm-payment.js` verify the charge).
 
 ---
 
@@ -280,7 +280,7 @@ Everything a buyer needs is in this repo **except** live credentials and live da
 1. **This repository** (source of truth for code + schema).
 2. **Credentials handover** — share via a password manager (1Password, Bitwarden shared vault):
    - Supabase project URL, anon key, service_role key, project ref, dashboard access
-   - Flutterwave account access + API keys
+   - Korapay account access + API keys
    - Resend API key
    - Vercel project access + custom domain / DNS registrar login
    - GitHub repo access
@@ -293,7 +293,7 @@ Everything a buyer needs is in this repo **except** live credentials and live da
    - Import to their Vercel account, set env vars, deploy
    - Create their own GA4 property and PostHog project, swap the IDs in `frontend/public/index.html` (§8)
    - Point their domain
-5. **Rotate everything after handover** — the seller must reset Supabase service_role, Flutterwave keys, Resend key, and any OAuth client secrets so the previous owner loses access. Buyer generates their own. GA/PostHog aren't secrets in the same sense, but the buyer should still create their own accounts rather than inherit the seller's.
+5. **Rotate everything after handover** — the seller must reset Supabase service_role, Korapay keys, Resend key, and any OAuth client secrets so the previous owner loses access. Buyer generates their own. GA/PostHog aren't secrets in the same sense, but the buyer should still create their own accounts rather than inherit the seller's.
 6. **Optional extras to include with the sale:**
    - Screenshots / demo video of the live app
    - Traffic + revenue analytics
@@ -310,7 +310,7 @@ These live only in third‑party dashboards and must be captured manually if you
 - Supabase Auth settings (site URL, redirect URLs, OAuth client IDs/secrets, email templates)
 - Supabase project secrets (edge function env vars) — mirror them in `supabase/functions/.env.example` names, values in your password manager
 - Vercel environment variables and domain config
-- Flutterwave webhook + payout account config
+- Korapay webhook + payout account config
 - Resend domain verification records
 - Google Analytics / PostHog project configuration (the IDs are in `index.html`, but dashboard settings like GA4 conversion events or PostHog dashboards are not)
 - Live table data (use Supabase backups / `pg_dump`)
@@ -401,9 +401,9 @@ hand for testing, you need to pass that key as the Bearer token.
 | Anyone (even logged out) can read all users' name/email/phone via the API | `17_restrict_user_pii.sql` was never run — see §4 |
 | Storage upload fails                   | Bucket missing or wrong policy — re‑run `06_storage.sql`       |
 | Edge function 500                      | `supabase functions logs <n>` → check missing secret        |
-| Payments not verifying                 | Flutterwave secret key not set in Vercel env / edge function       |
-| "Unsuccessful Webhook Delivery" email  | `FLW_WEBHOOK_HASH` missing/mismatched in Vercel, or webhook URL/SSL wrong — see §7 |
-| Flutterwave balance not in bank account yet | Normal T+1 local settlement delay, not an integration bug — see §7 |
+| Payments not verifying                 | Korapay secret key not set in Vercel env / edge function       |
+| "Unsuccessful Webhook Delivery" email  | `KORAPAY_WEBHOOK_HASH` missing/mismatched in Vercel, or webhook URL/SSL wrong — see §7 |
+| Korapay balance not in bank account yet | Normal T+1 local settlement delay, not an integration bug — see §7 |
 | Vercel 404 on refresh                  | Root Directory not set to `frontend`                            |
 | User toggles push "on" but never receives anything | Check the Database Webhook is set up (§11 step 4) and `supabase functions logs send-push` for errors |
 | Push worked before, now silently stops for everyone | VAPID keys were regenerated — see the warning in §11 step 1 |

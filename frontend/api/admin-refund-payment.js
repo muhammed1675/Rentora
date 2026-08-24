@@ -9,8 +9,8 @@
 // confirmed. So resolving "the house isn't available" doesn't need any
 // clawback; it's a clean refund of money that was never released.
 //
-// MANUAL REFUND FLOW: this endpoint does NOT call Flutterwave's refund API.
-// Flutterwave's refund endpoint proved unreliable in practice (slow/502s),
+// MANUAL REFUND FLOW: this endpoint does NOT call the payment provider's refund API.
+// the payment provider's refund endpoint proved unreliable in practice (slow/502s),
 // which left payments stuck in an in-between state with no money actually
 // returned and no clean way to retry. Instead, the admin sends the money
 // back to the student directly (bank transfer, outside the app) and then
@@ -28,7 +28,7 @@
 //      later if the agent proves the listing was actually fine.
 //
 // Also accepts a payment already stuck in 'refund_processing' (from the
-// old Flutterwave-backed version of this endpoint) so any payment left
+// old the payment provider-backed version of this endpoint) so any payment left
 // hanging by that flow can be resolved here too, in one click.
 //
 // Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, alreadyProcessed: true });
   }
   // 'refund_processing' is accepted here too — it's the state a payment
-  // could be left in by the old Flutterwave-backed version of this
+  // could be left in by the old the payment provider-backed version of this
   // endpoint. Resolving it now just means: record the manual refund.
   if (payment.status !== 'held' && payment.status !== 'refund_processing') {
     return res.status(409).json({

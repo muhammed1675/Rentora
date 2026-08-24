@@ -1,7 +1,6 @@
 // api/_cors.js — shared CORS allow-list for Vercel serverless functions.
 //
-// Previously several endpoints (confirm-payment, flutterwave-verify,
-// flutterwave-init, admin-refund-payment) set
+// Previously several payment endpoints set
 // `Access-Control-Allow-Origin: *`, which lets ANY website's JavaScript
 // call these endpoints on behalf of a logged-in user's browser. For
 // admin-refund-payment and confirm-payment specifically, that's a

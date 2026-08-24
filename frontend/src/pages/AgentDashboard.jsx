@@ -972,7 +972,7 @@ export function AgentDashboard() {
                           status: req.status,
                           rows: [
                             { label: 'Amount Requested', value: `₦${Number(req.amount).toLocaleString('en-NG')}` },
-                            { label: 'Withdrawal Fee (1.3%)', value: `-₦${Number(req.fee_amount || 0).toLocaleString('en-NG')}` },
+                            { label: 'Withdrawal Fee', value: `-₦${Number(req.fee_amount || 0).toLocaleString('en-NG')}` },
                           ],
                           total: { label: 'Paid Out', value: `₦${Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}` },
                           filename: `rentora-withdrawal-receipt-${req.id}.png`,
@@ -1139,7 +1139,7 @@ export function AgentDashboard() {
           <DialogHeader>
             <DialogTitle>Request Withdrawal</DialogTitle>
             <DialogDescription>
-              Funds will be sent to your registered bank account, minus a 1.3% withdrawal fee. Admin will process within 1–2 business days.
+              Funds will be sent to your registered bank account with no withdrawal fee. Admin will process within 1–2 business days.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1169,8 +1169,8 @@ export function AgentDashboard() {
             </div>
             {withdrawAmount > 0 && (
               <div className="p-3 rounded-lg bg-muted text-sm space-y-1">
-                <div className="flex justify-between"><span className="text-muted-foreground">Withdrawal fee (1.3%)</span><span>-₦{withdrawalAPI.previewFee(withdrawAmount).fee.toLocaleString('en-NG')}</span></div>
-                <div className="flex justify-between font-semibold pt-1 border-t"><span>You'll receive</span><span>₦{withdrawalAPI.previewFee(withdrawAmount).net.toLocaleString('en-NG')}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Withdrawal fee</span><span>₦0</span></div>
+                <div className="flex justify-between font-semibold pt-1 border-t"><span>You'll receive</span><span>₦{Number(withdrawAmount || 0).toLocaleString('en-NG')}</span></div>
               </div>
             )}
           </div>
@@ -1246,22 +1246,12 @@ export function AgentDashboard() {
                 <div className="space-y-2"><Label>Price (₦/year) *</Label><Input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="120000" /></div>
                 <div className="space-y-2"><Label>Caution Fee (₦)</Label><Input type="number" value={formData.caution_fee} onChange={(e) => setFormData({ ...formData, caution_fee: e.target.value })} placeholder="e.g. 50000" /></div>
                 <div className="space-y-2">
-                  <Label>Agent Fee</Label>
-                  <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
-                    {formData.price ? formatPrice(Math.round(parseInt(formData.price || '0', 10) * 0.10)) : '₦0'} <span className="ml-1">(10% of rent, auto-calculated)</span>
-                  </div>
+                  <Label>Agency Fee (₦)</Label>
+                  <Input type="number" min="0" value={formData.agency_fee || ''} onChange={(e) => setFormData({ ...formData, agency_fee: e.target.value })} placeholder="Enter the fee for this property, or 0" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Inspection Fee (₦)</Label>
-                  <Input
-                    type="number"
-                    min="1000"
-                    value={formData.inspection_fee}
-                    onChange={(e) => setFormData({ ...formData, inspection_fee: e.target.value })}
-                    placeholder="e.g. 3000"
-                  />
-                  <p className="text-xs text-muted-foreground">Fee a student pays to book an inspection/viewing of this property.</p>
-                </div>
+                {/* Viewing fee field removed — property viewings are now free. The
+                    inspection_fee column is kept in the database with its default
+                    so historical records stay intact. */}
                 <div className="space-y-2">
                   <Label>Recurring Payment (₦/year)</Label>
                   <Input type="number" value={formData.recurring_payment} onChange={(e) => setFormData({ ...formData, recurring_payment: e.target.value })} placeholder="e.g. 200000" />

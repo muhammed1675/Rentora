@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useVerifyGate } from '../components/VerifyGateDialog';
 import { propertyAPI, inspectionAPI, reviewAPI, rentAPI, reportAPI } from '../lib/api';
-import { openFlutterwaveCheckout } from '../lib/flutterwave';
+import { openKorapayCheckout } from '../lib/korapay';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -258,11 +258,6 @@ export function PropertyDetails() {
 
 
   const [payingRent, setPayingRent] = useState(false);
-  const [serviceFeePct, setServiceFeePct] = useState(5);
-
-  useEffect(() => {
-    rentAPI.getServiceFeePct().then(setServiceFeePct).catch(() => {});
-  }, []);
   const handlePayRent = async () => {
     if (!user) { toast.error('Please log in first'); return; }
     if (!requireVerification('pay')) return;
@@ -270,15 +265,15 @@ export function PropertyDetails() {
     setPayingRent(true);
     try {
       const res = await rentAPI.initiate(id, user);
-      const { openFlutterwaveCheckout } = await import('../lib/flutterwave');
-      await openFlutterwaveCheckout({
+      const { openKorapayCheckout } = await import('../lib/korapay');
+      await openKorapayCheckout({
         reference: res.data.reference,
         amount: res.data.amount,
         email: user.email,
         name: user?.full_name || user?.email,
         narration: `Rent (held by Rentora) — ${property?.title}`,
         onSuccess: async (kref) => {
-          // Note: openFlutterwaveCheckout already called and confirmed
+          // Note: openKorapayCheckout already called and confirmed
           // /api/confirm-payment itself before invoking this — calling
           // rentAPI.markHeld() again here was a redundant second request
           // to the same endpoint, and wrapping it in an empty catch meant
@@ -289,7 +284,7 @@ export function PropertyDetails() {
         },
         onFailed: () => { toast.error('Payment failed. Please try again.'); setPayingRent(false); },
         onPending: () => {
-          toast.message('Payment received — confirming with Flutterwave now. Check your profile in a minute; it will update automatically once confirmed.');
+          toast.message('Payment received — confirming with Korapay now. Check your profile in a minute; it will update automatically once confirmed.');
           setPayingRent(false);
         },
         onClose: () => setPayingRent(false),
@@ -616,17 +611,19 @@ export function PropertyDetails() {
                   <p className="text-sm font-semibold shrink-0">{formatPrice(property.caution_fee)}</p>
                 </div>
                 )}
+                {Number(property.agency_fee || 0) > 0 && (
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <p className="text-sm text-muted-foreground min-w-0">Agent Fee <span className="text-xs">(10% of rent)</span></p>
-                  <p className="text-sm font-semibold shrink-0">{formatPrice(Math.round(Number(property.price || 0) * 0.10))}</p>
+                  <p className="text-sm text-muted-foreground min-w-0">Agency Fee</p>
+                  <p className="text-sm font-semibold shrink-0">{formatPrice(property.agency_fee)}</p>
                 </div>
+                )}
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t border-border/40 pt-2">
                   <p className="text-sm font-semibold min-w-0">Total Move-in Cost <span className="text-xs font-normal text-muted-foreground block sm:inline">(+ small service fee at checkout)</span></p>
                   <p className="text-sm font-bold text-primary shrink-0">
                     {formatPrice(
                       Number(property.price || 0) +
                       Number(property.caution_fee || 0) +
-                      Math.round(Number(property.price || 0) * 0.10)
+                      Number(property.agency_fee || 0)
                     )}
                   </p>
                 </div>
@@ -647,18 +644,18 @@ export function PropertyDetails() {
               </div>
               {property?.price > 0 && (() => {
                 const rent = Number(property.price);
-                const agentFee = Math.round(rent * 0.10);
+                const agentFee = Number(property.agency_fee ?? property.agent_fee) || 0;
                 const cautionFee = Number(property.caution_fee) || 0;
-                const serviceFee = Math.round((rent + agentFee) * (serviceFeePct / 100));
+                const serviceFee = Math.round(rent * 0.035);
                 const total = rent + agentFee + cautionFee + serviceFee;
                 return (
                   <div className="text-sm space-y-1 mb-3">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rent</span><span className="shrink-0 text-right">{formatPrice(rent)}</span></div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agent fee (10%)</span><span className="shrink-0 text-right">{formatPrice(agentFee)}</span></div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Agency Fee</span><span className="shrink-0 text-right">{formatPrice(agentFee)}</span></div>
                     {cautionFee > 0 && (
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Caution fee</span><span className="shrink-0 text-right">{formatPrice(cautionFee)}</span></div>
                     )}
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Service fee ({serviceFeePct}%)</span><span className="shrink-0 text-right">{formatPrice(serviceFee)}</span></div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"><span className="min-w-0 text-muted-foreground">Rentora service fee (3.5% of rent)</span><span className="shrink-0 text-right">{formatPrice(serviceFee)}</span></div>
                     <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t pt-1.5 font-semibold"><span className="min-w-0">Total to pay</span><span className="shrink-0 text-right text-primary">{formatPrice(total)}</span></div>
                   </div>
                 );
