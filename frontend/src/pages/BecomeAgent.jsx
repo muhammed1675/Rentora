@@ -65,7 +65,7 @@ export function BecomeAgent() {
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
 
-  // Load bank list from Flutterwave via edge function
+  // Load bank list via the Korapay-backed edge function
   useEffect(() => {
     const loadBanks = async () => {
       try {

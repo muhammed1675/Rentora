@@ -943,7 +943,7 @@ export function AdminDashboard() {
                       <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Total Revenue</span>
                     </div>
                     <p className="text-3xl font-bold text-white leading-none">{formatPrice(stats?.total_revenue || 0)}</p>
-                    <p className="text-[11px] text-white/70 mt-2">Rent service fee + withdrawal fee</p>
+                    <p className="text-[11px] text-white/70 mt-2">Rent service fee</p>
                     <button
                       onClick={() => setActiveTab('rentora-revenue')}
                       className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur px-3 py-1.5 rounded-full transition"
@@ -1044,7 +1044,7 @@ export function AdminDashboard() {
                         <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Withdrawal Fee</p>
                       </div>
                       <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">1.3% of every agent withdrawal, once paid</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Withdrawal fee: ₦0; minimum withdrawal: ₦3,000</p>
                     </div>
                     <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
                       <div className="flex items-center gap-2 mb-2">
@@ -2120,7 +2120,7 @@ export function AdminDashboard() {
                         <p className="text-sm text-muted-foreground">{req.agent_email}</p>
                         <p className="text-lg font-bold text-green-600">₦{Number(req.amount).toLocaleString('en-NG')} <span className="text-xs font-normal text-muted-foreground">requested</span></p>
                         <div className="text-xs text-muted-foreground">
-                          Fee (1.3%): -₦{Number(req.fee_amount || 0).toLocaleString('en-NG')}
+                          Fee: ₦0
                         </div>
                         <p className="text-sm font-semibold text-foreground">
                           Pay out: ₦{Number(req.net_amount || (req.amount - (req.fee_amount || 0))).toLocaleString('en-NG')}
@@ -2404,7 +2404,7 @@ export function AdminDashboard() {
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
             <p className="text-sm opacity-90 mb-1">Total Revenue (All-Time)</p>
             <p className="text-4xl sm:text-5xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p>
-            <p className="text-xs opacity-80 mt-2">Rent service fee + withdrawal fee</p>
+            <p className="text-xs opacity-80 mt-2">Rent service fee</p>
           </Card>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2422,7 +2422,7 @@ export function AdminDashboard() {
               </div>
               <p className="text-sm text-muted-foreground mb-1">Withdrawal Fee</p>
               <p className="text-3xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">1.3% of every agent withdrawal, once paid</p>
+              <p className="text-xs text-muted-foreground mt-2">Withdrawal fee: ₦0; minimum withdrawal: ₦3,000</p>
             </Card>
           </div>
 
@@ -2886,8 +2886,8 @@ export function AdminDashboard() {
                     <p className="font-semibold">{previewProperty.caution_fee ? formatPrice(previewProperty.caution_fee) : '—'}</p>
                   </div>
                   <div className="p-3 rounded-lg border border-blue-200">
-                    <p className="text-xs text-muted-foreground">Agent Fee (10% of rent)</p>
-                    <p className="font-semibold">{formatPrice(Math.round(Number(previewProperty.price || 0) * 0.10))}</p>
+                    <p className="text-xs text-muted-foreground">Agency Fee</p>
+                    <p className="font-semibold">{formatPrice(previewProperty.agency_fee || previewProperty.agent_fee || 0)}</p>
                   </div>
                 </div>
               </div>

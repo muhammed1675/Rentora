@@ -106,7 +106,7 @@ export function Profile() {
     }
     fetchData();
 
-    // Auto-confirm payment if redirected back from Flutterwave
+    // Confirm any payment redirect server-side; the redirect itself is never proof of payment.
     const params = new URLSearchParams(window.location.search);
     const reference = params.get('reference') || params.get('trxref');
     if (reference) {
@@ -179,8 +179,8 @@ export function Profile() {
     setSendingTip(true);
     try {
       const res = await tipAPI.initiate(tipDialogViewing, amt, user);
-      const { openFlutterwaveCheckout } = await import('../lib/flutterwave');
-      await openFlutterwaveCheckout({
+      const { openKorapayCheckout } = await import('../lib/korapay');
+      await openKorapayCheckout({
         reference: res.data.reference,
         amount: res.data.amount,
         email: user.email,

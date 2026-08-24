@@ -440,7 +440,7 @@ export const inspectionAPI = {
         ['Student', user.full_name || '—'],
         ['Student email', user.email || '—'],
         ['Agent', property.uploaded_by_agent_name || '—'],
-        ['Date', data.inspection_date || '���'],
+        ['Date', data.inspection_date || '�����'],
       ],
       actionUrl: 'https://www.rentora.com.ng/admin',
     });
@@ -557,7 +557,7 @@ export const tipAPI = {
   },
 
   // Creates the pending tip row and returns what's needed to open the
-  // Flutterwave checkout. Actual crediting only happens once
+  // Korapay checkout. Actual crediting only happens once
   // /api/confirm-payment.js independently verifies the charge and flips
   // this row to 'completed' — never on the client's word alone.
   initiate: async (inspection, amount, user) => {
@@ -1074,7 +1074,7 @@ export const adminAPI = {
 
   // Resolve a held rent payment where the property turned out not to be
   // available (or was misrepresented): refunds the student in full via
-  // Flutterwave and soft-delists the property (status -> 'rejected', not
+  // Korapay and soft-delists the property (status -> 'rejected', not
   // 'available' — see /api/admin-refund-payment.js). Admin-only; the
   // server independently re-checks the caller's role from their own token.
   refundRentPayment: async (paymentId, reason, note = '') => {
@@ -1104,7 +1104,7 @@ export const paymentAPI = {
   },
   // Calls the server-side verified confirmation endpoint (/api/confirm-payment)
   // instead of writing to the database directly. That endpoint independently
-  // verifies the charge with Flutterwave using the secret key before marking
+  // verifies the charge with Korapay using the secret key before marking
   // anything paid — this function no longer trusts the browser's own word
   // that a payment succeeded. Works for token purchases, viewings, and
   // rent (the endpoint auto-detects which one based on the reference).
@@ -1496,11 +1496,9 @@ export const withdrawalAPI = {
     const available = Number(bal?.total_earned || 0) - Number(bal?.total_withdrawn || 0);
     if (amount > available) throw new Error(`Amount exceeds available balance (₦${available.toLocaleString('en-NG')})`);
 
-    // Rentora takes a 1.3% fee on every withdrawal. The agent's balance is
-    // still debited by the full requested amount (that's what leaves their
-    // available balance) — the fee is what Rentora keeps out of it, and
-    // net_amount is what actually gets paid out to their bank account.
-    const { fee, net } = withdrawalAPI.previewFee(amount);
+// Withdrawals have no Rentora fee; the requested amount is paid in full.
+  const fee = 0;
+  const net = Number(amount);
 
     const insertRes = await supabase
       .from('withdrawal_requests')
@@ -1527,7 +1525,7 @@ export const withdrawalAPI = {
         ['Agent', agentName || '—'],
         ['Agent email', agentEmail || '—'],
         ['Amount requested', `NGN ${Number(amount).toLocaleString('en-NG')}`],
-        ['Fee (1.3%)', `NGN ${fee.toLocaleString('en-NG')}`],
+        ['Withdrawal fee', 'NGN 0'],
         ['Net payout', `NGN ${net.toLocaleString('en-NG')}`],
         ['Bank', bankName || '—'],
         ['Account number', accountNumber || '—'],
@@ -1639,7 +1637,7 @@ export const rentAPI = {
   // Initiate a rent payment. Rentora holds (rent + agent_fee) until move-in,
   // then releases the FULL amount to the agent — Rentora's only cut is the
   // service_fee, added on top, never a percentage of the rent itself.
-  // Agent fee is always 10% of rent, computed here — it is not a value
+  // Agency fee is entered on the property and snapshotted into this payment
   // agents type into the listing form.
   initiate: async (propertyId, user) => {
     const { data: property, error: propErr } = await supabase
@@ -1655,13 +1653,19 @@ export const rentAPI = {
     // agent's wallet — the property owner is no longer paid directly, so
     // no bank details are required to start a rent payment.
 
-    const feePct = await rentAPI.getServiceFeePct();
-    const rentAmount    = Number(property.price);
-    const agentFee      = Math.round(rentAmount * 0.10);      // 10% of rent, always
-    const cautionFee    = Number(property.caution_fee) || 0;  // pass-through, no service fee applied
-    const baseAmount    = rentAmount + agentFee;               // rent + agent fee — both go to the agent on release
-    const serviceFee    = Math.round(baseAmount * (feePct / 100)); // Rentora's only cut — never applied to the caution fee
-    const totalAmount   = baseAmount + serviceFee + cautionFee;
+    const feePct = 3.5;
+    const rentAmount = Number(property.price) || 0;
+    const agentFee = Number(property.agency_fee ?? property.agent_fee) || 0;
+    const agreementFee = Number(property.agreement_fee) || 0;
+    const cautionFee = Number(property.caution_fee) || 0;
+    const inspectionFee = Number(property.inspection_fee) || 0;
+    const documentationFee = Number(property.documentation_fee) || 0;
+    const otherFees = Array.isArray(property.other_fees)
+      ? property.other_fees.map((fee) => ({ name: String(fee.name || 'Other Fee'), amount: Math.max(0, Math.round(Number(fee.amount) || 0)) })).filter((fee) => fee.amount > 0)
+      : [];
+    const otherFeesTotal = otherFees.reduce((sum, fee) => sum + fee.amount, 0);
+    const serviceFee = Math.round(rentAmount * 0.035);
+    const totalAmount = rentAmount + agentFee + agreementFee + cautionFee + inspectionFee + documentationFee + otherFeesTotal + serviceFee;
     const reference     = generateReference('RENT');
 
     // 5-day auto-release window from now
@@ -1676,7 +1680,13 @@ export const rentAPI = {
         agent_id: property.uploaded_by_agent_id,
         rent_amount: rentAmount,
         agent_fee: agentFee,
+        agency_fee: agentFee,
+        agreement_fee: agreementFee,
         caution_fee: cautionFee,
+        inspection_fee: inspectionFee,
+        documentation_fee: documentationFee,
+        other_fees: otherFees,
+        other_fees_total: otherFeesTotal,
         service_fee: serviceFee,
         total_amount: totalAmount,
         reference,
@@ -1697,7 +1707,13 @@ export const rentAPI = {
         reference,
         rent_amount: rentAmount,
         agent_fee: agentFee,
+        agency_fee: agentFee,
+        agreement_fee: agreementFee,
         caution_fee: cautionFee,
+        inspection_fee: inspectionFee,
+        documentation_fee: documentationFee,
+        other_fees: otherFees,
+        other_fees_total: otherFeesTotal,
         service_fee: serviceFee,
         amount: totalAmount,
         service_fee_pct: feePct,
@@ -1706,7 +1722,7 @@ export const rentAPI = {
     };
   },
 
-  // Called by the Flutterwave success callback: mark the rent as held in escrow.
+  // Called by the Korapay success callback: mark the rent as held in escrow.
   // Returns held/released rent payments for properties this agent owns, so
   // the Agent Dashboard can show an accurate "Taken" state and block the
   // availability toggle client-side (the DB also blocks it — this is just
@@ -1737,7 +1753,7 @@ export const rentAPI = {
 
   // Calls the server-side verified confirmation endpoint — no longer
   // writes directly to the database or trusts the browser's own claim
-  // that Flutterwave succeeded. See /api/confirm-payment.js. The endpoint
+  // that Korapay succeeded. See /api/confirm-payment.js. The endpoint
   // handles the agent/student notification emails itself, only on the
   // actual first transition (never on a repeat call), which also closes
   // the duplicate-email risk from a double-fired success callback.

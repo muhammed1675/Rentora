@@ -2,7 +2,7 @@
 //
 // This is the ONLY place a payment (token purchase, inspection fee, or
 // rent) should ever be marked as paid/held/completed. Previously this
-// happened directly from the browser, trusting the Flutterwave SDK's
+// happened directly from the browser, trusting the Korapay SDK's
 // onSuccess callback with no independent verification — which meant
 // anyone calling the Supabase REST API directly (bypassing the app
 // entirely) could mark their own payment "complete" without ever
@@ -12,21 +12,21 @@
 // This function:
 //   1. Looks up the reference in whichever table it belongs to
 //      (transactions / inspection_transactions / property_rent_payments)
-//   2. Verifies the charge with Flutterwave SERVER-SIDE using the secret key
+//   2. Verifies the charge with Korapay SERVER-SIDE using the secret key
 //      (the browser never sees this key)
-//   3. Confirms the amount Flutterwave actually charged matches what our
+//   3. Confirms the amount Korapay actually charged matches what our
 //      database expects for that reference
 //   4. Only if both checks pass does it perform the status transition,
 //      using the Supabase SERVICE ROLE key (bypasses RLS — safe here
 //      because this code never runs in the browser)
 //
-// FAILS CLOSED: if Flutterwave's response is missing, ambiguous, or
+// FAILS CLOSED: if Korapay's response is missing, ambiguous, or
 // doesn't match, this returns an error and does NOT mark anything
 // paid. A legitimate payment stuck as "pending" is a visible, reportable
 // problem. A forged payment silently marked "paid" is a bankruptcy risk.
 //
 // Requires two Vercel environment variables:
-//   - FLW_SECRET_KEY        (should already exist — used by flutterwave-verify.js)
+//   - KORAPAY_SECRET_KEY    (server-side Korapay verification credential)
 //   - SUPABASE_SERVICE_ROLE_KEY  (NEW — from Supabase Dashboard > Project Settings > API)
 // Also needs SUPABASE_URL (should already exist).
 
@@ -107,22 +107,22 @@ async function handlePayment(req, res) {
     const { ok: korapayOk, body: korapayBody } = await verifyByReference(reference);
 
     if (!korapayOk || (korapayBody?.status !== 'success' && korapayBody?.status !== true)) {
-      console.error('confirm-payment: Flutterwave verify failed', korapayBody);
-      return res.status(402).json({ error: 'Could not verify payment with Flutterwave', detail: korapayBody?.message });
+      console.error('confirm-payment: Korapay verify failed', korapayBody);
+      return res.status(402).json({ error: 'Could not verify payment with Korapay', detail: korapayBody?.message });
     }
 
-    // Flutterwave marks a completed payment as data.status === "successful".
+    // Korapay marks a completed payment as data.status === "successful".
     // Never assume success from the mere presence of a response.
     const charge = readCharge(korapayBody);
     const chargeStatus = charge.status;
     const chargedAmount = charge.amount;
 
     if (chargeStatus !== 'successful') {
-      return res.status(402).json({ error: `Payment not successful (Flutterwave status: ${chargeStatus || 'unknown'})` });
+      return res.status(402).json({ error: `Payment not successful (Korapay status: ${chargeStatus || 'unknown'})` });
     }
     if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) {
       console.error('confirm-payment: could not parse charged amount', korapayBody);
-      return res.status(502).json({ error: 'Could not confirm the charged amount with Flutterwave — payment not completed.' });
+      return res.status(502).json({ error: 'Could not confirm the charged amount with Korapay — payment not completed.' });
     }
     if (charge.currency && charge.currency !== 'NGN') {
       return res.status(409).json({ error: `Unexpected payment currency: ${charge.currency}` });
@@ -133,21 +133,21 @@ async function handlePayment(req, res) {
 
     // ---- 3. Match the charged amount against what we expect, then transition ----
     //
-    // IMPORTANT: Flutterwave's `charged_amount` is what the CUSTOMER paid,
+    // IMPORTANT: Korapay's `charged_amount` is what the CUSTOMER paid,
     // which is often HIGHER than the amount we requested. When "customer
-    // bears the transaction fee" is enabled on the Flutterwave dashboard
+    // bears the transaction fee" is enabled on the Korapay dashboard
     // (common/default for NG merchants, especially for bank transfer /
-    // USSD), Flutterwave adds its fee on top before charging the customer,
+    // USSD), Korapay adds its fee on top before charging the customer,
     // e.g. we ask for ₦1000 and the customer is charged ₦1020 — we still
     // receive the full ₦1000 at settlement (data.amount_settled).
-    // Flutterwave's own docs are explicit about this: verify that the
+    // Korapay's own docs are explicit about this: verify that the
     // charged amount is >= the amount you expect, not that it matches
-    // exactly. See: https://developer.flutterwave.com/docs/transaction-verification
+    // exactly. See: https://developers.korapay.com/docs/verify-a-charge
     //
     // So we only fail closed when the customer was charged LESS than
     // expected (an undercharge could indicate someone gaming the amount).
     // We do NOT reject an overcharge — that's the customer legitimately
-    // covering Flutterwave's fee, and treating it as a mismatch is what was
+    // covering Korapay's fee, and treating it as a mismatch is what was
     // causing every real, successful payment to get stuck on "pending".
     const UNDERCHARGE_TOLERANCE = 5; // ₦5 slack for rounding/floating point only
 
@@ -176,7 +176,7 @@ async function handlePayment(req, res) {
       // Catch email errors so they don't break the webhook: the payment has
       // already been marked "completed" and tokens added to wallet, so the
       // core transaction is complete. Email failures should be logged but not
-      // reported to Flutterwave (which would trigger infinite retries).
+      // reported to Korapay (which would trigger infinite retries).
       try {
         const tokenEmailResult = await sendTokenReceiptEmail(supabase, tokenTx).then(
           () => ({ status: 'fulfilled' }),
@@ -228,7 +228,7 @@ async function handlePayment(req, res) {
       // Catch email errors so they don't break the webhook: the payment has
       // already been marked "completed" and inspection marked "assigned", so
       // the core transaction is complete. Email failures should be logged but
-      // not reported to Flutterwave (which would trigger infinite retries).
+      // not reported to Korapay (which would trigger infinite retries).
       try {
         const emailResults = await Promise.allSettled([
           sendInspectionAgentNotify(supabase, inspTx, inspection),
@@ -291,7 +291,7 @@ async function handlePayment(req, res) {
       // Catch email errors so they don't break the webhook: the payment has
       // already been marked "held" in the database, so the core transaction
       // is complete. Email failures should be logged but not reported to
-      // Flutterwave (which would trigger infinite retries).
+      // Korapay (which would trigger infinite retries).
       try {
         const heldEmailResult = await sendRentHeldEmail(supabase, rentTx).then(
           () => ({ status: 'fulfilled' }),
@@ -370,7 +370,7 @@ async function handlePayment(req, res) {
     }
   } catch (err) {
     // Payment confirmation failed — don't return 200.
-    // Return 500 so Flutterwave retries: a payment stuck as "pending" is
+    // Return 500 so Korapay retries: a payment stuck as "pending" is
     // better than one silently marked "paid" when we never checked it.
     console.error('confirm-payment: unexpected error', err);
     return res.status(500).json({ error: 'Failed to confirm payment', detail: String(err?.message || err) });
@@ -567,12 +567,12 @@ function describeOutcome(status, body) {
     return { outcome: 'duplicate', title: 'Payment already processed', reason: 'This reference was confirmed earlier — no changes were made (idempotent replay of the callback or webhook).' };
   }
   if (status === 200) {
-    return { outcome: 'success', title: 'Payment successful', reason: 'Flutterwave verified the charge server-side and the amount matched what Rentora expected, so the payment was completed.' };
+    return { outcome: 'success', title: 'Payment successful', reason: 'Korapay verified the charge server-side and the amount matched what Rentora expected, so the payment was completed.' };
   }
   if (status === 404) return { outcome: 'failed', title: 'Payment could not be matched', reason: body?.error || 'No transaction in Rentora matches this reference.' };
-  if (status === 402) return { outcome: 'failed', title: 'Payment not verified by Flutterwave', reason: body?.error || 'Flutterwave did not report this charge as successful.' };
+  if (status === 402) return { outcome: 'failed', title: 'Payment not verified by Korapay', reason: body?.error || 'Korapay did not report this charge as successful.' };
   if (status === 409) return { outcome: 'failed', title: 'Payment rejected — mismatch', reason: body?.error || 'The charged amount, currency or reference did not match Rentora records.' };
-  if (status === 502) return { outcome: 'failed', title: 'Payment rejected — unreadable amount', reason: body?.error || 'Could not confirm the charged amount with Flutterwave.' };
+  if (status === 502) return { outcome: 'failed', title: 'Payment rejected — unreadable amount', reason: body?.error || 'Could not confirm the charged amount with Korapay.' };
   return { outcome: 'failed', title: 'Payment confirmation error', reason: body?.error || body?.detail || `Server returned status ${status}.` };
 }
 
