@@ -207,83 +207,12 @@ export const propertyAPI = {
   },
 
   update: async (id, data) => {
-    // Capture the existing listing before the update so we can send an
-    // accurate admin notification after an agent changes an existing
-    // property. The notification is best-effort and must never block the
-    // actual property update.
-    let existingProperty = null;
-    try {
-      const { data: currentProperty } = await supabase
-        .from('properties')
-        .select('id, title, price, status, uploaded_by_agent_id, uploaded_by_agent_name')
-        .eq('id', id)
-        .maybeSingle();
-      existingProperty = currentProperty || null;
-    } catch (_) {
-      existingProperty = null;
-    }
-
     const { error } = await supabase
       .from('properties')
       .update(data)
       .eq('id', id);
-
+    
     if (error) throw error;
-
-    // If this is an existing listing being edited by a normal user/agent,
-    // notify every admin that the listing needs review. This deliberately
-    // runs after the DB update so admins never receive an alert for an
-    // update that actually failed.
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const isAdmin = authUser?.user_metadata?.role === 'admin';
-      const newStatus = data?.status || 'pending';
-
-      if (!isAdmin) {
-        const agentName = authUser?.user_metadata?.full_name || existingProperty?.uploaded_by_agent_name || authUser?.email || 'An agent';
-        const changed = [];
-
-        const labels = {
-          title: 'Title',
-          price: 'Rent',
-          agency_fee: 'Agency fee',
-          agent_fee: 'Agency fee',
-          agreement_fee: 'Agreement fee',
-          caution_fee: 'Caution fee',
-          inspection_fee: 'Inspection fee',
-          documentation_fee: 'Documentation fee',
-          other_fees: 'Other fees',
-          availability: 'Availability',
-          address: 'Address',
-          description: 'Description',
-          property_type: 'Property type',
-          location_id: 'Location',
-          images: 'Images',
-          status: 'Status',
-        };
-
-        Object.keys(data || {}).forEach((key) => {
-          if (labels[key] && key !== 'status') changed.push([labels[key], 'Updated']);
-        });
-
-        notifyAdmins({
-          title: `Property updated: ${data?.title || existingProperty?.title || 'Untitled listing'}`,
-          eventLabel: 'Property update',
-          summary: `${agentName} updated an existing property listing. The listing has been submitted for admin review.`,
-          breakdown: [
-            ['Property', data?.title || existingProperty?.title || '—'],
-            ['Agent', agentName],
-            ['Agent email', authUser?.email || '—'],
-            ['New status', newStatus],
-            ...(changed.length ? changed : [['Changes', 'Listing details updated']]),
-          ],
-          actionUrl: 'https://www.rentora.com.ng/admin',
-        });
-      }
-    } catch (notifyError) {
-      console.warn('Property update admin notification failed:', notifyError?.message || notifyError);
-    }
-
     return { data: { message: 'Property updated' } };
   },
 
@@ -419,7 +348,12 @@ export const inspectionAPI = {
     const reference = generateReference('VIEW');
     const inspectionId = uuidv4();
 
-    // Create the viewing request — free, so it is confirmed immediately.
+    const inspectionFee = Math.max(0, Math.round(Number(property.inspection_fee) || 0));
+
+    // Create the viewing request in a pending payment state. The agent's
+    // inspection_fee is the amount the student must pay before the viewing
+    // is assigned to the agent. A zero fee remains supported for properties
+    // where the agent explicitly chooses to offer a free viewing.
     const { error: insertError } = await supabase
       .from('inspections')
       .insert({
@@ -434,8 +368,8 @@ export const inspectionAPI = {
         agent_id: property.uploaded_by_agent_id,
         agent_name: property.uploaded_by_agent_name,
         inspection_date: data.inspection_date,
-        status: 'confirmed',
-        payment_status: 'not_required',
+        status: inspectionFee > 0 ? 'pending' : 'confirmed',
+        payment_status: inspectionFee > 0 ? 'pending' : 'not_required',
         payment_reference: reference
       });
 
@@ -449,26 +383,30 @@ export const inspectionAPI = {
 
     const sendMail = sendTransactionalEmail;
 
-    // Confirmation email to the student — best-effort, never blocks the request.
-    try {
-      const studentEmail = data.email || user.email;
-      if (studentEmail) {
-        await sendMail({
-          type: 'inspection_booked',
-          to: studentEmail,
-          data: {
-            name: user.full_name || 'there',
-            property_title: property.title,
-            inspection_date: data.inspection_date,
-            reference,
-            amount: 0,
-          },
-        });
-      }
-    } catch (e) { console.warn('inspection_booked email failed:', e.message); }
+    // Free viewing: notify immediately. Paid viewing: confirmation emails are
+    // sent by /api/confirm-payment only after KoraPay verification succeeds.
+    if (inspectionFee <= 0) {
+      try {
+        const studentEmail = data.email || user.email;
+        if (studentEmail) {
+          await sendMail({
+            type: 'inspection_booked',
+            to: studentEmail,
+            data: {
+              name: user.full_name || 'there',
+              property_title: property.title,
+              inspection_date: data.inspection_date,
+              reference,
+              amount: 0,
+            },
+          });
+        }
+      } catch (e) { console.warn('inspection_booked email failed:', e.message); }
+    }
 
-    // Tell the agent about the new (free) viewing request — email + in-app.
-    if (property.uploaded_by_agent_id) {
+    // Tell the agent about a free viewing immediately. Paid viewing
+    // notifications are sent by /api/confirm-payment after successful payment.
+    if (property.uploaded_by_agent_id && inspectionFee <= 0) {
       try {
         const { data: agent } = await supabase
           .from('users')
@@ -520,10 +458,12 @@ export const inspectionAPI = {
       data: {
         inspection_id: inspectionId,
         reference,
+        amount: inspectionFee,
         agent_id: property.uploaded_by_agent_id,
         agent_name: property.uploaded_by_agent_name,
         property_title: property.title,
         inspection_date: data.inspection_date,
+        payment_required: inspectionFee > 0,
       }
     };
   },

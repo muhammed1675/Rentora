@@ -238,17 +238,44 @@ export function PropertyDetails() {
 
     setRequestingInspection(true);
     try {
-      // Viewings are free — the request is confirmed straight away and the
-      // agent is notified. No payment step.
-      await inspectionAPI.request({
+      const result = await inspectionAPI.request({
         property_id: id,
         inspection_date: inspectionDate,
         email: inspectionEmail,
         phone_number: inspectionPhone,
       }, user);
 
-      setShowInspectionDialog(false);
-      toast.success('Viewing request sent! Our agent will contact you shortly.');
+      const inspectionAmount = Number(result?.data?.amount || 0);
+
+      if (inspectionAmount > 0) {
+        const { openKorapayCheckout } = await import('../lib/korapay');
+        await openKorapayCheckout({
+          reference: result.data.reference,
+          amount: inspectionAmount,
+          email: inspectionEmail || user.email,
+          name: user?.full_name || user?.email,
+          narration: `Property viewing — ${property?.title}`,
+          onSuccess: () => {
+            setShowInspectionDialog(false);
+            toast.success('Viewing payment confirmed. Your inspection request has been sent to the agent.');
+            setRequestingInspection(false);
+          },
+          onFailed: () => {
+            toast.error('Viewing payment failed. Please try again.');
+            setRequestingInspection(false);
+          },
+          onPending: () => {
+            toast.message('Viewing payment received — we are confirming it now. Your request will update automatically once confirmed.');
+            setShowInspectionDialog(false);
+            setRequestingInspection(false);
+          },
+          onClose: () => setRequestingInspection(false),
+        });
+      } else {
+        setShowInspectionDialog(false);
+        toast.success('Viewing request sent! Our agent will contact you shortly.');
+        setRequestingInspection(false);
+      }
     } catch (error) {
       toast.error(error.message || 'Failed to send your viewing request');
     } finally {
@@ -685,7 +712,7 @@ export function PropertyDetails() {
               <p className="text-sm text-muted-foreground mb-4">This property has been taken and is no longer accepting viewing requests.</p>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground mb-4">Schedule a free physical visit with our verified agent.</p>
+                <p className="text-sm text-muted-foreground mb-4">Schedule a physical viewing with our verified agent.</p>
                 <Button variant="outline" onClick={() => {
                   if (!isAuthenticated) { toast.error('Please login to request a viewing'); navigate('/login'); return; }
                   if (!requireVerification('book')) return;
@@ -707,7 +734,7 @@ export function PropertyDetails() {
         <DialogContent className="max-w-[calc(100vw-1.5rem)] overflow-hidden sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Request a Property Viewing</DialogTitle>
-            <DialogDescription className="break-words">Schedule a free physical viewing with our verified agent. No payment is required.</DialogDescription>
+            <DialogDescription className="break-words">Schedule a physical viewing with our verified agent. The viewing fee is set by the agent for this property.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -733,14 +760,14 @@ export function PropertyDetails() {
             <Card className="p-4 bg-muted/50">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <span className="font-medium">Viewing fee</span>
-                <span className="shrink-0 text-right text-lg font-bold text-primary sm:text-xl">Free</span>
+                <span className="shrink-0 text-right text-lg font-bold text-primary sm:text-xl">{formatPrice(Number(property?.inspection_fee) || 0)}</span>
               </div>
             </Card>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInspectionDialog(false)}>Cancel</Button>
             <Button onClick={handleRequestInspection} disabled={requestingInspection} className="min-w-0 gap-2" data-testid="confirm-viewing-btn">
-              {requestingInspection ? 'Sending...' : <><CalendarIcon className="h-4 w-4 shrink-0" /><span className="truncate">Send Viewing Request</span></>}
+              {requestingInspection ? 'Processing...' : <><CalendarIcon className="h-4 w-4 shrink-0" /><span className="truncate">Pay & Request Viewing</span></>}
             </Button>
           </DialogFooter>
         </DialogContent>
