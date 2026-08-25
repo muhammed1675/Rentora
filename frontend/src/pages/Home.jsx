@@ -5,6 +5,7 @@ import { SplitText } from 'gsap/SplitText';
 import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck, Lock, CheckCircle2, Zap, Star, Users, Home as HomeIcon } from 'lucide-react';
 import { AppBanner } from '../components/AppBanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+import AdSlot from '../components/AdSlot';
 
 gsap.registerPlugin(SplitText);
 
@@ -95,6 +96,9 @@ export function Home() {
   return (
     <div data-testid="home-page">
       <AppBanner />
+      <div className="mx-auto max-w-7xl px-5 pt-6 sm:px-8">
+        <AdSlot slot="header_billboard" context="the home page" />
+      </div>
 
       {/* Hero */}
       <section data-no-motion className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 md:pb-24 md:pt-12">

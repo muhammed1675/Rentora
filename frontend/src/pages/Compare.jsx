@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { ArrowLeft, X, Home, Building, MapPin, Coins, GitCompare, Plus } from 'lucide-react';
+import AdSlot from '../components/AdSlot';
 
 function getCompareList() {
   try { return JSON.parse(localStorage.getItem('rentora_compare') || '[]'); }
@@ -68,6 +69,8 @@ export function Compare() {
           </Button>
         )}
       </div>
+
+      <AdSlot slot="mid_page_content" context="the compare page" className="mb-6" />
 
       {compareList.length === 0 ? (
         /* Empty state */

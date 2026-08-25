@@ -22,6 +22,7 @@ import {
   Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send
 } from 'lucide-react';
 import { toast } from 'sonner';
+import AdsAdminPanel from '../components/AdsAdminPanel';
 
 export function AdminDashboard() {
   const navigate = useNavigate();
@@ -736,6 +737,7 @@ export function AdminDashboard() {
     },
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
     { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
+    { id: 'ads', label: 'Ads', icon: Megaphone },
     { id: 'broadcasts', label: 'Broadcasts', icon: Megaphone },
   ];
 
@@ -1169,8 +1171,14 @@ export function AdminDashboard() {
         </TabsContent>
 
 
-        {/* ── Users ── */}
-        <TabsContent value="users">
+          {/* ── Ads ── */}
+          <TabsContent value="ads">
+            <div className="mb-6"><h1 className="text-2xl font-bold text-slate-900">Advertising</h1><p className="text-sm text-slate-500">Review campaigns, track revenue and manage placement pricing.</p></div>
+            <AdsAdminPanel />
+          </TabsContent>
+
+          {/* ── Users ── */}
+          <TabsContent value="users">
           <div className="mb-4 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input placeholder="Search users..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
