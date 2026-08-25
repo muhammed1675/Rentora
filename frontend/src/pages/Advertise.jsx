@@ -24,7 +24,7 @@ export default function Advertise() {
 
   const submit = async (event) => {
     event.preventDefault(); setMessage('');
-    if (!user) { navigate(`/login?next=${encodeURIComponent('/advertise')}`); return; }
+    if (!user) { navigate(`/login?next=${encodeURIComponent('/advertise/create')}`); return; }
     const url = safeExternalUrl(form.destinationUrl);
     const creativeError = validateCreative(file, form.slot);
     if (!form.slot || !form.advertiserName.trim() || !normalizeWhatsApp(form.whatsapp) || !url || !form.headline.trim() || creativeError) { setMessage(creativeError || 'Please complete every field with valid information.'); return; }

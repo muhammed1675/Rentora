@@ -29,6 +29,12 @@ import { FAQ } from './pages/FAQ';
 import Notifications from './pages/Notifications';
 import VerifyAccount from './pages/VerifyAccount';
 import Advertise from './pages/Advertise';
+import AdvertiseHome from './pages/AdvertiseHome';
+import AdvertiserDashboard from './pages/AdvertiserDashboard';
+
+// advertise.rentora.com.ng resolves to this same deployment (see Vercel
+// config) — this just tells the router which "site" it's rendering.
+const isAdvertiseHost = typeof window !== 'undefined' && window.location.hostname === 'advertise.rentora.com.ng';
 
 // Protected Route wrapper. Browsing is always allowed for everyone —
 // verification is enforced at the specific action, not at the route
@@ -136,11 +142,20 @@ function AppRoutes() {
       <PushClickListener />
       <Routes>
       {/* Public Routes */}
-      {/* advertise.rentora.com.ng resolves to this same app (see Vercel);
-          serve the existing Advertise page there instead of Home, on
-          "/" only — every other route is untouched. */}
-      <Route path="/" element={<Layout>{window.location.hostname === 'advertise.rentora.com.ng' ? <Advertise /> : <Home />}</Layout>} />
-      <Route path="/advertise" element={<Layout><Advertise /></Layout>} />
+      {/* On advertise.rentora.com.ng, "/" is the public advertising
+          homepage instead of the normal Rentora homepage. Every other
+          route (including "/" on rentora.com.ng / www) is unchanged. */}
+      <Route path="/" element={<Layout>{isAdvertiseHost ? <AdvertiseHome /> : <Home />}</Layout>} />
+      <Route path="/advertise" element={<Layout><AdvertiseHome /></Layout>} />
+      <Route path="/advertise/create" element={<Layout><Advertise /></Layout>} />
+      <Route
+        path="/advertise/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout><AdvertiserDashboard /></Layout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/browse" element={<Layout><Browse /></Layout>} />
       <Route path="/property/:id" element={<Layout><PropertyDetails /></Layout>} />
       <Route path="/login" element={<Layout><Login /></Layout>} />
