@@ -28,6 +28,7 @@ import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
 import Notifications from './pages/Notifications';
 import VerifyAccount from './pages/VerifyAccount';
+import Advertise from './pages/Advertise';
 
 // Protected Route wrapper. Browsing is always allowed for everyone —
 // verification is enforced at the specific action, not at the route
@@ -135,7 +136,11 @@ function AppRoutes() {
       <PushClickListener />
       <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Layout><Home /></Layout>} />
+      {/* advertise.rentora.com.ng resolves to this same app (see Vercel);
+          serve the existing Advertise page there instead of Home, on
+          "/" only — every other route is untouched. */}
+      <Route path="/" element={<Layout>{window.location.hostname === 'advertise.rentora.com.ng' ? <Advertise /> : <Home />}</Layout>} />
+      <Route path="/advertise" element={<Layout><Advertise /></Layout>} />
       <Route path="/browse" element={<Layout><Browse /></Layout>} />
       <Route path="/property/:id" element={<Layout><PropertyDetails /></Layout>} />
       <Route path="/login" element={<Layout><Login /></Layout>} />
