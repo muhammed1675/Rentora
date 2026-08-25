@@ -67,11 +67,13 @@ export function PaymentCallback() {
   };
 
   const formatPrice = (price) => {
+    const n = Number(price);
+    if (!Number.isFinite(n)) return '—';
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(n);
   };
 
   return (

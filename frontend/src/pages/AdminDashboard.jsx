@@ -77,6 +77,7 @@ export function AdminDashboard() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteExpiryDays, setInviteExpiryDays] = useState('7');
   const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [resendingInviteId, setResendingInviteId] = useState(null);
 
   // Broadcasts — admin → all users (or a role) push, shown via the same
   // bell/notifications system as personal notifications. See lib/notifications.js.
@@ -237,17 +238,46 @@ export function AdminDashboard() {
       const code = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
       const days = Math.max(1, parseInt(inviteExpiryDays, 10) || 7);
       const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+      const email = inviteEmail.trim();
       const { error } = await supabase.from('agent_invites').insert({
-        code, created_by: user.id, email: inviteEmail.trim() || null, expires_at: expiresAt,
+        code, created_by: user.id, email: email || null, expires_at: expiresAt,
       });
       if (error) throw error;
-      toast.success('Invite link generated');
+
+      if (email) {
+        // Best-effort: the invite row is already saved either way, so an
+        // email hiccup shouldn't look like the whole action failed — the
+        // admin can still copy the link or hit Resend from the list below.
+        try {
+          await adminAPI.sendAgentInviteEmail({ to: email, link: inviteLink(code), expiresAt, invitedBy: user.full_name });
+          toast.success(`Invite sent to ${email}`);
+        } catch (emailErr) {
+          console.error('Failed to email agent invite:', emailErr);
+          toast.error('Invite link created, but the email failed to send. You can copy the link or hit Resend below.');
+        }
+      } else {
+        toast.success('Invite link generated');
+      }
+
       setInviteEmail('');
       await fetchAgentInvites();
     } catch (e) {
       toast.error(e.message || 'Failed to generate invite');
     } finally {
       setGeneratingInvite(false);
+    }
+  };
+
+  const resendAgentInvite = async (invite) => {
+    if (!invite.email) return;
+    setResendingInviteId(invite.id);
+    try {
+      await adminAPI.sendAgentInviteEmail({ to: invite.email, link: inviteLink(invite.code), expiresAt: invite.expires_at, invitedBy: user.full_name });
+      toast.success(`Invite resent to ${invite.email}`);
+    } catch (e) {
+      toast.error(e.message || 'Failed to resend invite email');
+    } finally {
+      setResendingInviteId(null);
     }
   };
 
@@ -1623,8 +1653,9 @@ export function AdminDashboard() {
             <Card className="p-5">
               <h3 className="font-semibold mb-1">Generate invite link</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Agent applications are invite-only. Generate a single-use link and send it to the
-                person you want to work with — nobody can find or guess this page on their own.
+                Agent applications are invite-only — nobody can find or guess this page on their own.
+                Enter the agent's email to have the invite link emailed to them directly, or leave it
+                blank to just generate a link to copy or share on WhatsApp yourself.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Input
@@ -1644,7 +1675,7 @@ export function AdminDashboard() {
                 </Select>
                 <Button onClick={generateAgentInvite} disabled={generatingInvite} className="gap-2">
                   {generatingInvite ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                  Generate invite link
+                  {inviteEmail.trim() ? 'Generate & email invite' : 'Generate invite link'}
                 </Button>
               </div>
             </Card>
@@ -1691,6 +1722,11 @@ export function AdminDashboard() {
                               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => shareInviteOnWhatsApp(invite.code)}>
                                 WhatsApp
                               </Button>
+                              {invite.email && (
+                                <Button size="sm" variant="outline" className="gap-1.5" disabled={resendingInviteId === invite.id} onClick={() => resendAgentInvite(invite)}>
+                                  {resendingInviteId === invite.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Resend
+                                </Button>
+                              )}
                               <Button size="sm" variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => revokeAgentInvite(invite)}>
                                 <XCircle className="w-3.5 h-3.5" /> Revoke
                               </Button>

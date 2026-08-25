@@ -1190,6 +1190,27 @@ export const adminAPI = {
     if (!res.ok) throw new Error(result.error || 'Failed to process refund.');
     return result;
   },
+
+  // Emails an agent invite link directly to the address the admin typed in.
+  // Uses the 'agent_invite' template on the send-email edge function — see
+  // supabase/functions/send-email/index.ts. Throws on failure so the caller
+  // (AdminDashboard's generateAgentInvite) can tell the admin the invite
+  // was created but the email didn't go out, rather than failing silently.
+  sendAgentInviteEmail: async ({ to, link, expiresAt, invitedBy }) => {
+    const res = await sendTransactionalEmail({
+      type: 'agent_invite',
+      to,
+      data: {
+        link,
+        expires_at: new Date(expiresAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }),
+        invited_by: invitedBy || 'the Rentora team',
+      },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || 'Failed to send invite email');
+    }
+  },
 };
 
 // ============== PAYMENT APIs ==============

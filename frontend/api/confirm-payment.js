@@ -156,7 +156,7 @@ async function handlePayment(req, res) {
 
     if (tokenTx) {
       if (tokenTx.status === 'completed') {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'token_purchase' });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'token_purchase', amount: tokenTx.amount, tokens: tokenTx.tokens_added });
       }
       if (chargedAmount < Number(tokenTx.amount) - UNDERCHARGE_TOLERANCE) {
         console.error('confirm-payment: token amount mismatch', { expected: tokenTx.amount, charged: chargedAmount, reference });
@@ -172,7 +172,7 @@ async function handlePayment(req, res) {
         .maybeSingle();
       if (txErr) throw txErr;
       if (!claimedToken) {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'token_purchase' });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'token_purchase', amount: tokenTx.amount, tokens: tokenTx.tokens_added });
       }
 
       const { data: wallet } = await supabase.from('wallets').select('token_balance').eq('user_id', tokenTx.user_id).maybeSingle();
@@ -208,7 +208,7 @@ async function handlePayment(req, res) {
 
     if (inspTx) {
       if (inspTx.status === 'completed') {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection' });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection', amount: inspTx.amount });
       }
       const shortfall = Number(inspTx.amount) - chargedAmount; // positive => customer paid less than expected
       console.log('[confirm-payment] Inspection amount check:', {
@@ -233,7 +233,7 @@ async function handlePayment(req, res) {
         .maybeSingle();
       if (itxErr) throw itxErr;
       if (!claimedInspection) {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection' });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'inspection', amount: inspTx.amount });
       }
 
       const { error: inspErr } = await supabase.from('inspections').update({ payment_status: 'completed', status: 'assigned' }).eq('id', inspTx.inspection_id).eq('payment_status', 'pending');
@@ -272,7 +272,7 @@ async function handlePayment(req, res) {
 
     if (rentTx) {
       if (rentTx.status !== 'pending') {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'rent', status: rentTx.status });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'rent', status: rentTx.status, amount: rentTx.total_amount });
       }
       if (chargedAmount < Number(rentTx.total_amount) - UNDERCHARGE_TOLERANCE) {
         console.error('confirm-payment: rent amount mismatch', { expected: rentTx.total_amount, charged: chargedAmount, reference });
@@ -288,7 +288,7 @@ async function handlePayment(req, res) {
         .maybeSingle();
       if (rentErr) throw rentErr;
       if (!claimedRent) {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'rent', status: rentTx.status });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'rent', status: rentTx.status, amount: rentTx.total_amount });
       }
 
       // Lock the property the instant rent is actually held — otherwise
@@ -337,7 +337,7 @@ async function handlePayment(req, res) {
 
     if (tipTx) {
       if (tipTx.status === 'completed') {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip' });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip', amount: tipTx.amount });
       }
       if (chargedAmount < Number(tipTx.amount) - UNDERCHARGE_TOLERANCE) {
         console.error('confirm-payment: tip amount mismatch', { expected: tipTx.amount, charged: chargedAmount, reference });
@@ -362,12 +362,12 @@ async function handlePayment(req, res) {
         // already processed rather than a hard failure, since the charge
         // did succeed and shouldn't be reported as failed to the student.
         if (tipErr.code === '23505') {
-          return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip' });
+          return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip', amount: tipTx.amount });
         }
         throw tipErr;
       }
       if (!updatedTip) {
-        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip' });
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'tip', amount: tipTx.amount });
       }
 
       // Agent balance crediting happens via the trg_credit_agent_tip_balance
