@@ -468,6 +468,24 @@ function emailPropertyApproved(agentName: string, propertyTitle: string) {
   });
 }
 
+// Agent-facing: a submitted or edited listing was reviewed and turned down.
+// Kept separate from emailPropertyApproved so the subject line and tone are
+// clearly different — this is not a "listing removed after being live"
+// notice (see emailRentPaymentResolvedAgent), it's a review outcome.
+function emailPropertyRejected(agentName: string, propertyTitle: string) {
+  return baseTemplate({
+    eyebrow: "Listing not approved",
+    headline: "Your Listing Needs Changes",
+    subhead: `Hi ${agentName}, ${propertyTitle} was reviewed but not approved to go live yet.`,
+    rowsHtml: row("home", "Property", propertyTitle),
+    paragraphs: [
+      "This usually means a detail needs fixing — photos, pricing, description, or contact info.",
+      "You can edit the listing and resubmit it for another review from your Agent Dashboard. If you're not sure what to change, contact support@rentora.com.ng and we'll help.",
+    ],
+    cta: { buttons: [{ text: "Edit Listing", href: "https://www.rentora.com.ng/agent" }] },
+  });
+}
+
 function emailAdminPaymentAlert(d: any) {
   const ok = d.outcome === "success";
   const dup = d.outcome === "duplicate";
@@ -686,6 +704,10 @@ serve(async (req) => {
       case "property_approved":
         subject = `Your listing "${data.property_title}" is now live on Rentora`;
         html = emailPropertyApproved(data.agent_name, data.property_title);
+        break;
+      case "property_rejected":
+        subject = `Update on your listing "${data.property_title}"`;
+        html = emailPropertyRejected(data.agent_name, data.property_title);
         break;
       case "verification_approved":
         subject = "Your Rentora Agent Verification is Approved!";

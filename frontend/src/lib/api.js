@@ -206,13 +206,45 @@ export const propertyAPI = {
     return { data: { property_id: propertyId } };
   },
 
-  update: async (id, data) => {
+  // `user` (the agent making the edit) is optional — pass it whenever the
+  // caller has it so the admin email can show who made the change. Admins
+  // are only emailed when the edit sends the listing back to 'pending'
+  // (a real content edit awaiting re-approval), not for lightweight status
+  // toggles like marking a property available/unavailable.
+  update: async (id, data, user) => {
     const { error } = await supabase
       .from('properties')
       .update(data)
       .eq('id', id);
     
     if (error) throw error;
+
+    if (data.status === 'pending') {
+      try {
+        const { data: admins } = await supabase.from('users').select('email, full_name').eq('role', 'admin');
+        if (admins?.length) {
+          await Promise.allSettled(
+            admins.filter((a) => a.email).map((admin) =>
+              sendTransactionalEmail({
+                type: 'property_updated_admin',
+                to: admin.email,
+                data: {
+                  property_title: data.title || 'Untitled property',
+                  agent_name: user?.full_name || '—',
+                  agent_email: user?.email || '',
+                  status: data.status,
+                  property_id: id,
+                  summary: 'This listing was edited by the agent and needs to be reviewed again before it goes back live.',
+                  admin_name: admin.full_name || 'Admin',
+                  action_url: 'https://www.rentora.com.ng/admin',
+                },
+              })
+            )
+          );
+        }
+      } catch (e) { console.warn('property_updated_admin email failed:', e.message); }
+    }
+
     return { data: { message: 'Property updated' } };
   },
 
@@ -260,8 +292,8 @@ export const propertyAPI = {
     if (error) throw error;
 
     // Notify the agent — best-effort, never allowed to affect the
-    // approval itself, which has already succeeded above.
-    if (status === 'approved') {
+    // approval/rejection itself, which has already succeeded above.
+    if (status === 'approved' || status === 'rejected') {
       try {
         const property = rows?.[0];
         if (property?.uploaded_by_agent_id) {
@@ -269,7 +301,7 @@ export const propertyAPI = {
           const agent = agentRes.data?.[0];
           if (agent?.email) {
             await sendTransactionalEmail({
-              type: 'property_approved',
+              type: status === 'approved' ? 'property_approved' : 'property_rejected',
               to: agent.email,
               data: {
                 agent_name: agent.full_name || 'there',
@@ -279,13 +311,15 @@ export const propertyAPI = {
           }
           notifyUser(
             property.uploaded_by_agent_id,
-            'property_approved',
-            'Your listing is now live',
-            `"${property.title}" has been approved and is now visible to students.`,
+            status === 'approved' ? 'property_approved' : 'property_rejected',
+            status === 'approved' ? 'Your listing is now live' : 'Your listing was not approved',
+            status === 'approved'
+              ? `"${property.title}" has been approved and is now visible to students.`
+              : `"${property.title}" was reviewed and not approved. Edit and resubmit it from your dashboard.`,
             '/agent'
           );
         }
-      } catch (e) { console.warn('property_approved email failed:', e); }
+      } catch (e) { console.warn(`property_${status} email failed:`, e); }
     }
 
     return { data: { message: `Property ${status}` } };
@@ -470,20 +504,27 @@ export const inspectionAPI = {
       );
     }
 
-    // Tell admins a viewing request came in.
-    notifyAdmins({
-      title: `New viewing request: ${property.title}`,
-      eventLabel: 'New viewing request',
-      summary: `${user.full_name || 'A student'} requested a viewing of "${property.title}" on ${data.inspection_date}.`,
-      breakdown: [
-        ['Property', property.title || '—'],
-        ['Student', user.full_name || '—'],
-        ['Student email', user.email || '—'],
-        ['Agent', property.uploaded_by_agent_name || '—'],
-        ['Date', data.inspection_date || '�����'],
-      ],
-      actionUrl: 'https://www.rentora.com.ng/admin',
-    });
+    // Tell admins a viewing request came in — only immediately for FREE
+    // viewings. For paid viewings, admins are already notified once the
+    // payment actually completes (confirm-payment.js sends an
+    // 'admin_payment_alert' email after KoraPay verification succeeds).
+    // Sending this one too, before any money has moved, meant admins got
+    // an email for viewing requests that were never actually paid for.
+    if (inspectionFee <= 0) {
+      notifyAdmins({
+        title: `New viewing request: ${property.title}`,
+        eventLabel: 'New viewing request',
+        summary: `${user.full_name || 'A student'} requested a free viewing of "${property.title}" on ${data.inspection_date}.`,
+        breakdown: [
+          ['Property', property.title || '—'],
+          ['Student', user.full_name || '—'],
+          ['Student email', user.email || '—'],
+          ['Agent', property.uploaded_by_agent_name || '—'],
+          ['Date', data.inspection_date || '—'],
+        ],
+        actionUrl: 'https://www.rentora.com.ng/admin',
+      });
+    }
 
     return {
       data: {

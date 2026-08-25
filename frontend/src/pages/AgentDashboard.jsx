@@ -402,7 +402,7 @@ export function AgentDashboard() {
         // (and off Browse) until reviewed. approved_by_admin_id is NOT sent
         // here — the DB only allows admins to change that column, and an
         // agent's own edit will be rejected if it's included.
-        await propertyAPI.update(editingProperty.id, { ...data, status: 'pending' });
+        await propertyAPI.update(editingProperty.id, { ...data, status: 'pending' }, user);
         toast.success('Property updated — pending admin re-approval');
       } else {
         await propertyAPI.create(data, user);

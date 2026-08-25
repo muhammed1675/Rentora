@@ -2874,8 +2874,8 @@ export function AdminDashboard() {
                     <p className="font-semibold">{formatPrice(previewProperty.price)}</p>
                   </div>
                   <div className="p-3 rounded-lg border border-blue-200">
-                    <p className="text-xs text-muted-foreground">Viewing</p>
-                    <p className="font-semibold">Free</p>
+                    <p className="text-xs text-muted-foreground">Viewing Fee</p>
+                    <p className="font-semibold">{Number(previewProperty.inspection_fee) > 0 ? formatPrice(previewProperty.inspection_fee) : 'Free'}</p>
                   </div>
                   <div className="p-3 rounded-lg border border-blue-200"><p className="text-xs text-muted-foreground">Agreement Fee</p><p className="font-semibold">{formatPrice(previewProperty.agreement_fee || 0)}</p></div>
                   <div className="p-3 rounded-lg border border-blue-200"><p className="text-xs text-muted-foreground">Documentation Fee</p><p className="font-semibold">{formatPrice(previewProperty.documentation_fee || 0)}</p></div>
