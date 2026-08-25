@@ -36,24 +36,29 @@ export const advertisingAPI = {
     return { path: data.path, url: urlData.publicUrl };
   },
   createPendingAd: async (payload) => {
-    const { data, error } = await supabase.rpc('create_pending_ad', {
-      p_idempotency_key: payload.idempotencyKey,
-      p_slot: payload.slot,
-      p_duration_days: payload.durationDays,
-      p_advertiser_name: payload.advertiserName,
-      p_whatsapp: payload.whatsapp,
-      p_destination_url: payload.destinationUrl,
-      p_creative_url: payload.creativeUrl,
-      p_creative_path: payload.creativePath,
-    });
+    const startsAt = new Date();
+    const endsAt = new Date(startsAt.getTime() + Number(payload.durationDays) * 86400000);
+    const { data, error } = await supabase.from('ads').insert({
+      full_name: payload.advertiserName.trim(),
+      business_name: payload.advertiserName.trim(),
+      whatsapp_number: payload.whatsapp,
+      slot: payload.slot,
+      ad_text: [payload.headline, payload.description].filter(Boolean).join(' — '),
+      image_url: payload.creativeUrl,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      status: 'pending',
+      payment_status: 'pending',
+    }).select('*').single();
     if (error) throw error;
     return data;
   },
   incrementClick: async (id) => { await supabase.rpc('increment_ad_click', { p_ad_id: id }); },
   getPublicAd: async (id) => {
-    const { data, error } = await supabase.from('advertisements').select('id, advertiser_name, slot, destination_url, creative_url, headline, description').eq('id', id).eq('status', 'approved').eq('payment_status', 'paid').maybeSingle();
+    const { data, error } = await supabase.from('ads').select('id, full_name, business_name, slot, image_url, ad_text, whatsapp_number, starts_at, ends_at').eq('id', id).in('status', ['approved', 'active']).in('payment_status', ['paid', 'completed']).maybeSingle();
     if (error) throw error;
-    return data;
+    const now = new Date().toISOString();
+    return data && (!data.starts_at || data.starts_at <= now) && (!data.ends_at || data.ends_at >= now) ? data : null;
   },
 };
 
