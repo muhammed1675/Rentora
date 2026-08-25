@@ -43,6 +43,15 @@ function escapeDeep(value: any): any {
   return value;
 }
 
+// Subject lines are plain text, not HTML — they must NOT go through
+// escapeHtml/escapeDeep, or an apostrophe in e.g. a property title
+// ("Don't Pay2") renders literally as "Don&#39;t Pay2" in the inbox.
+// Use the raw (unescaped) field here instead. We still strip CR/LF so a
+// crafted title can't inject extra email headers.
+function sanitizeForHeader(value: unknown): string {
+  return String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -674,39 +683,39 @@ serve(async (req) => {
         html = emailInspectionBooked(data.name, data.property_title, data.inspection_date, data.reference, data.amount);
         break;
       case "inspection_agent_notify":
-        subject = `New Viewing Booking: ${data.property_title}`;
+        subject = `New Viewing Booking: ${sanitizeForHeader(rawData.property_title)}`;
         html = emailInspectionAgentNotify(data.agent_name, data.user_name, data.user_email, data.user_phone, data.property_title, data.inspection_date, data.reference);
         break;
       case "rent_payment_held":
-        subject = `Rent Paid for ${data.property_title} — Held by Rentora`;
+        subject = `Rent Paid for ${sanitizeForHeader(rawData.property_title)} — Held by Rentora`;
         html = emailRentPaymentHeld(data.agent_name, data.property_title, data.amount, data.rent_amount, data.agent_fee, data.agreement_fee, data.caution_fee, data.inspection_fee, data.documentation_fee, data.other_fees_total, data.reference, data.student_name, data.student_email, data.student_phone);
         break;
       case "rent_payment_receipt":
-        subject = `Rent Payment Received — ${data.property_title}`;
+        subject = `Rent Payment Received — ${sanitizeForHeader(rawData.property_title)}`;
         html = emailRentPaymentReceipt(data.student_name, data.property_title, data.amount, data.reference);
         break;
       case "rent_payment_released":
-        subject = `Funds Released — ${data.property_title}`;
+        subject = `Funds Released — ${sanitizeForHeader(rawData.property_title)}`;
         html = emailRentPaymentReleasedAgent(data.agent_name, data.property_title, data.rent_amount, data.agent_fee, data.agreement_fee, data.caution_fee, data.inspection_fee, data.documentation_fee, data.other_fees_total, data.reference);
         break;
       case "rent_payment_released_student":
-        subject = `Move-In Confirmed — ${data.property_title}`;
+        subject = `Move-In Confirmed — ${sanitizeForHeader(rawData.property_title)}`;
         html = emailRentPaymentReleasedStudent(data.student_name, data.property_title, data.reference);
         break;
       case "rent_payment_resolved_student":
-        subject = `Update on your payment — ${data.property_title}`;
+        subject = `Update on your payment — ${sanitizeForHeader(rawData.property_title)}`;
         html = emailRentPaymentResolvedStudent(data.student_name, data.property_title, data.amount, data.reference);
         break;
       case "rent_payment_resolved_agent":
-        subject = `Listing removed — ${data.property_title}`;
+        subject = `Listing removed — ${sanitizeForHeader(rawData.property_title)}`;
         html = emailRentPaymentResolvedAgent(data.agent_name, data.property_title, data.reason);
         break;
       case "property_approved":
-        subject = `Your listing "${data.property_title}" is now live on Rentora`;
+        subject = `Your listing "${sanitizeForHeader(rawData.property_title)}" is now live on Rentora`;
         html = emailPropertyApproved(data.agent_name, data.property_title);
         break;
       case "property_rejected":
-        subject = `Update on your listing "${data.property_title}"`;
+        subject = `Update on your listing "${sanitizeForHeader(rawData.property_title)}"`;
         html = emailPropertyRejected(data.agent_name, data.property_title);
         break;
       case "verification_approved":
@@ -731,17 +740,17 @@ serve(async (req) => {
         break;
       case "admin_payment_alert": {
         const label = data.outcome === "success" ? "Payment received" : data.outcome === "duplicate" ? "Duplicate payment callback" : "Payment FAILED";
-        subject = `[Rentora Admin] ${label}: ${data.payment_type || "payment"} — ${data.reference}`;
+        subject = `[Rentora Admin] ${label}: ${sanitizeForHeader(rawData.payment_type) || "payment"} — ${sanitizeForHeader(rawData.reference)}`;
         html = emailAdminPaymentAlert(data);
         break;
       }
       case "admin_activity_alert": {
-        subject = `[Rentora Admin] ${data.title || "New activity"}`;
+        subject = `[Rentora Admin] ${sanitizeForHeader(rawData.title) || "New activity"}`;
         html = emailAdminActivityAlert(data);
         break;
       }
       case "property_updated_admin": {
-        subject = `[Rentora Admin] Property updated — ${data.property_title || "listing"}`;
+        subject = `[Rentora Admin] Property updated — ${sanitizeForHeader(rawData.property_title) || "listing"}`;
         html = emailPropertyUpdatedAdmin(data);
         break;
       }
