@@ -65,11 +65,13 @@ function baseTemplate(opts: {
   lead?: string;
   sectionHeading?: string;
   rowsHtml?: string;
+  sectionHeading2?: string;
+  rowsHtml2?: string;
   paragraphs?: string[];
   cta?: { heading?: string; buttons: { text: string; href: string; color?: string }[] };
 }): string {
   const {
-    eyebrow, headline, subhead, intro, lead, sectionHeading, rowsHtml, paragraphs, cta,
+    eyebrow, headline, subhead, intro, lead, sectionHeading, rowsHtml, sectionHeading2, rowsHtml2, paragraphs, cta,
   } = opts;
 
   const introHtml = intro
@@ -78,6 +80,7 @@ function baseTemplate(opts: {
 
   const leadHtml = lead ? `<p class="lead">${lead}</p>` : "";
   const sectionHeadingHtml = sectionHeading ? `<h2>${sectionHeading}</h2>` : "";
+  const sectionHeading2Html = sectionHeading2 ? `<h2>${sectionHeading2}</h2>` : "";
   const paragraphsHtml = (paragraphs || []).map((p) => `<p>${p}</p>`).join("");
 
   const ctaHtml = cta
@@ -156,6 +159,8 @@ function baseTemplate(opts: {
       ${leadHtml}
       ${sectionHeadingHtml}
       ${rowsHtml ? `<div class="rows">${rowsHtml}</div>` : ""}
+      ${sectionHeading2Html}
+      ${rowsHtml2 ? `<div class="rows">${rowsHtml2}</div>` : ""}
       ${paragraphsHtml}
     </div>
     ${ctaHtml}
@@ -248,6 +253,20 @@ function emailInspectionBooked(name: string, propertyTitle: string, inspectionDa
   });
 }
 
+function emailAgentInvite(link: string, expiresAt: string, invitedBy: string) {
+  return baseTemplate({
+    eyebrow: "Agent invitation",
+    headline: `You're Invited to List on <em>Rentora</em>`,
+    subhead: `${invitedBy} has invited you to apply as a verified Rentora agent.`,
+    lead: "Rentora agent applications are invite-only. Use the link below to start your application — it's a single-use link tied to your email.",
+    rowsHtml: [
+      row("clock", "Link Expires", expiresAt),
+    ].join(""),
+    paragraphs: ["Once approved, you'll be able to list properties and reach students looking for verified housing near LAUTECH directly on Rentora."],
+    cta: { heading: "Click below to start your application:", buttons: [{ text: "Apply as an Agent", href: link }] },
+  });
+}
+
 function emailVerificationApproved(name: string) {
   return baseTemplate({
     eyebrow: "Agent verification",
@@ -326,7 +345,8 @@ function emailSignIn(name: string, ip: string, location: string, time: string, d
   });
 }
 
-function emailInspectionAgentNotify(agentName: string, userName: string, userEmail: string, userPhone: string, propertyTitle: string, inspectionDate: string, reference: string) {
+function emailInspectionAgentNotify(agentName: string, userName: string, userEmail: string, userPhone: string, propertyTitle: string, inspectionDate: string, reference: string, viewingFee: number, rentPrice: number, agentFee: number, cautionFee: number) {
+  const money = (n: number) => `₦${Number(n || 0).toLocaleString()}`;
   return baseTemplate({
     eyebrow: "New booking",
     headline: `You Have a New <em>Viewing</em>!`,
@@ -338,6 +358,13 @@ function emailInspectionAgentNotify(agentName: string, userName: string, userEma
       row("mail", "Student Email", userEmail, { valueColor: "#2E86D8" }),
       userPhone ? row("phone", "Student Phone", userPhone) : "",
       row("tag", "Reference", reference),
+    ].join(""),
+    sectionHeading2: "Payment & Fee Breakdown",
+    rowsHtml2: [
+      row("money", "Viewing Fee Paid", money(viewingFee), { color: "#1f7a43", valueColor: "#1f7a43" }),
+      row("home", "Rent Amount", money(rentPrice)),
+      row("coin", "Agent Fee", money(agentFee)),
+      cautionFee ? row("lock", "Caution Fee", money(cautionFee)) : "",
     ].join(""),
     paragraphs: ["Please contact the student to confirm arrangements for the viewing."],
     cta: { buttons: [userPhone
@@ -359,15 +386,21 @@ function emailRentPaymentHeld(agentName: string, propertyTitle: string, totalPai
     rowsHtml: [
       row("home", "Property", propertyTitle),
       row("money", "Total Paid by Student", `₦${Number(totalPaid).toLocaleString()}`),
-      row("target", "You'll Receive (once released)", `₦${payout.toLocaleString()}`),
-      agreementFee > 0 ? row("tag", "Agreement Fee", `₦${Number(agreementFee).toLocaleString()}`) : "",
-      inspectionFee > 0 ? row("home", "Inspection Fee", `₦${Number(inspectionFee).toLocaleString()}`) : "",
-      documentationFee > 0 ? row("tag", "Documentation Fee", `₦${Number(documentationFee).toLocaleString()}`) : "",
-      otherFeesTotal > 0 ? row("tag", "Other Fees", `₦${Number(otherFeesTotal).toLocaleString()}`) : "",
       row("tag", "Reference", reference),
       row("user", "Student Name", studentName),
       studentEmail ? row("mail", "Student Email", studentEmail, { valueColor: "#2E86D8" }) : "",
       studentPhone ? row("phone", "Student Phone", studentPhone) : "",
+    ].join(""),
+    sectionHeading2: "Your Payout Breakdown (once released)",
+    rowsHtml2: [
+      row("home", "Rent Amount", `₦${Number(rentAmount).toLocaleString()}`),
+      row("coin", "Agent Fee", `₦${Number(agentFee).toLocaleString()}`),
+      cautionFee > 0 ? row("lock", "Caution Fee", `₦${Number(cautionFee).toLocaleString()}`) : "",
+      agreementFee > 0 ? row("tag", "Agreement Fee", `₦${Number(agreementFee).toLocaleString()}`) : "",
+      inspectionFee > 0 ? row("home", "Inspection Fee", `₦${Number(inspectionFee).toLocaleString()}`) : "",
+      documentationFee > 0 ? row("tag", "Documentation Fee", `₦${Number(documentationFee).toLocaleString()}`) : "",
+      otherFeesTotal > 0 ? row("tag", "Other Fees", `₦${Number(otherFeesTotal).toLocaleString()}`) : "",
+      row("target", "You'll Receive", `₦${payout.toLocaleString()}`, { color: "#1f7a43", valueColor: "#1f7a43" }),
     ].join(""),
     paragraphs: ["The full rent and all disclosed property-related charges are released together to your Rentora balance once confirmed — Rentora's only cut is a separate service fee, which is not part of your payout. You'll get another email once it's released."],
     cta: { buttons: [{ text: "View on Agent Dashboard", href: "https://www.rentora.com.ng/agent?tab=rent-payments" }] },
@@ -684,7 +717,7 @@ serve(async (req) => {
         break;
       case "inspection_agent_notify":
         subject = `New Viewing Booking: ${sanitizeForHeader(rawData.property_title)}`;
-        html = emailInspectionAgentNotify(data.agent_name, data.user_name, data.user_email, data.user_phone, data.property_title, data.inspection_date, data.reference);
+        html = emailInspectionAgentNotify(data.agent_name, data.user_name, data.user_email, data.user_phone, data.property_title, data.inspection_date, data.reference, data.viewing_fee, data.rent_price, data.agent_fee, data.caution_fee);
         break;
       case "rent_payment_held":
         subject = `Rent Paid for ${sanitizeForHeader(rawData.property_title)} — Held by Rentora`;
@@ -717,6 +750,10 @@ serve(async (req) => {
       case "property_rejected":
         subject = `Update on your listing "${sanitizeForHeader(rawData.property_title)}"`;
         html = emailPropertyRejected(data.agent_name, data.property_title);
+        break;
+      case "agent_invite":
+        subject = "You're Invited to Become a Rentora Agent";
+        html = emailAgentInvite(data.link, data.expires_at, data.invited_by);
         break;
       case "verification_approved":
         subject = "Your Rentora Agent Verification is Approved!";

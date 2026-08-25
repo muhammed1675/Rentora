@@ -489,9 +489,10 @@ async function sendInspectionAgentNotify(supabase, inspTx, inspection) {
     throw new Error(`no agent_id on inspection=${inspection.id} and property has no uploaded_by_agent_id`);
   }
 
-  const [{ data: student }, { data: agent }] = await Promise.all([
+  const [{ data: student }, { data: agent }, { data: property }] = await Promise.all([
     supabase.from('users').select('email, full_name, phone').eq('id', inspTx.user_id).maybeSingle(),
     supabase.from('users').select('email, full_name').eq('id', agentId).maybeSingle(),
+    supabase.from('properties').select('price, agent_fee, caution_fee').eq('id', inspection.property_id).maybeSingle(),
   ]);
 
   if (!agent) {
@@ -514,6 +515,10 @@ async function sendInspectionAgentNotify(supabase, inspTx, inspection) {
       property_title: inspection?.property_title || 'a property',
       inspection_date: inspection?.inspection_date || '',
       reference: inspTx.reference,
+      viewing_fee: inspTx.amount,
+      rent_price: property?.price || 0,
+      agent_fee: property?.agent_fee || 0,
+      caution_fee: property?.caution_fee || 0,
     },
   });
   await notify(supabase, agentId, 'inspection_agent_notify', 'New inspection booked', `${student?.full_name || 'A student'} booked an inspection for ${inspection?.property_title || 'a property'}.`, '/agent');
