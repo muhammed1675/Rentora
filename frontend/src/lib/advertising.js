@@ -2,9 +2,9 @@ import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 export const AD_SLOT_SPECS = {
-  home_hero: { label: 'Home hero', width: 1200, height: 400 },
-  browse_banner: { label: 'Browse banner', width: 1200, height: 300 },
-  property_sidebar: { label: 'Property sidebar', width: 400, height: 600 },
+  header_billboard: { label: 'Header billboard', width: 970, height: 250 },
+  mid_page_content: { label: 'Mid-page content', width: 728, height: 90 },
+  in_feed_banner: { label: 'In-feed banner', width: 300, height: 200 },
 };
 
 export const normalizeWhatsApp = (value) => {

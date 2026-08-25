@@ -13,29 +13,27 @@ export function AdSlot({ slot, className = '' }) {
     const load = async () => {
       const now = new Date().toISOString();
       const { data } = await supabase
-        .from('advertisements')
-        .select('id, advertiser_name, creative_url, destination_url, headline, description, starts_at, ends_at')
+        .from('ads')
+        .select('id, full_name, business_name, image_url, ad_text, whatsapp_number, starts_at, ends_at')
         .eq('slot', slot)
-        .eq('status', 'approved')
-        .eq('payment_status', 'paid')
-        .lte('starts_at', now)
-        .gte('ends_at', now)
-        .limit(1)
-        .maybeSingle();
-      if (active) { setAd(data || null); setLoaded(true); }
+        .in('status', ['approved', 'active'])
+        .in('payment_status', ['paid', 'completed'])
+        .limit(12);
+      const eligible = (data || []).filter((candidate) => (!candidate.starts_at || candidate.starts_at <= now) && (!candidate.ends_at || candidate.ends_at >= now));
+      if (active) { setAd(eligible[Math.floor(Math.random() * eligible.length)] || null); setLoaded(true); }
     };
     load();
     return () => { active = false; };
   }, [slot]);
 
-  const destination = safeExternalUrl(ad?.destination_url);
+  const destination = safeExternalUrl(ad?.destination_url || `https://wa.me/${String(ad?.whatsapp_number || '').replace(/\D/g, '')}`);
   const content = ad ? (
     <a href={destination || '#'} target="_blank" rel="noopener noreferrer" onClick={() => advertisingAPI.incrementClick(ad.id)} className="group block overflow-hidden rounded-2xl border border-border/70 bg-card transition hover:border-primary/40 hover:shadow-md">
       <div className="relative aspect-[3/1] overflow-hidden bg-muted">
-        <img src={ad.creative_url} alt={ad.headline || `${ad.advertiser_name} advertisement`} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" loading="lazy" />
+        <img src={ad.image_url} alt={`${ad.business_name || ad.full_name || 'Advertiser'} advertisement`} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" loading="lazy" />
         <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-background/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sponsored <ArrowUpRight className="h-3 w-3" /></span>
       </div>
-      {(ad.headline || ad.description) && <div className="p-4"><p className="font-semibold text-foreground">{ad.headline || ad.advertiser_name}</p>{ad.description && <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{ad.description}</p>}</div>}
+      {ad.ad_text && <div className="p-4"><p className="font-semibold text-foreground">{ad.business_name || ad.full_name}</p><p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{ad.ad_text}</p></div>}
     </a>
   ) : (
     <Link to="/advertise" className="flex min-h-24 items-center justify-between rounded-2xl border border-dashed border-border bg-muted/30 px-5 py-4 transition hover:border-primary/50 hover:bg-muted/50">
