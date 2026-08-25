@@ -433,9 +433,11 @@ export function PropertyDetails() {
           )}
 
           {/* Title block — clean typographic hierarchy: title, then a single
-              muted location line, then the address. The old inline
-              "Get Directions on Google Maps" button lived here and made the
-              block look cramped; it now lives in the Location card below. */}
+              muted location line. The address is intentionally not repeated
+              here — it's already shown in the Location card below. The old
+              inline "Get Directions on Google Maps" button lived here and
+              made the block look cramped; it now lives in the Location card
+              below. */}
           <div className="min-w-0 space-y-2">
             <h1 className="break-words text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
               {property.title}
@@ -455,9 +457,6 @@ export function PropertyDetails() {
                 </>
               )}
             </div>
-            {property.address && (
-              <p className="text-sm text-muted-foreground/80 break-words">{property.address}</p>
-            )}
           </div>
 
           <Card className="max-w-full overflow-hidden p-4 sm:p-6">
