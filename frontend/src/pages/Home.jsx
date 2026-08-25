@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { SplitText } from 'gsap/SplitText';
 import { ArrowRight, BadgeCheck, KeyRound, HandCoins, ShieldCheck, Lock, CheckCircle2, Zap, Star, Users, Home as HomeIcon } from 'lucide-react';
 import { AppBanner } from '../components/AppBanner';
+import { AdSlot } from '../components/AdSlot';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 
 gsap.registerPlugin(SplitText);
@@ -96,6 +97,8 @@ export function Home() {
     <div data-testid="home-page">
       <AppBanner />
 
+      <AdSlot slot="header_billboard" className="mb-8" />
+
       {/* Hero */}
       <section data-no-motion className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 md:pb-24 md:pt-12">
         <div className="relative min-h-[560px] overflow-hidden rounded-[28px] bg-[hsl(60_8%_90%)] md:min-h-[680px]">
@@ -165,6 +168,8 @@ export function Home() {
         </div>
       </section>
 
+      <AdSlot slot="mid_page_content" className="mb-12" />
+
       {/* Testimonials & Social Proof */}
       <section className="bg-muted/30 py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
@@ -213,6 +218,8 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      <AdSlot slot="in_feed_banner" className="mb-12" />
 
       {/* How it works */}
       <section className="bg-white py-20 md:py-28">
