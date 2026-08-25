@@ -64,6 +64,7 @@ export function PaymentCallback() {
     inspection: 'Viewing Fee',
     rent: 'Rent Payment',
     tip: 'Agent Tip',
+    advertisement: 'Advertisement',
   };
 
   const formatPrice = (price) => {

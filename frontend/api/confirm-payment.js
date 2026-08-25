@@ -88,21 +88,36 @@ async function handlePayment(req, res) {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // ads has no payment_reference column (and none is being added). The
+  // Korapay reference for an advert is `ADV-<ad.id>-<timestamp>`, generated
+  // in /api/advertise-init-payment.js — recover the ad's UUID from it here
+  // instead of querying a reference column.
+  const adIdFromReference = (() => {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!/^ADV-/i.test(reference)) return null;
+    const candidate = reference.slice(4, 40); // "ADV-" is 4 chars; a UUID is 36 chars
+    return UUID_RE.test(candidate) ? candidate : null;
+  })();
+
   try {
     // ---- 1. Find which table this reference belongs to ----
-    const [tokenRes, inspRes, rentRes, tipRes] = await Promise.all([
+    const [tokenRes, inspRes, rentRes, tipRes, adRes] = await Promise.all([
       supabase.from('transactions').select('*').eq('reference', reference).maybeSingle(),
       supabase.from('inspection_transactions').select('*').eq('reference', reference).maybeSingle(),
       supabase.from('property_rent_payments').select('*').eq('reference', reference).maybeSingle(),
       supabase.from('inspection_tips').select('*').eq('reference', reference).maybeSingle(),
+      adIdFromReference
+        ? supabase.from('ads').select('*').eq('id', adIdFromReference).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     const tokenTx = tokenRes.data;
     const inspTx = inspRes.data;
     const rentTx = rentRes.data;
     const tipTx = tipRes.data;
+    const adTx = adRes.data;
 
-    if (!tokenTx && !inspTx && !rentTx && !tipTx) {
+    if (!tokenTx && !inspTx && !rentTx && !tipTx && !adTx) {
       return res.status(404).json({ error: 'No transaction found for this reference' });
     }
 
@@ -393,6 +408,80 @@ async function handlePayment(req, res) {
       }
 
       return res.status(200).json({ ok: true, type: 'tip', amount: tipTx.amount });
+    }
+
+    if (adTx) {
+      // Payment lifecycle for adverts: submitted -> pending -> Korapay
+      // payment -> server-side verification (here) -> paid -> admin
+      // approval (approve_ad RPC) -> public. This step ONLY marks the
+      // payment paid; it never touches `status`, so a paid advert still
+      // will not render publicly until an admin explicitly approves it
+      // (see AdSlot.jsx / advertisingAPI.getPublicAd, both of which
+      // require status IN ('approved','active')).
+      if (adTx.payment_status === 'paid' || adTx.payment_status === 'completed') {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'advertisement', amount: adTx.amount_paid });
+      }
+      // adTx.price was set server-side (never by the browser) in
+      // /api/advertise-init-payment.js, computed from ad_slot_config at
+      // the moment the checkout was created — this is the only figure we
+      // trust as "expected". `amount_paid` is written below, only once
+      // Korapay's own verified charge amount has cleared that check.
+      const expected = Number(adTx.price);
+      if (!Number.isFinite(expected) || expected <= 0) {
+        console.error('confirm-payment: advert has no server-computed expected price', { ad_id: adTx.id, reference });
+        return res.status(409).json({ error: 'This advert was never priced server-side — cannot verify payment.' });
+      }
+      if (chargedAmount < expected - UNDERCHARGE_TOLERANCE) {
+        console.error('confirm-payment: advert amount mismatch', { expected, charged: chargedAmount, reference });
+        return res.status(409).json({ error: 'Charged amount does not match the expected advert price.' });
+      }
+
+      const { data: claimedAd, error: adUpdErr } = await supabase
+        .from('ads')
+        .update({ payment_status: 'paid', amount_paid: chargedAmount })
+        .eq('id', adTx.id)
+        .eq('payment_status', 'pending')
+        .select('id')
+        .maybeSingle();
+      if (adUpdErr) throw adUpdErr;
+      if (!claimedAd) {
+        return res.status(200).json({ ok: true, alreadyProcessed: true, type: 'advertisement', amount: adTx.amount_paid });
+      }
+
+      // Best-effort: let admins know a paid advert is waiting for review.
+      // Never allowed to block or fail the payment confirmation itself.
+      try {
+        const { data: admins } = await supabase.from('users').select('id, email, full_name').eq('role', 'admin');
+        await Promise.allSettled((admins || []).filter((a) => a.email).map((admin) => callSupabaseSendEmail({
+          type: 'admin_activity_alert',
+          to: admin.email,
+          data: {
+            title: `New paid advert awaiting review: ${adTx.business_name || adTx.full_name || 'Advertiser'}`,
+            event_label: 'Advert review',
+            summary: `${adTx.business_name || adTx.full_name || 'An advertiser'} paid ₦${Number(chargedAmount).toLocaleString('en-NG')} for the ${adTx.slot} slot. Review it in the admin dashboard's Adverts tab.`,
+            breakdown: [
+              ['Slot', adTx.slot],
+              ['Amount', `NGN ${Number(chargedAmount).toLocaleString('en-NG')}`],
+              ['Reference', reference],
+            ],
+            action_url: 'https://www.rentora.com.ng/admin?tab=advertising',
+            admin_name: admin.full_name || 'Admin',
+          },
+        })));
+        if (admins?.length) {
+          await supabase.from('user_notifications').insert(admins.map((admin) => ({
+            user_id: admin.id,
+            type: 'advert_paid',
+            title: 'New advert awaiting review',
+            body: `${adTx.business_name || adTx.full_name || 'An advertiser'} paid for the ${adTx.slot} slot.`,
+            link: '/admin?tab=advertising',
+          })));
+        }
+      } catch (notifyErr) {
+        console.error(`[advert] admin notify failed for reference=${reference}:`, notifyErr?.message || notifyErr);
+      }
+
+      return res.status(200).json({ ok: true, type: 'advertisement', amount: chargedAmount });
     }
   } catch (err) {
     // Payment confirmation failed — don't return 200.

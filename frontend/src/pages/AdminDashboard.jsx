@@ -95,6 +95,14 @@ export function AdminDashboard() {
   const [broadcastEmailedIds, setBroadcastEmailedIds] = useState({}); // { [broadcastId]: { sent, recipients } }
   const [broadcastReach, setBroadcastReach] = useState({}); // { [broadcastId]: { total, read } }
 
+  // Advertising — paid adverts awaiting review, plus their full history.
+  // Approve/reject go through the security-definer approve_ad / reject_ad
+  // RPCs (see the advertising SQL) rather than direct table writes, so the
+  // server-side admin-role check can never be bypassed from here.
+  const [ads, setAds] = useState([]);
+  const [loadingAds, setLoadingAds] = useState(false);
+  const [adActionBusyId, setAdActionBusyId] = useState(null);
+
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
     if (!isAdmin) { toast.error('Access denied'); navigate('/'); return; }
@@ -153,6 +161,59 @@ export function AdminDashboard() {
   useEffect(() => {
     if (isAdmin && activeTab === 'broadcasts') fetchBroadcasts();
   }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchAds = async () => {
+    setLoadingAds(true);
+    try {
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setAds(data || []);
+    } catch (e) {
+      console.error('Failed to load adverts:', e);
+      toast.error('Failed to load adverts');
+    } finally {
+      setLoadingAds(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'advertising') fetchAds();
+  }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // approve_ad / reject_ad are SECURITY DEFINER functions that re-check the
+  // caller is an admin from their own row in `users` — see the advertising
+  // SQL. approve_ad additionally requires payment_status IN ('paid',
+  // 'completed'), so an unpaid advert can never be approved from here even
+  // if this UI had a bug.
+  const handleAdDecision = async (adId, decision) => {
+    setAdActionBusyId(adId);
+    try {
+      const { error } = await supabase.rpc(decision === 'approve' ? 'approve_ad' : 'reject_ad', { p_ad_id: adId });
+      if (error) throw error;
+      setAds((prev) => prev.map((a) => a.id === adId ? { ...a, status: decision === 'approve' ? 'approved' : 'rejected' } : a));
+      toast.success(decision === 'approve' ? 'Advert approved' : 'Advert rejected');
+    } catch (e) {
+      console.error(`Failed to ${decision} ad:`, e);
+      toast.error(e.message || `Failed to ${decision === 'approve' ? 'approve' : 'reject'} advert`);
+    } finally {
+      setAdActionBusyId(null);
+    }
+  };
+
+  const adDurationLabel = (ad) => {
+    if (!ad.starts_at || !ad.ends_at) return '—';
+    const days = Math.round((new Date(ad.ends_at) - new Date(ad.starts_at)) / 86400000);
+    return `${days} day${days === 1 ? '' : 's'}`;
+  };
+
+  // `price` is the server-computed quoted price (set when checkout starts);
+  // `amount_paid` is only set once confirm-payment.js has independently
+  // verified the Korapay charge. Show whichever is actually known yet.
+  const adAmountLabel = (ad) => formatPrice(ad.amount_paid || ad.price || 0);
 
   const handleSendBroadcast = async () => {
     if (sendingBroadcastRef.current) return; // already sending — ignore the extra click
@@ -675,6 +736,8 @@ export function AdminDashboard() {
     released: 'bg-green-100 text-green-800',
     paid: 'bg-green-100 text-green-800',
     refunded: 'bg-red-100 text-red-800',
+    active: 'bg-green-100 text-green-800',
+    pending_review: 'bg-yellow-100 text-yellow-800',
   }[status] || 'bg-gray-100 text-gray-800');
 
   const filteredUsers = users.filter(u =>
@@ -736,6 +799,7 @@ export function AdminDashboard() {
     },
     { id: 'messages', label: 'Messages', icon: MessageSquare, count: messages.filter(m => m.status === 'unread').length, urgent: true },
     { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
+    { id: 'advertising', label: 'Adverts', icon: Megaphone, count: ads.filter(a => (a.payment_status === 'paid' || a.payment_status === 'completed') && a.status !== 'approved' && a.status !== 'active' && a.status !== 'rejected').length, urgent: true },
     { id: 'broadcasts', label: 'Broadcasts', icon: Megaphone },
   ];
 
@@ -2005,6 +2069,113 @@ export function AdminDashboard() {
                   </div>
                 </Card>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Advertising Tab ── */}
+        <TabsContent value="advertising">
+          {loadingAds ? (
+            <Card className="p-12 text-center border-border/60"><RefreshCw className="w-6 h-6 mx-auto animate-spin text-foreground/30" /></Card>
+          ) : ads.length === 0 ? (
+            <Card className="p-12 text-center border-border/60">
+              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <Megaphone className="w-7 h-7 text-foreground/30" />
+              </div>
+              <h3 className="font-semibold">No Adverts Yet</h3>
+              <p className="text-sm text-foreground/55 mt-1">Adverts submitted from the "Advertise" page will appear here once payment is confirmed.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {/* Mobile cards */}
+              <div className="sm:hidden space-y-3">
+                {ads.map((ad) => {
+                  const canDecide = (ad.payment_status === 'paid' || ad.payment_status === 'completed') && ad.status !== 'approved' && ad.status !== 'active' && ad.status !== 'rejected';
+                  return (
+                    <Card key={ad.id} className="p-4">
+                      <div className="flex gap-3">
+                        {ad.image_url && <img src={ad.image_url} alt="" className="w-20 h-14 rounded-md object-cover shrink-0 border border-border/50" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm truncate">{ad.business_name || ad.full_name || 'Advertiser'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{ad.full_name}{ad.whatsapp_number ? ` · ${ad.whatsapp_number}` : ''}</p>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <Badge className={`${getStatusBadge(ad.status)} text-xs`}>{ad.status}</Badge>
+                            <Badge className={`${getStatusBadge(ad.payment_status)} text-xs`}>{ad.payment_status}</Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
+                        <span>Slot: <span className="text-foreground">{ad.slot}</span></span>
+                        <span>Duration: <span className="text-foreground">{adDurationLabel(ad)}</span></span>
+                        <span>Amount: <span className="text-foreground">{adAmountLabel(ad)}</span></span>
+                        <span>Clicks: <span className="text-foreground">{ad.clicks ?? 0}</span></span>
+                        <span className="col-span-2">Created: {ad.created_at ? new Date(ad.created_at).toLocaleDateString() : '—'}</span>
+                      </div>
+                      {canDecide && (
+                        <div className="flex gap-2 mt-3">
+                          <Button size="sm" variant="outline" className="flex-1" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'reject')}>Reject</Button>
+                          <Button size="sm" className="flex-1" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'approve')}>Approve</Button>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <Card className="hidden sm:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Creative</TableHead>
+                      <TableHead>Advertiser</TableHead>
+                      <TableHead>Slot</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Clicks</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ads.map((ad) => {
+                      const canDecide = (ad.payment_status === 'paid' || ad.payment_status === 'completed') && ad.status !== 'approved' && ad.status !== 'active' && ad.status !== 'rejected';
+                      return (
+                        <TableRow key={ad.id}>
+                          <TableCell>
+                            {ad.image_url ? <img src={ad.image_url} alt="" className="w-16 h-10 rounded object-cover border border-border/50" /> : <span className="text-xs text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-medium text-sm">{ad.business_name || ad.full_name || 'Advertiser'}</p>
+                            <p className="text-xs text-muted-foreground">{ad.full_name}{ad.whatsapp_number ? ` · ${ad.whatsapp_number}` : ''}</p>
+                          </TableCell>
+                          <TableCell className="text-sm">{ad.slot}</TableCell>
+                          <TableCell className="text-sm">{adDurationLabel(ad)}</TableCell>
+                          <TableCell className="text-sm">{adAmountLabel(ad)}</TableCell>
+                          <TableCell><Badge className={getStatusBadge(ad.payment_status)}>{ad.payment_status}</Badge></TableCell>
+                          <TableCell><Badge className={getStatusBadge(ad.status)}>{ad.status}</Badge></TableCell>
+                          <TableCell className="text-sm">{ad.clicks ?? 0}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{ad.created_at ? new Date(ad.created_at).toLocaleDateString() : '—'}</TableCell>
+                          <TableCell className="text-right">
+                            {canDecide ? (
+                              <div className="flex gap-2 justify-end">
+                                <Button size="sm" variant="outline" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'reject')}>Reject</Button>
+                                <Button size="sm" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'approve')}>Approve</Button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                {ad.payment_status === 'pending' ? 'Awaiting payment' : ad.status === 'rejected' ? 'Rejected' : 'Reviewed'}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           )}
         </TabsContent>
