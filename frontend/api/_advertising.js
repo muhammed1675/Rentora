@@ -32,10 +32,9 @@ export function computeAdTotal(slotConfig, durationDays) {
 
 // Human-readable label written to ads.billing_period alongside the price —
 // display/reporting only; pricing itself always comes from computeAdTotal.
-export function billingPeriodLabel(durationDays) {
+export const billingPeriodLabel = (durationDays) => {
   const days = Number(durationDays);
-  if (days === 7) return 'weekly';
-  if (days === 14) return 'biweekly';
-  if (days === 30) return 'monthly';
+  if (days === 7 || days === 14) return 'week';
+  if (days === 30) return 'month';
   return null;
-}
+};
