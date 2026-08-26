@@ -38,20 +38,12 @@ import { korapayFetch } from './_korapay.js';
 import { applyCors } from './_cors.js';
 import { computeAdTotal, billingPeriodLabel } from './_advertising.js';
 
-// Korapay's charge API rejects the customer phone with a 422 when it's sent
-// in the app's internal "+234XXXXXXXXXX" form — it wants a local Nigerian
-// format instead ("0XXXXXXXXXX"). ad.whatsapp_number is always stored as
-// "+234..." (see normalizeWhatsApp in lib/advertising.js), and unlike the
-// shared /api/korapay-init.js flow (where buyer.phone is often blank),
-// this endpoint always has a populated number to send — so it always hit
-// the 422. This only reformats what's sent to Korapay; the stored
-// whatsapp_number is untouched.
-function toKorapayPhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (digits.startsWith('234') && digits.length === 13) return `0${digits.slice(3)}`;
-  if (digits.startsWith('0') && digits.length === 11) return digits;
-  return undefined;
-}
+// NOTE: Korapay's /charges/initialize rejects `customer.phone` outright on
+// this endpoint ("customer.phone is not allowed") — confirmed via the
+// validation_error response body. So customer phone is intentionally NOT
+// sent here, unlike some other Korapay integrations that expect it. Do not
+// re-add a phone field to the `customer` object below without re-verifying
+// against Korapay's current schema for this charge type.
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -143,8 +135,14 @@ export default async function handler(req, res) {
   }
 
   // ---- 5. Derive a unique Korapay reference from the ad's own UUID — no
-  // extra column needed. confirm-payment.js reverses this to find the ad.
-  const reference = `ADV-${ad.id}-${Date.now()}`;
+  // extra column needed. confirm-payment.js reverses this to find the ad
+  // via reference.slice(4, 40) — the fixed "ADV-" prefix + 36-char UUID —
+  // so the suffix format below is free to change without touching that.
+  // Korapay caps `reference` at 50 chars: "ADV-" (4) + UUID (36) + "-" (1)
+  // + a decimal Date.now() (13 digits) = 54, which Korapay rejected with
+  // "reference should have at most 50 characters!". Base36 keeps the
+  // timestamp to ~8 digits, bringing the total to 49.
+  const reference = `ADV-${ad.id}-${Date.now().toString(36)}`;
   redirectUrlObj.searchParams.set('reference', reference);
   const redirect_url = redirectUrlObj.toString();
 
@@ -157,7 +155,7 @@ export default async function handler(req, res) {
         amount,
         currency: 'NGN',
         redirect_url,
-        customer: { name: ad.full_name || buyer.full_name || 'Advertiser', email: buyer.email, phone: toKorapayPhone(ad.whatsapp_number) || toKorapayPhone(buyer.phone) || undefined },
+        customer: { name: ad.full_name || buyer.full_name || 'Advertiser', email: buyer.email },
         narration: `Rentora advert — ${ad.slot}`,
       }),
     });
@@ -166,11 +164,7 @@ export default async function handler(req, res) {
       // for a rejection — log the whole thing so it shows up in Vercel's
       // function logs instead of only ever seeing a bare "422" in the browser.
       console.error('[advertise-init-payment] Korapay rejected charge:', result.status, JSON.stringify(result.body));
-      // TEMP DEBUG: surfacing result.body.data to the client so the failing
-      // field is visible in the Network tab response body. Revert once the
-      // validation_error cause is confirmed — don't ship this to users long-term,
-      // it leaks Korapay's internal error shape.
-      return res.status(result.ok ? 502 : result.status).json({ error: result.body?.message || 'Korapay checkout unavailable', debug_data: result.body?.data });
+      return res.status(result.ok ? 502 : result.status).json({ error: result.body?.message || 'Korapay checkout unavailable' });
     }
     return res.status(200).json({
       status: true,
