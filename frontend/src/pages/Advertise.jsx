@@ -27,7 +27,7 @@ export default function Advertise() {
     if (!user) { navigate(`/login?next=${encodeURIComponent('/advertise/create')}`); return; }
     const url = safeExternalUrl(form.destinationUrl);
     const creativeError = validateCreative(file, form.slot);
-    if (!form.slot || !form.advertiserName.trim() || !normalizeWhatsApp(form.whatsapp) || !url || !form.headline.trim() || creativeError) { setMessage(creativeError || 'Please complete every field with valid information.'); return; }
+    if (!form.slot || !form.advertiserName.trim() || !normalizeWhatsApp(form.whatsapp) || !url || !form.headline.trim() || !form.description.trim() || creativeError) { setMessage(creativeError || 'Please complete every field with valid information.'); return; }
     setBusy(true);
     try {
       const uploaded = await advertisingAPI.uploadCreative(file);

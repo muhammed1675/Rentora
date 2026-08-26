@@ -29,12 +29,13 @@ function receiptEmailHtml({ userName, amount, type, tokens, reference, date }) {
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
         <!-- Header -->
-        <tr><td style="background:#0062AE;padding:32px;text-align:center">
-          <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700">Rentora</h1>
-          <p style="margin:8px 0 0;color:#bfdbfe;font-size:14px">Payment Receipt</p>
+        <tr><td style="padding:28px 32px 10px;text-align:left">
+          <img src="${process.env.PUBLIC_SITE_URL || 'https://www.rentora.com.ng'}/rentora-logo.png" alt="Rentora" width="132" style="display:block;border:0;max-width:132px;height:auto" />
         </td></tr>
+        <tr><td style="padding:0 32px 22px;text-align:right;color:#475569;font-size:14px;font-weight:600">Transaction Successful <span style="display:inline-block;margin-left:6px;background:#16a34a;color:#fff;border-radius:50%;width:22px;height:22px;line-height:22px;text-align:center">✓</span></td></tr>
+        <tr><td style="padding:0 32px 24px"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#effaf2;border-radius:16px"><tr><td style="padding:24px"><table cellpadding="0" cellspacing="0" role="presentation"><tr><td style="width:64px;height:64px;border:4px solid #16803c;border-radius:50%;text-align:center;color:#16803c;font-size:38px;line-height:56px">✓</td><td style="padding-left:22px"><h1 style="margin:0;color:#0f172a;font-size:25px;line-height:1.2">Payment Successful!</h1><p style="margin:8px 0 0;color:#334155;font-size:16px">Your payment has been received.</p></td></tr></table></td></tr></table></td></tr>
         <!-- Body -->
-        <tr><td style="padding:32px">
+        <tr><td style="padding:0 32px 32px">
           <p style="margin:0 0 8px;font-size:16px;color:#111">Hi <strong>${userName}</strong>,</p>
           <p style="margin:0 0 24px;color:#555;font-size:15px">
             Your payment was successful. Here are your receipt details:

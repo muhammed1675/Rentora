@@ -15,7 +15,7 @@ export function AdSlot({ slot, className = '' }) {
     let active = true;
     const load = async () => {
       const now = new Date().toISOString();
-      const { data } = await supabase.from('ads').select('id, full_name, business_name, image_url, ad_text, starts_at, ends_at').eq('slot', slot).in('status', ['approved', 'active']).in('payment_status', ['paid', 'completed']).limit(12);
+      const { data } = await supabase.from('ads').select('id, full_name, business_name, image_url, ad_text, message_body, starts_at, ends_at').eq('slot', slot).in('status', ['approved', 'active']).in('payment_status', ['paid', 'completed']).limit(12);
       const eligible = (data || []).filter((candidate) => (!candidate.starts_at || candidate.starts_at <= now) && (!candidate.ends_at || candidate.ends_at >= now));
       if (active) { setAds(eligible); setLoaded(true); }
     };
