@@ -2687,9 +2687,8 @@ export function AdminDashboard() {
                       ) : (
                         <span className="text-xs text-muted-foreground italic">None</span>
                       )}
-  </div>
-  </TableCell>
-  </TableRow>
+                    </TableCell>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
