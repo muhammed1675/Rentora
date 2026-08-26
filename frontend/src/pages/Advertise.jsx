@@ -31,7 +31,7 @@ export default function Advertise() {
     setBusy(true);
     try {
       const uploaded = await advertisingAPI.uploadCreative(file);
-      const ad = await advertisingAPI.createPendingAd({ ...form, userId: user.id, durationDays: Number(form.durationDays), whatsapp: normalizeWhatsApp(form.whatsapp), destinationUrl: url, creativeUrl: uploaded.url, creativePath: uploaded.path });
+      const ad = await advertisingAPI.createPendingAd({ ...form, userId: user.id, durationDays: Number(form.durationDays), whatsapp: normalizeWhatsApp(form.whatsapp), destinationUrl: url, creativeUrl: uploaded.url, creativePath: uploaded.path, price: total });
       // The server appends its own generated ?reference= to this base URL.
       const payment = await advertisingAPI.initPayment(ad.id, `${window.location.origin}/payment/callback`);
       const checkoutUrl = payment?.data?.checkout_url;

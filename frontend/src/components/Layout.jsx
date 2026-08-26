@@ -53,15 +53,27 @@ export function Layout({ children }) {
           </Link>
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
-            {navItems.map(item => {
-              const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
-              return (
-                <Link key={item.to} to={item.to}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${active ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {item.label}
-                </Link>
-              );
-            })}
+            {(() => {
+              // Match on a real path-segment boundary (`/advertise/`, not a
+              // bare startsWith) so `/advertise` doesn't also light up for
+              // `/advertise/dashboard` or `/advertise/create`. When more than
+              // one item matches (a parent and a child route), only the
+              // longest — i.e. most specific — one wins, so exactly one nav
+              // item is ever highlighted at a time.
+              const activeTo = navItems
+                .map((item) => item.to)
+                .filter((to) => location.pathname === to || (to !== '/' && location.pathname.startsWith(`${to}/`)))
+                .sort((a, b) => b.length - a.length)[0];
+              return navItems.map((item) => {
+                const active = item.to === activeTo;
+                return (
+                  <Link key={item.to} to={item.to}
+                    className={`text-sm font-medium transition-colors hover:text-primary ${active ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {item.label}
+                  </Link>
+                );
+              });
+            })()}
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">

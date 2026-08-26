@@ -71,15 +71,16 @@ export const advertisingAPI = {
     return { path: data.path, url: urlData.publicUrl };
   },
   createPendingAd: async (payload) => {
-    // Note: no `status`, `payment_status`, `price`, or `amount_paid` are
-    // set here — the table defaults apply, and the real price is written
-    // server-side in advertisingAPI.initPayment, never by this browser-side
-    // insert. `billing_period` IS set here (see billingPeriodLabel above)
-    // because the column is NOT NULL and this insert runs before any
-    // server round-trip; it's a descriptive label derived 1:1 from the
-    // duration the advertiser already picked in the form, not a price,
-    // and gets overwritten with the server's own computed value the
-    // moment checkout starts.
+    // Note: no `status` or `payment_status` are set here — the table
+    // defaults apply. `price` and `billing_period` ARE set here because
+    // both columns are NOT NULL and this insert runs before any server
+    // round-trip. `price` is just the same display estimate already shown
+    // to the advertiser (estimateAdPrice, computed from ad_slot_config) —
+    // it is NOT trusted for payment. The moment checkout starts, the
+    // server unconditionally overwrites this with its own computed value
+    // (see api/advertise-init-payment.js, step 4: `.update({ price: amount,
+    // billing_period })`), so a browser-supplied number here can never
+    // change what gets charged or verified.
     const startsAt = new Date();
     const endsAt = new Date(startsAt.getTime() + Number(payload.durationDays) * 86400000);
     const { data, error } = await supabase.from('ads').insert({
@@ -94,6 +95,7 @@ export const advertisingAPI = {
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       billing_period: billingPeriodLabel(payload.durationDays),
+      price: payload.price,
     }).select('*').single();
     if (error) throw error;
     return data;
