@@ -123,9 +123,7 @@ export function Layout({ children }) {
               ))}
               {isAuthenticated && (
                 <>
-                  {isAdvertiseHost ? (
-                    <Link to="/advertise/dashboard" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">My campaigns</Link>
-                  ) : (
+                  {!isAdvertiseHost && (
                     <>
                       <Link to="/notifications" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Notifications</Link>
                       <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>

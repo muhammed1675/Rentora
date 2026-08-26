@@ -30,6 +30,7 @@ import Notifications from './pages/Notifications';
 import VerifyAccount from './pages/VerifyAccount';
 import Advertise from './pages/Advertise';
 import AdvertiseHome from './pages/AdvertiseHome';
+import AdvertisePricing from './pages/AdvertisePricing';
 import AdvertiserDashboard from './pages/AdvertiserDashboard';
 
 // advertise.rentora.com.ng resolves to this same deployment (see Vercel
@@ -146,7 +147,7 @@ function AppRoutes() {
           homepage instead of the normal Rentora homepage. Every other
           route (including "/" on rentora.com.ng / www) is unchanged. */}
       <Route path="/" element={<Layout>{isAdvertiseHost ? <AdvertiseHome /> : <Home />}</Layout>} />
-      <Route path="/advertise" element={<Layout><AdvertiseHome /></Layout>} />
+      <Route path="/advertise" element={<Layout><AdvertisePricing /></Layout>} />
       <Route path="/advertise/create" element={<Layout><Advertise /></Layout>} />
       <Route
         path="/advertise/dashboard"
