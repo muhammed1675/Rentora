@@ -105,8 +105,8 @@ export function PaymentCallback() {
               </div>
             )}
             <div className="flex gap-3 mt-4">
-              <Button variant="outline" className="flex-1" onClick={() => navigate('/profile')}>
-                View Profile
+              <Button variant="outline" className="flex-1" onClick={() => navigate(paymentDetails?.type === 'advertisement' ? '/advertise/dashboard' : '/profile')}>
+                {paymentDetails?.type === 'advertisement' ? 'View my ads' : 'View Profile'}
               </Button>
               <Button className="flex-1" onClick={() => navigate('/browse')}>
                 Browse Properties

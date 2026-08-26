@@ -26,6 +26,23 @@ const statusBadge = (status) => ({
   completed: 'bg-slate-100 text-slate-600',
 }[status] || 'bg-slate-100 text-slate-600');
 
+const statusLabel = (status) => ({
+  pending: 'Payment pending',
+  pending_review: 'Under review',
+  approved: 'Approved',
+  active: 'Live',
+  rejected: 'Rejected',
+  failed: 'Payment failed',
+}[status] || status || 'Unknown');
+
+const statusMessage = (ad) => {
+  if (ad.status === 'pending_review') return 'Your ad was submitted and is awaiting admin review.';
+  if (['approved', 'active'].includes(ad.status)) return 'Your ad has been approved and is live or scheduled.';
+  if (ad.status === 'rejected') return ad.admin_note || ad.rejection_reason || 'This ad was rejected. Please contact support for details.';
+  if (ad.payment_status === 'pending') return 'Complete payment before your ad can be reviewed.';
+  return '';
+};
+
 const durationLabel = (ad) => {
   if (!ad.starts_at || !ad.ends_at) return '—';
   const days = Math.round((new Date(ad.ends_at) - new Date(ad.starts_at)) / 86400000);
@@ -226,11 +243,12 @@ export function AdvertiserDashboard() {
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold">{AD_SLOT_SPECS[ad.slot]?.label || ad.slot}</p>
                             <div className="mt-2 flex flex-wrap gap-1.5">
-                              <Badge className={`border-0 text-[10px] ${statusBadge(ad.status)}`}>{ad.status}</Badge>
-                              <Badge className={`border-0 text-[10px] ${statusBadge(ad.payment_status)}`}>{ad.payment_status}</Badge>
+                              <Badge className={`border-0 text-[10px] ${statusBadge(ad.status)}`}>{statusLabel(ad.status)}</Badge>
+                              <Badge className={`border-0 text-[10px] ${statusBadge(ad.payment_status)}`}>{statusLabel(ad.payment_status)}</Badge>
                             </div>
                           </div>
                         </div>
+                        <p className="mt-3 text-xs leading-5 text-muted-foreground">{statusMessage(ad)}</p>
                         <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
                           <span>Duration: <span className="text-foreground">{durationLabel(ad)}</span></span>
                           <span>Amount: <span className="text-foreground">{formatPrice(amountOf(ad))}</span></span>
@@ -269,8 +287,8 @@ export function AdvertiserDashboard() {
                             <td className="px-3 py-3.5 font-medium text-foreground">{AD_SLOT_SPECS[ad.slot]?.label || ad.slot}</td>
                             <td className="px-3 py-3.5">{durationLabel(ad)}</td>
                             <td className="px-3 py-3.5 font-medium text-foreground">{formatPrice(amountOf(ad))}</td>
-                            <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.payment_status)}`}>{ad.payment_status}</Badge></td>
-                            <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.status)}`}>{ad.status}</Badge></td>
+                            <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.payment_status)}`}>{statusLabel(ad.payment_status)}</Badge></td>
+                            <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.status)}`}>{statusLabel(ad.status)}</Badge></td>
                             <td className="px-3 py-3.5">{ad.clicks ?? 0}</td>
                             <td className="px-3 py-3.5 text-muted-foreground">{ad.created_at ? new Date(ad.created_at).toLocaleDateString() : '—'}</td>
                           </tr>
