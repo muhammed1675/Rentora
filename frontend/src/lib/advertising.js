@@ -91,6 +91,7 @@ export const advertisingAPI = {
       link_url: payload.destinationUrl,
       slot: payload.slot,
       ad_text: [payload.headline, payload.description].filter(Boolean).join(' — '),
+      message_body: payload.description?.trim() || null,
       image_url: payload.creativeUrl,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
@@ -130,7 +131,7 @@ export const advertisingAPI = {
   },
   incrementClick: async (id) => { await supabase.rpc('increment_ad_click', { p_ad_id: id }); },
   getPublicAd: async (id) => {
-    const { data, error } = await supabase.from('ads').select('id, full_name, business_name, slot, image_url, ad_text, whatsapp_number, link_url, starts_at, ends_at').eq('id', id).in('status', ['approved', 'active']).in('payment_status', ['paid', 'completed']).maybeSingle();
+    const { data, error } = await supabase.from('ads').select('id, full_name, business_name, slot, image_url, ad_text, message_body, whatsapp_number, link_url, starts_at, ends_at').eq('id', id).in('status', ['approved', 'active']).in('payment_status', ['paid', 'completed']).maybeSingle();
     if (error) throw error;
     const now = new Date().toISOString();
     return data && (!data.starts_at || data.starts_at <= now) && (!data.ends_at || data.ends_at >= now) ? data : null;

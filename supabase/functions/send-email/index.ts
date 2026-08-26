@@ -57,6 +57,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Maps a `tone` name to the accent/icon-badge colors used across the
+// header icon, headline highlight, and the reassurance/alert box. Kept to
+// four tones so every template reads consistently instead of one-off hex
+// values scattered through each `emailX()` function.
+const TONES: Record<string, { accent: string; badgeBg: string; badgeFg: string; boxBg: string; boxBorder: string }> = {
+  green: { accent: "#1f7a43", badgeBg: "#e3f5e9", badgeFg: "#1f7a43", boxBg: "#eef8f1", boxBorder: "#cdecd7" },
+  blue: { accent: "#153E75", badgeBg: "#eaf2fb", badgeFg: "#2E86D8", boxBg: "#eef5fc", boxBorder: "#d3e6f8" },
+  red: { accent: "#b3261e", badgeBg: "#fdeaea", badgeFg: "#c0362d", boxBg: "#fdf1f1", boxBorder: "#f6d4d2" },
+  amber: { accent: "#92620a", badgeBg: "#fdf1de", badgeFg: "#b3760f", boxBg: "#fdf6ea", boxBorder: "#f5e3bd" },
+};
+
 function baseTemplate(opts: {
   eyebrow?: string;
   headline: string;
@@ -69,10 +80,26 @@ function baseTemplate(opts: {
   rowsHtml2?: string;
   paragraphs?: string[];
   cta?: { heading?: string; buttons: { text: string; href: string; color?: string }[] };
+  // New, optional — used to opt individual templates into the richer
+  // "confirmation" look (icon badge under the logo + tone-matched
+  // highlighted word in the headline). Templates that don't pass these
+  // still render correctly with sensible blue defaults.
+  icon?: string;
+  tone?: "green" | "blue" | "red" | "amber";
+  // A prominent highlighted callout box in the body (e.g. "Don't recognize
+  // this activity?"), styled with the same tone as `icon`/`tone`.
+  alertBox?: { title: string; text: string; buttonText?: string; href?: string };
 }): string {
   const {
     eyebrow, headline, subhead, intro, lead, sectionHeading, rowsHtml, sectionHeading2, rowsHtml2, paragraphs, cta,
+    icon, tone = "blue", alertBox,
   } = opts;
+
+  const t = TONES[tone] || TONES.blue;
+
+  const iconBadgeHtml = icon
+    ? `<div class="icon-badge" style="background:${t.badgeBg}"><span style="font-size:30px;line-height:1">${ic(icon, 30)}</span></div>`
+    : "";
 
   const introHtml = intro
     ? `<div class="intro"><p>${intro}</p></div>`
@@ -83,12 +110,29 @@ function baseTemplate(opts: {
   const sectionHeading2Html = sectionHeading2 ? `<h2>${sectionHeading2}</h2>` : "";
   const paragraphsHtml = (paragraphs || []).map((p) => `<p>${p}</p>`).join("");
 
+  const alertBoxHtml = alertBox
+    ? `<div class="alert-box" style="background:${t.boxBg};border:1px solid ${t.boxBorder}">
+        <span class="alert-icon" style="background:${t.badgeBg};color:${t.badgeFg}">${ic("shield", 18)}</span>
+        <div class="alert-copy">
+          <p class="alert-title">${alertBox.title}</p>
+          <p class="alert-text">${alertBox.text}</p>
+          ${alertBox.buttonText ? `<a href="${alertBox.href || "#"}" class="btn" style="background:${t.badgeFg}">${alertBox.buttonText}</a>` : ""}
+        </div>
+      </div>`
+    : "";
+
   const ctaHtml = cta
     ? `<div class="cta-section">
         ${cta.heading ? `<p class="cta-lead">${cta.heading}</p>` : ""}
         ${cta.buttons.map((b) => `<a href="${b.href}" class="btn"${b.color ? ` style="background:${b.color}"` : ""}>${b.text}</a>`).join("")}
       </div>`
     : "";
+
+  // Headline: wrap the last `<em>…</em>` phrase (already used throughout
+  // the emailX() functions to mark the key phrase) in the tone accent
+  // color instead of italics, matching the two-tone "Sign-in Successful!"
+  // style. Falls back to plain text if a template has no <em> at all.
+  const headlineHtml = headline.replace(/<em>(.*?)<\/em>/g, `<span class="accent" style="color:${t.accent}">$1</span>`);
 
   return `<!DOCTYPE html>
 <html>
@@ -97,35 +141,45 @@ function baseTemplate(opts: {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { margin:0; padding:0; background:#eef2f7; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
-    .wrapper { max-width:560px; margin:32px auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(21,62,117,0.10); }
+    .wrapper { max-width:560px; margin:32px auto; background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 2px 16px rgba(21,62,117,0.08); border-top:4px solid #2E86D8; }
 
-    /* ── Header (hero) ───────────────────────────── */
-    .header { background:#2E86D8; padding:36px 32px 32px; text-align:center; }
-    .logo-pill { display:inline-flex; align-items:center; justify-content:center; background:transparent; padding:0; margin-bottom:24px; }
-    .logo-pill img { height:24px; width:auto; display:block; }
-    .eyebrow { display:block; color:rgba(255,255,255,0.75); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700; margin:0 0 10px; }
-    .header h1 { color:#ffffff; font-size:24px; font-weight:700; line-height:1.32; margin:0 0 12px; letter-spacing:-0.01em; }
-    .header h1 em { font-style:italic; font-weight:800; }
-    .header .subhead { color:rgba(255,255,255,0.88); font-size:14px; line-height:1.6; margin:0 auto; max-width:400px; }
+    /* ── Header (light, centered) ─────────────────── */
+    .header { background:#ffffff; padding:36px 32px 28px; text-align:center; }
+    .logo-pill { display:inline-flex; align-items:center; justify-content:center; background:transparent; padding:0; margin-bottom:6px; }
+    .logo-pill img { height:26px; width:auto; display:block; }
+    .icon-badge { width:72px; height:72px; border-radius:50%; margin:22px auto 20px; display:flex; align-items:center; justify-content:center; }
+    .eyebrow { display:block; color:#8a97a6; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700; margin:0 0 10px; }
+    .header h1 { color:#16233a; font-size:25px; font-weight:800; line-height:1.32; margin:0 0 12px; letter-spacing:-0.01em; }
+    .header h1 .accent { font-weight:800; }
+    .header .subhead { color:#5b6b7d; font-size:14px; line-height:1.6; margin:0 auto; max-width:400px; }
 
     /* ── Intro band (light gray, under header) ──── */
-    .intro { background:#f7f9fb; padding:26px 32px; text-align:center; border-bottom:1px solid #e9edf2; }
+    .intro { background:#f7f9fb; padding:26px 32px; text-align:center; border-top:1px solid #e9edf2; border-bottom:1px solid #e9edf2; }
     .intro p { color:#5b6b7d; font-size:14px; line-height:1.65; margin:0; }
 
     /* ── Body ─────────────────────────────────────── */
     .body { padding:30px 32px 10px; }
     .body p.lead { color:#324459; font-size:15px; line-height:1.65; margin:0 0 22px; }
     .body p { color:#5b6b7d; font-size:14px; line-height:1.65; margin:0 0 16px; }
-    .body h2 { text-align:center; color:#153E75; font-size:18px; font-weight:700; margin:0 0 18px; letter-spacing:-0.01em; }
+    .body h2 { text-align:left; color:#153E75; font-size:15px; font-weight:700; margin:0 0 4px; letter-spacing:-0.01em; }
 
-    /* ── Icon-badge rows ──────────────────────────── */
-    .rows { margin:0 0 22px; }
-    .row { display:flex; align-items:center; gap:14px; background:#f7f9fb; border-radius:12px; padding:13px 16px; margin-bottom:10px; }
-    .row-icon { flex-shrink:0; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#ffffff; }
-    .row-body { flex:1; min-width:0; }
-    .row-label { display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; color:#8a97a6; font-weight:600; margin:0 0 2px; }
-    .row-value { display:block; font-size:14px; color:#153E75; font-weight:600; word-break:break-word; }
+    /* ── Detail card: bordered box with divided rows ── */
+    .rows { border:1px solid #e9edf2; border-radius:14px; padding:4px 18px; margin:14px 0 22px; }
+    .row { display:flex; align-items:center; gap:12px; padding:13px 0; border-bottom:1px solid #eef1f5; }
+    .rows .row:last-child { border-bottom:none; }
+    .row-icon { flex-shrink:0; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#eaf2fb; color:#2E86D8; font-size:15px; }
+    .row-body { flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .row-body.single { justify-content:flex-start; }
+    .row-label { font-size:13px; color:#5b6b7d; font-weight:500; }
+    .row-value { font-size:13.5px; color:#16233a; font-weight:700; text-align:right; word-break:break-word; }
     .row-single { font-size:14px; color:#324459; font-weight:500; }
+
+    /* ── Prominent tone-matched alert box ─────────── */
+    .alert-box { display:flex; gap:14px; align-items:flex-start; border-radius:14px; padding:18px; margin:6px 0 22px; }
+    .alert-icon { flex-shrink:0; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .alert-title { color:#16233a; font-size:14.5px; font-weight:700; margin:0 0 4px; }
+    .alert-text { color:#5b6b7d; font-size:13.5px; line-height:1.55; margin:0 0 12px; }
+    .alert-copy .btn { margin:0; padding:10px 22px; font-size:13px; }
 
     /* ── Status badge (small pill, used sparingly) ── */
     .badge { display:inline-flex; align-items:center; gap:6px; background:#e3f5e9; color:#1f7a43; border-radius:999px; padding:5px 14px; font-size:12.5px; font-weight:700; margin-bottom:16px; }
@@ -137,21 +191,37 @@ function baseTemplate(opts: {
     .cta-lead { color:#153E75; font-size:15px; font-weight:700; margin:0 0 16px; }
     .btn { display:inline-block; background:#2E86D8; color:#fff !important; text-decoration:none; padding:13px 34px; border-radius:9px; font-weight:700; font-size:14px; margin:0 4px 10px; }
 
-    /* ── Footer (dark) ───────────────────────────── */
-    .footer { background:#0f2038; padding:28px 32px; text-align:center; }
-    .footer p { color:#8a9bb0; font-size:12px; margin:0 0 8px; line-height:1.6; }
-    .footer a { color:#7fb2e8; text-decoration:none; }
-    .footer .legal { font-size:11px; color:#5f7186; }
-    .footer .legal a { color:#5f7186; text-decoration:underline; }
-    .footer .copyright { font-size:11px; color:#47597a; margin-top:12px; }
+    /* ── Divider with house mark ───────────────────── */
+    .divider { display:flex; align-items:center; gap:12px; padding:24px 32px 0; }
+    .divider hr { flex:1; border:none; border-top:1px solid #e9edf2; margin:0; }
+    .divider span { color:#9aa7b5; font-size:16px; }
+    .thankyou { text-align:center; color:#16233a; font-size:13.5px; font-weight:700; padding:14px 32px 26px; margin:0; }
+    .thankyou span { display:block; color:#8a97a6; font-weight:500; font-size:12.5px; margin-top:4px; }
+
+    /* ── Footer (light, three columns) ─────────────── */
+    .footer { background:#f7f9fb; padding:30px 32px; border-top:1px solid #e9edf2; }
+    .footer-col h3 { color:#16233a; font-size:13px; font-weight:700; margin:0 0 6px; }
+    .footer-col p { color:#8a97a6; font-size:12px; line-height:1.6; margin:0 0 6px; }
+    .footer-col a { color:#2E86D8; font-size:12.5px; font-weight:700; text-decoration:none; }
+    .footer table { width:100%; border-collapse:collapse; }
+    .footer td { vertical-align:top; padding:0 10px; }
+    .footer td:first-child { padding-left:0; }
+    .footer td:last-child { padding-right:0; }
+    .app-link { display:inline-block; background:#16233a; color:#fff !important; text-decoration:none; padding:8px 14px; border-radius:8px; font-size:11.5px; font-weight:700; }
+
+    /* ── Sub-footer (legal) ─────────────────────────── */
+    .subfooter { text-align:center; padding:18px 32px 26px; background:#f7f9fb; }
+    .subfooter p { color:#9aa7b5; font-size:11px; margin:0 0 6px; line-height:1.6; }
+    .subfooter a { color:#7c8ba0; text-decoration:underline; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="header">
       <span class="logo-pill"><img src="https://www.rentora.com.ng/rentora-logo.png" alt="Rentora" /></span>
+      ${iconBadgeHtml}
       ${eyebrow ? `<span class="eyebrow">${eyebrow}</span>` : ""}
-      <h1>${headline}</h1>
+      <h1>${headlineHtml}</h1>
       ${subhead ? `<p class="subhead">${subhead}</p>` : ""}
     </div>
     ${introHtml}
@@ -161,14 +231,36 @@ function baseTemplate(opts: {
       ${rowsHtml ? `<div class="rows">${rowsHtml}</div>` : ""}
       ${sectionHeading2Html}
       ${rowsHtml2 ? `<div class="rows">${rowsHtml2}</div>` : ""}
+      ${alertBoxHtml}
       ${paragraphsHtml}
     </div>
     ${ctaHtml}
+    <div class="divider"><hr /><span>${ic("home", 16)}</span><hr /></div>
+    <p class="thankyou">Thank you for choosing Rentora.<span>We're here to help you find a place you'll love to call home.</span></p>
     <div class="footer">
-      <p>Rentora — Student Housing, Ogbomosho, Oyo State</p>
-      <p><a href="https://www.rentora.com.ng">rentora.com.ng</a> &nbsp;·&nbsp; <a href="mailto:support@rentora.com.ng">support@rentora.com.ng</a></p>
-      <p class="legal"><a href="https://www.rentora.com.ng/terms">Privacy and terms</a> &nbsp;·&nbsp; <a href="mailto:support@rentora.com.ng">Contact support</a></p>
-      <p class="copyright">© 2026 Rentora. All rights reserved.</p>
+      <table role="presentation">
+        <tr>
+          <td class="footer-col" style="width:38%">
+            <span class="logo-pill"><img src="https://www.rentora.com.ng/rentora-logo.png" alt="Rentora" style="height:20px" /></span>
+            <p style="margin-top:10px">Find a place you'll love to call home.</p>
+          </td>
+          <td class="footer-col" style="width:31%">
+            <h3>Need Help?</h3>
+            <p>Our support team is ready to help.</p>
+            <a href="mailto:support@rentora.com.ng">Contact Support →</a>
+          </td>
+          <td class="footer-col" style="width:31%">
+            <h3>Get the Rentora App</h3>
+            <p>Search for homes, book, and manage on the go.</p>
+            <a class="app-link" href="https://www.rentora.com.ng/rentora.apk" download>Download for Android</a>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div class="subfooter">
+      <p>This is an automated email. Please do not reply to this message.</p>
+      <p><a href="https://www.rentora.com.ng/terms">Privacy and terms</a> &nbsp;·&nbsp; <a href="mailto:support@rentora.com.ng">support@rentora.com.ng</a></p>
+      <p>© 2026 Rentora. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -205,20 +297,37 @@ const iconPaths: Record<string, string> = {
   trash: `<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`,
 };
 
-  function ic(_name: string, size = 14): string {
-    // Gmail flags inline SVGs, so use a lightweight text marker instead.
-    return `<span aria-hidden="true" style="display:block;font-size:${size}px;line-height:1">&#9679;</span>`;
-  }
+// Unicode emoji instead of inline SVG — Gmail (and several other clients)
+// strip or flag inline <svg>, which is why this used to fall back to a
+// plain bullet. Emoji render natively everywhere without that risk, and
+// let the icon-badge / row-icon circles show something meaningful again
+// (a lock, a clock, a pin, etc.) instead of a dot.
+const EMOJI: Record<string, string> = {
+  home: "🏠", money: "💰", calendar: "📅", user: "👤", mail: "✉️", phone: "📞",
+  tag: "🏷️", target: "🎯", lock: "🔒", check: "✅", sparkles: "✨", pin: "📍",
+  search: "🔍", coin: "🪙", unlock: "🔓", document: "📄", clipboard: "📋",
+  clock: "🕒", globe: "🌐", monitor: "💻", alert: "⚠️", shield: "🛡️", trash: "🗑️",
+};
 
-// One icon-badge row. Pass `value` for a label/value data row (e.g.
-// "Property → Ajumobi Lodge"); omit it for a single-line feature row
-// (e.g. "Browse verified properties near campus").
+function ic(name: string, size = 14): string {
+  return `<span aria-hidden="true" style="display:inline-block;font-size:${size}px;line-height:1;font-style:normal">${EMOJI[name] || "•"}</span>`;
+}
+
+// One row inside a `.rows` detail card. Pass `value` for a label/value data
+// row (icon + label on the left, bold value right-aligned, e.g. "Date  →
+// 31 May 2025") — this is the "Sign-in Details" / "Booking Summary" card
+// style. Omit `value` for a single-line feature row (e.g. "Browse verified
+// properties near campus"), used in welcome/invite-style feature lists.
+// `opts.color` tints the small icon circle for that one row (e.g. green
+// for a "Status: Verified" row, red for a rejection reason).
 function row(iconName: string, label: string, value?: string, opts: { color?: string; valueColor?: string } = {}): string {
-  const bg = opts.color || "#2E86D8";
+  const iconBg = opts.color ? `${opts.color}1a` : "#eaf2fb"; // ~10% tint of the color, or default blue tint
+  const iconFg = opts.color || "#2E86D8";
   const body = value !== undefined
     ? `<span class="row-label">${label}</span><span class="row-value"${opts.valueColor ? ` style="color:${opts.valueColor}"` : ""}>${value}</span>`
     : `<span class="row-single">${label}</span>`;
-  return `<div class="row"><span class="row-icon" style="background:${bg}">${ic(iconName, 18)}</span><div class="row-body">${body}</div></div>`;
+  const rowBodyClass = value !== undefined ? "row-body" : "row-body single";
+  return `<div class="row"><span class="row-icon" style="background:${iconBg};color:${iconFg}">${ic(iconName, 14)}</span><div class="${rowBodyClass}">${body}</div></div>`;
 }
 
 function emailWelcome(name: string) {
@@ -239,15 +348,23 @@ function emailWelcome(name: string) {
 
 function emailInspectionBooked(name: string, propertyTitle: string, inspectionDate: string, reference: string, amount: number) {
   return baseTemplate({
-    eyebrow: "Booking confirmed",
-    headline: `Your Viewing Is <em>Confirmed</em>`,
-    subhead: `Hi ${name}, we've received your payment and locked in your viewing.`,
-    lead: "An agent will be in touch before the viewing date to confirm arrangements.",
+    icon: "check",
+    tone: "green",
+    headline: `Payment <em>Successful</em>!`,
+    subhead: "Your viewing has been booked.",
+    lead: `<strong>Hi ${name},</strong> great news! Your payment has been received and your viewing is confirmed. An agent will be in touch before the date.`,
+    sectionHeading: "Booking Summary",
     rowsHtml: [
       row("home", "Property", propertyTitle),
       row("calendar", "Date", inspectionDate),
       row("money", "Fee Paid", `₦${amount.toLocaleString()}`),
       row("tag", "Reference", reference),
+    ].join(""),
+    sectionHeading2: "Important Next Steps",
+    rowsHtml2: [
+      row("mail", "You'll receive a reminder before the viewing date", undefined),
+      row("clipboard", "Keep this email for your records", undefined),
+      row("phone", "Contact the agent directly for any questions", undefined),
     ].join(""),
     cta: { buttons: [{ text: "View My Viewing Requests", href: "https://www.rentora.com.ng/profile" }] },
   });
@@ -331,17 +448,24 @@ function emailStudentVerificationRejected(name: string, reason: string) {
 
 function emailSignIn(name: string, ip: string, location: string, time: string, device: string) {
   return baseTemplate({
-    eyebrow: "Account security",
-    headline: `Hi ${name}, You Just <em>Signed In</em>`,
-    subhead: "We noticed a new sign-in to your Rentora account. If this was you, no action needed.",
+    icon: "shield",
+    tone: "green",
+    headline: `Sign-in <em>Successful</em>!`,
+    subhead: "You've successfully signed in to your Rentora account.",
+    lead: `<strong>Hi ${name},</strong> welcome back! We're glad to have you.`,
+    sectionHeading: "Sign-in Details",
     rowsHtml: [
       row("clock", "Time", time),
       row("pin", "Location", location),
       row("globe", "IP Address", ip),
       row("monitor", "Device", device),
     ].join(""),
-    paragraphs: ["If this wasn't you, secure your account immediately."],
-    cta: { buttons: [{ text: "Report Unauthorised Access", href: "mailto:support@rentora.com.ng?subject=Unauthorised Sign-In", color: "#dc2626" }] },
+    alertBox: {
+      title: "Don't recognize this activity?",
+      text: "If you didn't sign in, someone may have accessed your account. Please secure your account immediately.",
+      buttonText: "Secure My Account",
+      href: "mailto:support@rentora.com.ng?subject=Unauthorised Sign-In",
+    },
   });
 }
 

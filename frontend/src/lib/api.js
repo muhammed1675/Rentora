@@ -1110,6 +1110,7 @@ export const adminAPI = {
       { data: inspTxs },
       { data: rentPayments },
       { data: paidWithdrawals },
+      { data: paidAds },
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'agent'),
@@ -1124,6 +1125,7 @@ export const adminAPI = {
       supabase.from('inspection_transactions').select('amount').eq('status', 'completed'),
       supabase.from('property_rent_payments').select('status, rent_amount, agent_fee, service_fee, total_amount'),
       supabase.from('withdrawal_requests').select('fee_amount').eq('status', 'paid'),
+      supabase.from('ads').select('price').in('payment_status', ['paid', 'completed']),
     ]);
 
     const tokenRevenue = tokenTxs?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
@@ -1144,6 +1146,12 @@ export const adminAPI = {
     const totalEscrowHeld = heldRows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
 
     const withdrawalFeeRevenue = paidWithdrawals?.reduce((s, w) => s + Number(w.fee_amount || 0), 0) || 0;
+    // Advertising revenue: sum of what advertisers actually paid for ad
+    // slots (only ads whose payment has actually cleared — 'paid' or
+    // 'completed'). This is real Rentora revenue, unlike withdrawal fees
+    // which are currently ₦0 (see withdrawal_fee_revenue above, kept only
+    // for reference on the admin dashboard).
+    const advertisingRevenue = paidAds?.reduce((s, a) => s + Number(a.price || 0), 0) || 0;
 
     return {
       data: {
@@ -1160,9 +1168,11 @@ export const adminAPI = {
         inspection_fees_processed: inspectionFeesProcessed,
         rent_service_fee_revenue: rentServiceFeeRevenue,
         withdrawal_fee_revenue: withdrawalFeeRevenue,
+        advertising_revenue: advertisingRevenue,
         // Rentora's actual revenue: token sales + rent service fee +
-        // withdrawal fee. Viewing fees are excluded — 100% goes to agents.
-        total_revenue: tokenRevenue + rentServiceFeeRevenue + withdrawalFeeRevenue,
+        // advertising. Withdrawal fee is excluded (currently ₦0) and
+        // viewing fees are excluded — 100% goes to agents.
+        total_revenue: tokenRevenue + rentServiceFeeRevenue + advertisingRevenue,
         total_escrow_held: totalEscrowHeld,
         total_rent_payments: rentRows.length,
         held_rent_payments: heldRows.length,

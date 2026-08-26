@@ -60,6 +60,7 @@ export function AdminDashboard() {
   const [bankRejectId, setBankRejectId] = useState(null);
   const [agentBankDetails, setAgentBankDetails] = useState([]);
   const [previewProperty, setPreviewProperty] = useState(null);
+  const [previewAd, setPreviewAd] = useState(null);
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
   const [rentPayments, setRentPayments] = useState([]);
   const [refundTarget, setRefundTarget] = useState(null); // held payment being resolved via refund
@@ -1106,7 +1107,7 @@ export function AdminDashboard() {
                       <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Total Revenue</span>
                     </div>
                     <p className="text-3xl font-bold text-white leading-none">{formatPrice(stats?.total_revenue || 0)}</p>
-                    <p className="text-[11px] text-white/70 mt-2">Rent service fee</p>
+                    <p className="text-[11px] text-white/70 mt-2">Rent service fee + advertising</p>
                     <button
                       onClick={() => setActiveTab('rentora-revenue')}
                       className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur px-3 py-1.5 rounded-full transition"
@@ -1203,11 +1204,11 @@ export function AdminDashboard() {
                     </div>
                     <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
                       <div className="flex items-center gap-2 mb-2">
-                        <ArrowDownCircle className="w-4 h-4 text-slate-400" />
-                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Withdrawal Fee</p>
+                        <Megaphone className="w-4 h-4 text-slate-400" />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Advertising Revenue</p>
                       </div>
-                      <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">Withdrawal fee: ₦0; minimum withdrawal: ₦3,000</p>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(stats?.advertising_revenue || 0)}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">Paid sponsored listings and ad slots</p>
                     </div>
                     <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
                       <div className="flex items-center gap-2 mb-2">
@@ -2173,8 +2174,9 @@ export function AdminDashboard() {
                           </div>
                         </div>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
-                        <span>Slot: <span className="text-foreground">{ad.slot}</span></span>
+<Button size="sm" variant="outline" className="w-full mt-3" onClick={() => setPreviewAd(ad)}><Eye className="w-4 h-4 mr-1" /> Preview ad</Button>
+  <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
+  <span>Slot: <span className="text-foreground">{ad.slot}</span></span>
                         <span>Duration: <span className="text-foreground">{adDurationLabel(ad)}</span></span>
                         <span>Amount: <span className="text-foreground">{adAmountLabel(ad)}</span></span>
                         <span>Clicks: <span className="text-foreground">{ad.clicks ?? 0}</span></span>
@@ -2227,18 +2229,21 @@ export function AdminDashboard() {
                           <TableCell><Badge className={getStatusBadge(ad.status)}>{ad.status}</Badge></TableCell>
                           <TableCell className="text-sm">{ad.clicks ?? 0}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{ad.created_at ? new Date(ad.created_at).toLocaleDateString() : '—'}</TableCell>
-                          <TableCell className="text-right">
-                            {canDecide ? (
-                              <div className="flex gap-2 justify-end">
-                                <Button size="sm" variant="outline" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'reject')}>Reject</Button>
-                                <Button size="sm" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'approve')}>Approve</Button>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                {ad.payment_status === 'pending' ? 'Awaiting payment' : ad.status === 'rejected' ? 'Rejected' : 'Reviewed'}
-                              </span>
-                            )}
-                          </TableCell>
+<TableCell className="text-right">
+  <div className="flex gap-2 justify-end">
+    <Button size="sm" variant="ghost" onClick={() => setPreviewAd(ad)}><Eye className="w-4 h-4 mr-1" /> Preview</Button>
+    {canDecide ? (
+      <>
+        <Button size="sm" variant="outline" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'reject')}>Reject</Button>
+        <Button size="sm" disabled={adActionBusyId === ad.id} onClick={() => handleAdDecision(ad.id, 'approve')}>Approve</Button>
+      </>
+    ) : (
+      <span className="text-xs text-muted-foreground">
+        {ad.payment_status === 'pending' ? 'Awaiting payment' : ad.status === 'rejected' ? 'Rejected' : 'Reviewed'}
+      </span>
+    )}
+  </div>
+</TableCell>
                         </TableRow>
                       );
                     })}
@@ -2736,7 +2741,7 @@ export function AdminDashboard() {
           <Card className="p-6 mb-6 bg-gradient-to-br from-primary to-primary/80 text-white">
             <p className="text-sm opacity-90 mb-1">Total Revenue (All-Time)</p>
             <p className="text-4xl sm:text-5xl font-bold">{formatPrice(stats?.total_revenue || 0)}</p>
-            <p className="text-xs opacity-80 mt-2">Rent service fee</p>
+            <p className="text-xs opacity-80 mt-2">Rent service fee + advertising</p>
           </Card>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2750,11 +2755,11 @@ export function AdminDashboard() {
             </Card>
             <Card className="p-6 border-2 border-secondary/20">
               <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-3">
-                <ArrowDownCircle className="w-6 h-6 text-secondary" />
+                <Megaphone className="w-6 h-6 text-secondary" />
               </div>
-              <p className="text-sm text-muted-foreground mb-1">Withdrawal Fee</p>
-              <p className="text-3xl font-bold">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</p>
-              <p className="text-xs text-muted-foreground mt-2">Withdrawal fee: ₦0; minimum withdrawal: ₦3,000</p>
+              <p className="text-sm text-muted-foreground mb-1">Advertising Revenue</p>
+              <p className="text-3xl font-bold">{formatPrice(stats?.advertising_revenue || 0)}</p>
+              <p className="text-xs text-muted-foreground mt-2">Sponsored listings and local business ad slots</p>
             </Card>
           </div>
 
@@ -2768,6 +2773,10 @@ export function AdminDashboard() {
               <div className="flex justify-between p-2 rounded bg-muted/50">
                 <span className="text-muted-foreground">Currently held in escrow (not yet Rentora's or anyone's)</span>
                 <span className="font-medium">{formatPrice(stats?.total_escrow_held || 0)}</span>
+              </div>
+              <div className="flex justify-between p-2 rounded bg-muted/50">
+                <span className="text-muted-foreground">Withdrawal fees collected (currently ₦0 fee)</span>
+                <span className="font-medium">{formatPrice(stats?.withdrawal_fee_revenue || 0)}</span>
               </div>
             </div>
           </Card>
@@ -3143,7 +3152,29 @@ export function AdminDashboard() {
       </Dialog>
 
 
-      {/* ── Property Preview Dialog ── */}
+      {/* ── Ad Preview Dialog ── */}
+<Dialog open={!!previewAd} onOpenChange={() => setPreviewAd(null)}>
+  <DialogContent className="max-w-2xl">
+    <DialogHeader><DialogTitle>Advert Preview</DialogTitle><DialogDescription>Review the creative and campaign details before or after approval.</DialogDescription></DialogHeader>
+    {previewAd && (
+      <div className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+        {previewAd.image_url && <img src={previewAd.image_url} alt={previewAd.business_name || 'Advertisement creative'} className="w-full max-h-72 object-contain rounded-lg border bg-muted" />}
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div><p className="text-muted-foreground">Advertiser</p><p className="font-medium">{previewAd.full_name || previewAd.business_name || '—'}</p></div>
+          <div><p className="text-muted-foreground">Business</p><p className="font-medium">{previewAd.business_name || '—'}</p></div>
+          <div><p className="text-muted-foreground">Slot</p><p className="font-medium">{previewAd.slot || '—'}</p></div>
+          <div><p className="text-muted-foreground">Status</p><Badge className={getStatusBadge(previewAd.status)}>{previewAd.status}</Badge></div>
+          <div><p className="text-muted-foreground">Payment</p><Badge className={getStatusBadge(previewAd.payment_status)}>{previewAd.payment_status}</Badge></div>
+          <div><p className="text-muted-foreground">Amount</p><p className="font-medium">{adAmountLabel(previewAd)}</p></div>
+        </div>
+        {previewAd.ad_text && <div><p className="text-sm text-muted-foreground">Ad copy</p><p className="mt-1 rounded-lg bg-muted p-3 text-sm">{previewAd.ad_text}</p></div>}
+        {previewAd.target_url && <a className="text-sm text-primary underline" href={previewAd.target_url} target="_blank" rel="noreferrer">Open destination URL</a>}
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
+
+{/* ── Property Preview Dialog ── */}
       <Dialog open={!!previewProperty} onOpenChange={() => setPreviewProperty(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
