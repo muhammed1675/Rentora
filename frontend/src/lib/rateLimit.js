@@ -10,6 +10,8 @@ import { supabase } from './supabase';
 const LIMITS = {
   otp_request: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 15 },
   otp_verify: { maxAttempts: 8, windowMinutes: 15, blockMinutes: 15 },
+  reauth_request: { maxAttempts: 5, windowMinutes: 15, blockMinutes: 15 },
+  reauth_verify: { maxAttempts: 8, windowMinutes: 15, blockMinutes: 15 },
 };
 
 function formatWait(seconds) {

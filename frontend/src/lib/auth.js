@@ -331,6 +331,34 @@ export function AuthProvider({ children }) {
     return true;
   };
 
+  // ── Reauthentication: confirm identity before a sensitive edit ──
+  // Used for things like changing phone number, email, or password
+  // while already logged in. Sends the "Reauthentication" Supabase Auth
+  // email template (a fresh 6-digit code) to the user's current email.
+  const requestReauthCode = async () => {
+    if (!user?.email) throw new Error('You must be signed in to do this.');
+    await enforceRateLimit(user.email, 'reauth_request');
+    const { error } = await supabase.auth.reauthenticate();
+    if (error) throw new Error(parseAuthError(error));
+  };
+
+  // Verifies the code against Supabase's reauthentication challenge.
+  // On success, Supabase marks the current session as "recently
+  // reauthenticated" — resolve this promise and then go ahead with the
+  // sensitive update (e.g. userAPI.updateProfile with the new phone).
+  const verifyReauthCode = async (code) => {
+    if (!user?.email) throw new Error('You must be signed in to do this.');
+    await enforceRateLimit(user.email, 'reauth_verify');
+    const { error } = await supabase.auth.verifyOtp({
+      email: user.email,
+      token: code.trim(),
+      type: 'reauthentication',
+    });
+    if (error) throw new Error(parseAuthError(error));
+    clearRateLimit(user.email, 'reauth_verify');
+    clearRateLimit(user.email, 'reauth_request');
+  };
+
   // ── Logout ───────────────────────────────────────────────────
   const logout = async () => {
     await supabase.auth.signOut();
@@ -359,6 +387,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, session, loading,
       requestOtpCode, verifyOtpCode, logout, refreshUser,
+      requestReauthCode, verifyReauthCode,
       loginWithGoogle, completeOAuthSignIn, deleteAccount,
       isAuthenticated: !!user,
       isAdmin: user?.role === 'admin',

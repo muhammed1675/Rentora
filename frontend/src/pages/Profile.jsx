@@ -32,7 +32,7 @@ import { toast } from 'sonner';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, refreshUser, isUser, verificationStatus, deleteAccount } = useAuth();
+  const { user, isAuthenticated, refreshUser, isUser, verificationStatus, deleteAccount, requestReauthCode, verifyReauthCode } = useAuth();
   
   const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ inspection_transactions: [] });
@@ -253,20 +253,60 @@ export function Profile() {
   };
 
   const [phoneDraft, setPhoneDraft] = useState(user?.phone || '');
-  const [savingPhone, setSavingPhone] = useState(false);
+
+  // Reauthentication gate: changing the phone number is a sensitive edit,
+  // so we require a fresh 6-digit code (sent via the "Reauthentication"
+  // Supabase Auth email) before the update is actually written.
+  const [reauthOpen, setReauthOpen] = useState(false);
+  const [reauthCode, setReauthCode] = useState('');
+  const [reauthSending, setReauthSending] = useState(false);
+  const [reauthVerifying, setReauthVerifying] = useState(false);
 
   useEffect(() => { setPhoneDraft(user?.phone || ''); }, [user?.phone]);
 
+  // Step 1: user clicks "Save" — send the reauth code and open the dialog.
   const handleSavePhone = async () => {
-    setSavingPhone(true);
+    setReauthSending(true);
     try {
+      await requestReauthCode();
+      setReauthCode('');
+      setReauthOpen(true);
+      toast.success(`We sent a verification code to ${user?.email}`);
+    } catch (e) {
+      toast.error(e.message || 'Could not send verification code');
+    } finally {
+      setReauthSending(false);
+    }
+  };
+
+  // Step 2: user enters the code from the email — verify it, then commit
+  // the actual phone number update.
+  const handleConfirmPhoneChange = async () => {
+    if (!reauthCode.trim()) return;
+    setReauthVerifying(true);
+    try {
+      await verifyReauthCode(reauthCode);
       await userAPI.updateProfile(user.id, { phone: phoneDraft });
       toast.success('Phone number updated');
+      setReauthOpen(false);
+      setReauthCode('');
       await refreshUser();
     } catch (e) {
       toast.error(e.message || 'Failed to update phone number');
     } finally {
-      setSavingPhone(false);
+      setReauthVerifying(false);
+    }
+  };
+
+  const handleResendReauthCode = async () => {
+    setReauthSending(true);
+    try {
+      await requestReauthCode();
+      toast.success('New code sent');
+    } catch (e) {
+      toast.error(e.message || 'Could not resend code');
+    } finally {
+      setReauthSending(false);
     }
   };
 
@@ -690,11 +730,11 @@ export function Profile() {
                   />
                   <Button
                     size="sm"
-                    disabled={savingPhone || phoneDraft === (user?.phone || '')}
+                    disabled={reauthSending || phoneDraft === (user?.phone || '')}
                     onClick={handleSavePhone}
                     data-testid="profile-phone-save"
                   >
-                    {savingPhone ? 'Saving...' : 'Save'}
+                    {reauthSending ? 'Sending code...' : 'Save'}
                   </Button>
                 </div>
               </div>
@@ -832,6 +872,48 @@ export function Profile() {
               data-testid="delete-account-confirm-submit"
             >
               {deletingAccount ? 'Deleting...' : 'Permanently Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reauthOpen} onOpenChange={(open) => { setReauthOpen(open); if (!open) setReauthCode(''); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verify your identity</DialogTitle>
+            <DialogDescription>
+              For your security, enter the code we sent to {user?.email} to confirm this phone number change.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="reauth-code">6-digit code</Label>
+            <Input
+              id="reauth-code"
+              value={reauthCode}
+              onChange={(e) => setReauthCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              inputMode="numeric"
+              maxLength={6}
+              autoFocus
+              data-testid="reauth-code-input"
+            />
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline mt-2"
+              onClick={handleResendReauthCode}
+              disabled={reauthSending}
+            >
+              {reauthSending ? 'Sending...' : "Didn't get it? Resend code"}
+            </button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReauthOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleConfirmPhoneChange}
+              disabled={reauthVerifying || reauthCode.length !== 6}
+              data-testid="reauth-code-confirm"
+            >
+              {reauthVerifying ? 'Verifying...' : 'Confirm change'}
             </Button>
           </DialogFooter>
         </DialogContent>
