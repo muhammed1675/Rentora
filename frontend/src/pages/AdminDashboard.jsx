@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
+import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI, adsAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { sendBroadcast, sendBroadcastEmail } from '../lib/notifications';
 import { AD_SLOT_SPECS } from '../lib/advertising';
@@ -274,12 +274,12 @@ export function AdminDashboard() {
   // caller is an admin from their own row in `users` — see the advertising
   // SQL. approve_ad additionally requires payment_status IN ('paid',
   // 'completed'), so an unpaid advert can never be approved from here even
-  // if this UI had a bug.
+  // if this UI had a bug. adsAPI.decide (lib/api.js) calls the same RPCs
+  // and additionally emails/notifies the advertiser of the outcome.
   const handleAdDecision = async (adId, decision) => {
     setAdActionBusyId(adId);
     try {
-      const { error } = await supabase.rpc(decision === 'approve' ? 'approve_ad' : 'reject_ad', { p_ad_id: adId });
-      if (error) throw error;
+      await adsAPI.decide(adId, decision);
       setAds((prev) => prev.map((a) => a.id === adId ? { ...a, status: decision === 'approve' ? 'approved' : 'rejected' } : a));
       toast.success(decision === 'approve' ? 'Advert approved' : 'Advert rejected');
     } catch (e) {

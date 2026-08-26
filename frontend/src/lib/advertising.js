@@ -78,17 +78,19 @@ export const advertisingAPI = {
     return { path: data.path, url: urlData.publicUrl };
   },
   createPendingAd: async (payload) => {
-    // Note: no `status`, `payment_status`, `price`, or `amount_paid` are
-    // set here — the table defaults apply, and the real price is written
-    // server-side in advertisingAPI.initPayment, never by this browser-side
-    // insert. `billing_period` IS set here (see billingPeriodLabel above)
-    // because the column is NOT NULL and this insert runs before any
-    // server round-trip; it's a descriptive label derived 1:1 from the
-    // duration the advertiser already picked in the form, not a price,
-    // and gets overwritten with the server's own computed value the
-    // moment checkout starts.
+    // `price` IS set here — as a client-side ESTIMATE only — because the
+    // `ads.price` column is NOT NULL with no database default, so this
+    // insert fails outright without it. This value is never trusted for
+    // billing: advertisingAPI.initPayment (via /api/advertise-init-payment.js)
+    // overwrites it moments later with the authoritative, server-computed
+    // price from ad_slot_config before any Korapay charge is created, and
+    // confirm-payment.js verifies the paid amount against that
+    // server-written value, never this one. `billing_period` is set here
+    // too for the same NOT-NULL reason and is likewise overwritten
+    // server-side.
     const startsAt = new Date();
     const endsAt = new Date(startsAt.getTime() + Number(payload.durationDays) * 86400000);
+    const estimatedPrice = estimateAdPrice(payload.slotConfig, payload.durationDays);
     const { data, error } = await supabase.from('ads').insert({
       user_id: payload.userId,
       full_name: payload.advertiserName.trim(),
@@ -101,6 +103,7 @@ export const advertisingAPI = {
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       billing_period: billingPeriodLabel(payload.durationDays),
+      price: Number.isFinite(estimatedPrice) && estimatedPrice > 0 ? estimatedPrice : 0,
     }).select('*').single();
     if (error) throw error;
     return data;

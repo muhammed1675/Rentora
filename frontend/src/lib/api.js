@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { notifyUser } from './notifications';
 import { compressImage } from './imageCompression';
+import { AD_SLOT_SPECS } from './advertising';
 
 // Helper to generate payment reference
 const generateReference = (prefix) => {
@@ -1404,6 +1405,56 @@ export const reportAPI = {
       .eq('id', id);
     if (error) throw error;
     return { data: { ok: true } };
+  },
+};
+
+// ============== ADVERTISING (ADMIN REVIEW) APIs ==============
+
+export const adsAPI = {
+  // approve_ad / reject_ad are SECURITY DEFINER RPCs that re-check the
+  // caller is an admin server-side (see the advertising SQL) — this
+  // function does not, and cannot, weaken that. Everything below the RPC
+  // call is best-effort notification only, mirroring propertyAPI.approve's
+  // pattern: it never affects whether the decision itself succeeded.
+  decide: async (adId, decision) => {
+    const { error } = await supabase.rpc(decision === 'approve' ? 'approve_ad' : 'reject_ad', { p_ad_id: adId });
+    if (error) throw error;
+
+    try {
+      const { data: ad } = await supabase
+        .from('ads')
+        .select('user_id, business_name, full_name, slot')
+        .eq('id', adId)
+        .maybeSingle();
+      if (ad?.user_id) {
+        const { data: advertiser } = await supabase.from('users').select('email, full_name').eq('id', ad.user_id).maybeSingle();
+        const emailType = decision === 'approve' ? 'ad_approved' : 'ad_rejected';
+        const businessName = ad.business_name || ad.full_name || 'Your advertisement';
+        const slotLabel = AD_SLOT_SPECS[ad.slot]?.label || ad.slot;
+        if (advertiser?.email) {
+          await sendTransactionalEmail({
+            type: emailType,
+            to: advertiser.email,
+            data: {
+              advertiser_name: advertiser.full_name || businessName,
+              business_name: businessName,
+              slot_label: slotLabel,
+            },
+          });
+        }
+        notifyUser(
+          ad.user_id,
+          emailType,
+          decision === 'approve' ? 'Your advert is now live' : 'Your advert was not approved',
+          decision === 'approve'
+            ? `Your ${slotLabel} advert has been approved and is now showing on Rentora.`
+            : `Your ${slotLabel} advert was reviewed and not approved. Contact support for details.`,
+          '/advertise/dashboard'
+        );
+      }
+    } catch (e) { console.warn(`ad_${decision} email failed:`, e); }
+
+    return { data: { message: `Advert ${decision === 'approve' ? 'approved' : 'rejected'}` } };
   },
 };
 
