@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { ArrowUpRight, Megaphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { advertisingAPI, safeExternalUrl } from '../lib/advertising';
+import { ADVERTISE_PORTAL_URL, advertisingAPI, safeExternalUrl } from '../lib/advertising';
 
 export function AdSlot({ slot, className = '' }) {
   const [ad, setAd] = useState(null);
@@ -36,9 +35,9 @@ export function AdSlot({ slot, className = '' }) {
       {ad.ad_text && <div className="p-4"><p className="font-semibold text-foreground">{ad.business_name || ad.full_name}</p><p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{ad.ad_text}</p></div>}
     </a>
   ) : (
-    <Link to="/advertise" className="flex min-h-24 items-center justify-between rounded-2xl border border-dashed border-border bg-muted/30 px-5 py-4 transition hover:border-primary/50 hover:bg-muted/50">
+    <a href={ADVERTISE_PORTAL_URL} className="flex min-h-24 items-center justify-between rounded-2xl border border-dashed border-border bg-muted/30 px-5 py-4 transition hover:border-primary/50 hover:bg-muted/50">
       <span className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary"><Megaphone className="h-4 w-4" /></span><span><span className="block text-sm font-semibold text-foreground">Advertise here</span><span className="block text-xs text-muted-foreground">Reach students looking for their next home.</span></span></span><ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-    </Link>
+    </a>
   );
 
   return <aside aria-label={`${slot} advertising`} className={`mx-auto max-w-7xl px-5 sm:px-8 ${className}`}>{loaded ? content : <div className="min-h-24 animate-pulse rounded-2xl bg-muted/40" />}</aside>;

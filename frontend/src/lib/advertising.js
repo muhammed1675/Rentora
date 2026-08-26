@@ -1,6 +1,12 @@
 import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 
+// The dedicated advertising portal. Every "Advertise here" CTA on the main
+// rentora.com.ng site must send prospective advertisers here — never to
+// https://www.rentora.com.ng/advertise (a different, non-existent
+// destination on the main domain).
+export const ADVERTISE_PORTAL_URL = 'https://advertise.rentora.com.ng/';
+
 export const AD_SLOT_SPECS = {
   header_billboard: { label: 'Header billboard', width: 970, height: 250 },
   mid_page_content: { label: 'Mid-page content', width: 728, height: 90 },
