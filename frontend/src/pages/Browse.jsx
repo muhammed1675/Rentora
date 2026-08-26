@@ -9,6 +9,7 @@ import { Slider } from '../components/ui/slider';
 import { Card } from '../components/ui/card';
 import { Search, SlidersHorizontal, X, Home, Building, RefreshCw, Heart, Clock, MapPin, GitCompare } from 'lucide-react';
 import { toast } from 'sonner';
+import { AdSlot } from '../components/AdSlot';
 
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
@@ -117,8 +118,9 @@ export function Browse() {
     <div className="container mx-auto py-6" data-testid="browse-page">
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Browse Properties</h1>
-        <p className="text-foreground/60 mt-1">Find verified hostels and apartments near LAUTECH</p>
-      </div>
+  <p className="text-foreground/60 mt-1">Find verified hostels and apartments near LAUTECH</p>
+  </div>
+  <AdSlot slot="in_feed_banner" className="mb-6 px-0 sm:px-0" />
 
       {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">

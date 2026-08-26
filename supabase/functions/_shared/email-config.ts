@@ -71,13 +71,6 @@ export const EMAIL_CATEGORY: Record<string, SenderRole> = {
   property_approved: "noreply",
   account_deleted: "noreply",
 
-  // Advertising review outcomes — same non-financial "noreply" role as
-  // property_approved/property_rejected above. The financial side (payment
-  // received, receipt) is handled separately by the existing rent/token
-  // billing categories; these two are purely the admin review decision.
-  ad_approved: "noreply",
-  ad_rejected: "noreply",
-
   // Viewing notifications — booking, confirmation, reminders. Kept off
   // billing@ even though inspection_booked includes a fee-paid receipt
   // line, because the PRIMARY purpose of these emails is confirming the

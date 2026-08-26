@@ -28,13 +28,11 @@ export function AuthCallback() {
 
         // Only a genuinely brand-new sign-up gets steered to verification —
         // an existing user completing Google sign-in just goes back to
-        // wherever they were headed. On the advertising subdomain that's
-        // the advertiser dashboard; everywhere else it's /browse.
-        // Verification is enforced at the action, not by blocking the site.
-        const isAdvertiseHost = window.location.hostname === 'advertise.rentora.com.ng';
+        // wherever they were headed (or /browse). Verification is enforced
+        // at the action, not by blocking the rest of the site.
         const destination = profile?._isNewUser
           ? '/verify-account'
-          : (storedNext || (isAdvertiseHost ? '/advertise/dashboard' : '/browse'));
+          : (storedNext || '/browse');
         navigate(destination, { replace: true });
       } catch (err) {
         setError(err.message || 'Failed to sign in with Google.');

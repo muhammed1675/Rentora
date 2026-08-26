@@ -528,45 +528,6 @@ function emailPropertyRejected(agentName: string, propertyTitle: string) {
   });
 }
 
-// Advertiser-facing: a paid advert (header billboard / mid-page content /
-// in-feed banner) was reviewed and approved — mirrors emailPropertyApproved
-// above but points at the advertising portal (advertise.rentora.com.ng)
-// rather than the main site's agent dashboard, since that's where
-// advertisers manage their campaigns.
-function emailAdApproved(advertiserName: string, businessName: string, slotLabel: string) {
-  return baseTemplate({
-    eyebrow: "Advert approved",
-    headline: `Your Advert Is <em>Live</em>!`,
-    subhead: `Hi ${advertiserName}, your ${slotLabel} advert has been reviewed and approved. It's now showing to students browsing Rentora.`,
-    rowsHtml: [
-      row("megaphone", "Business", businessName),
-      row("target", "Placement", slotLabel),
-    ].join(""),
-    paragraphs: ["You'll be able to track clicks on this advert any time from your advertiser dashboard."],
-    cta: { buttons: [{ text: "View My Adverts", href: "https://advertise.rentora.com.ng/advertise/dashboard" }] },
-  });
-}
-
-// Advertiser-facing: a paid advert was reviewed and turned down. Kept
-// separate from emailAdApproved so the subject line and tone are clearly
-// different — mirrors emailPropertyRejected's approach for listings.
-function emailAdRejected(advertiserName: string, businessName: string, slotLabel: string) {
-  return baseTemplate({
-    eyebrow: "Advert not approved",
-    headline: "Your Advert Needs Changes",
-    subhead: `Hi ${advertiserName}, your ${slotLabel} advert was reviewed but not approved to go live yet.`,
-    rowsHtml: [
-      row("megaphone", "Business", businessName),
-      row("target", "Placement", slotLabel),
-    ].join(""),
-    paragraphs: [
-      "This usually means a detail needs fixing — the creative image, destination link, or ad copy.",
-      "Contact support@rentora.com.ng if you're not sure what to change, or start a new campaign from your advertiser dashboard.",
-    ],
-    cta: { buttons: [{ text: "Go to Advertiser Dashboard", href: "https://advertise.rentora.com.ng/advertise/dashboard" }] },
-  });
-}
-
 function emailAdminPaymentAlert(d: any) {
   const ok = d.outcome === "success";
   const dup = d.outcome === "duplicate";
@@ -789,14 +750,6 @@ serve(async (req) => {
       case "property_rejected":
         subject = `Update on your listing "${sanitizeForHeader(rawData.property_title)}"`;
         html = emailPropertyRejected(data.agent_name, data.property_title);
-        break;
-      case "ad_approved":
-        subject = `Your advert is now live on Rentora`;
-        html = emailAdApproved(data.advertiser_name, data.business_name, data.slot_label);
-        break;
-      case "ad_rejected":
-        subject = `Update on your Rentora advert`;
-        html = emailAdRejected(data.advertiser_name, data.business_name, data.slot_label);
         break;
       case "agent_invite":
         subject = "You're Invited to Become a Rentora Agent";
