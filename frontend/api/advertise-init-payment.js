@@ -38,6 +38,21 @@ import { korapayFetch } from './_korapay.js';
 import { applyCors } from './_cors.js';
 import { computeAdTotal, billingPeriodLabel } from './_advertising.js';
 
+// Korapay's charge API rejects the customer phone with a 422 when it's sent
+// in the app's internal "+234XXXXXXXXXX" form — it wants a local Nigerian
+// format instead ("0XXXXXXXXXX"). ad.whatsapp_number is always stored as
+// "+234..." (see normalizeWhatsApp in lib/advertising.js), and unlike the
+// shared /api/korapay-init.js flow (where buyer.phone is often blank),
+// this endpoint always has a populated number to send — so it always hit
+// the 422. This only reformats what's sent to Korapay; the stored
+// whatsapp_number is untouched.
+function toKorapayPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('234') && digits.length === 13) return `0${digits.slice(3)}`;
+  if (digits.startsWith('0') && digits.length === 11) return digits;
+  return undefined;
+}
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -142,7 +157,7 @@ export default async function handler(req, res) {
         amount,
         currency: 'NGN',
         redirect_url,
-        customer: { name: ad.full_name || buyer.full_name || 'Advertiser', email: buyer.email, phone: ad.whatsapp_number || buyer.phone || undefined },
+        customer: { name: ad.full_name || buyer.full_name || 'Advertiser', email: buyer.email, phone: toKorapayPhone(ad.whatsapp_number) || toKorapayPhone(buyer.phone) || undefined },
         narration: `Rentora advert — ${ad.slot}`,
       }),
     });
