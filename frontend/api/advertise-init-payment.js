@@ -166,7 +166,11 @@ export default async function handler(req, res) {
       // for a rejection — log the whole thing so it shows up in Vercel's
       // function logs instead of only ever seeing a bare "422" in the browser.
       console.error('[advertise-init-payment] Korapay rejected charge:', result.status, JSON.stringify(result.body));
-      return res.status(result.ok ? 502 : result.status).json({ error: result.body?.message || 'Korapay checkout unavailable' });
+      // TEMP DEBUG: surfacing result.body.data to the client so the failing
+      // field is visible in the Network tab response body. Revert once the
+      // validation_error cause is confirmed — don't ship this to users long-term,
+      // it leaks Korapay's internal error shape.
+      return res.status(result.ok ? 502 : result.status).json({ error: result.body?.message || 'Korapay checkout unavailable', debug_data: result.body?.data });
     }
     return res.status(200).json({
       status: true,
