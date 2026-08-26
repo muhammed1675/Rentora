@@ -22,6 +22,23 @@ export const estimateAdPrice = (slotConfig, durationDays) => {
   return 0;
 };
 
+// Database constraint: ads.billing_period IN ('week', 'month'). This column
+// is NOT NULL, and the very first insert (createPendingAd, below) happens
+// before any server round-trip, so it must be set here too — not just in
+// the later server-side price update. A 14-day campaign is still billed
+// weekly (2x rate), so it's still 'week' — only 30 days is 'month'. Setting
+// this client-side does not weaken payment integrity: the browser-supplied
+// value is unconditionally overwritten by advertisingAPI.initPayment
+// (server-side, from api/advertise-init-payment.js) once checkout starts,
+// using the same mapping. Keep this identical to billingPeriodLabel in
+// api/_advertising.js.
+export const billingPeriodLabel = (durationDays) => {
+  const days = Number(durationDays);
+  if (days === 7 || days === 14) return 'week';
+  if (days === 30) return 'month';
+  return null;
+};
+
 export const normalizeWhatsApp = (value) => {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.startsWith('234')) return `+${digits}`;
@@ -54,10 +71,15 @@ export const advertisingAPI = {
     return { path: data.path, url: urlData.publicUrl };
   },
   createPendingAd: async (payload) => {
-    // Note: no `status`, `payment_status`, or `amount_paid` are set here —
-    // the table defaults ('pending_review' / 'pending' / 0) apply, and the
-    // real price is written server-side in advertisingAPI.initPayment,
-    // never by this browser-side insert.
+    // Note: no `status`, `payment_status`, `price`, or `amount_paid` are
+    // set here — the table defaults apply, and the real price is written
+    // server-side in advertisingAPI.initPayment, never by this browser-side
+    // insert. `billing_period` IS set here (see billingPeriodLabel above)
+    // because the column is NOT NULL and this insert runs before any
+    // server round-trip; it's a descriptive label derived 1:1 from the
+    // duration the advertiser already picked in the form, not a price,
+    // and gets overwritten with the server's own computed value the
+    // moment checkout starts.
     const startsAt = new Date();
     const endsAt = new Date(startsAt.getTime() + Number(payload.durationDays) * 86400000);
     const { data, error } = await supabase.from('ads').insert({
@@ -71,6 +93,7 @@ export const advertisingAPI = {
       image_url: payload.creativeUrl,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
+      billing_period: billingPeriodLabel(payload.durationDays),
     }).select('*').single();
     if (error) throw error;
     return data;
@@ -90,6 +113,18 @@ export const advertisingAPI = {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body?.error || 'Failed to start payment for this advert.');
     return body;
+  },
+  // Admin-only: edit a slot's pricing / concurrency cap. Direct table write —
+  // same pattern already used elsewhere in AdminDashboard for admin-only
+  // config (e.g. agent_invites, student verification) — not an RPC, because
+  // unlike `ads`, ad_slot_config has no public write path for a regular
+  // user to abuse. `updates` must only contain keys already present on the
+  // row returned by getSlotConfig, so this never assumes a column name
+  // that isn't confirmed to exist.
+  updateSlotConfig: async (slot, updates) => {
+    const { data, error } = await supabase.from('ad_slot_config').update(updates).eq('slot', slot).select('*').single();
+    if (error) throw error;
+    return data;
   },
   incrementClick: async (id) => { await supabase.rpc('increment_ad_click', { p_ad_id: id }); },
   getPublicAd: async (id) => {

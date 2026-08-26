@@ -97,7 +97,10 @@ export function Home() {
     <div data-testid="home-page">
       <AppBanner />
 
-      <AdSlot slot="header_billboard" className="mb-8" />
+      {/* Ad: header billboard */}
+      <div className="pt-6">
+        <AdSlot slot="header_billboard" />
+      </div>
 
       {/* Hero */}
       <section data-no-motion className="mx-auto max-w-7xl px-5 pb-16 pt-8 sm:px-8 md:pb-24 md:pt-12">
@@ -168,7 +171,8 @@ export function Home() {
         </div>
       </section>
 
-      <AdSlot slot="mid_page_content" className="mb-12" />
+      {/* Ad: in-feed banner */}
+      <AdSlot slot="in_feed_banner" className="mb-16 md:mb-24" />
 
       {/* Testimonials & Social Proof */}
       <section className="bg-muted/30 py-20 md:py-28">
@@ -219,7 +223,10 @@ export function Home() {
         </div>
       </section>
 
-      <AdSlot slot="in_feed_banner" className="mb-12" />
+      {/* Ad: mid-page content */}
+      <div className="bg-white pt-16 md:pt-20">
+        <AdSlot slot="mid_page_content" />
+      </div>
 
       {/* How it works */}
       <section className="bg-white py-20 md:py-28">

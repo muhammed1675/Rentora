@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { sendBroadcast, sendBroadcastEmail } from '../lib/notifications';
+import { advertisingAPI, AD_SLOT_SPECS } from '../lib/advertising';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -102,6 +103,14 @@ export function AdminDashboard() {
   const [ads, setAds] = useState([]);
   const [loadingAds, setLoadingAds] = useState(false);
   const [adActionBusyId, setAdActionBusyId] = useState(null);
+  // Slot pricing / concurrency cap — admin-editable. Values are whatever
+  // ad_slot_config actually returns; we never assume a column exists
+  // beyond what getSlotConfig gives us (see updateSlotConfig in
+  // lib/advertising.js).
+  const [slotConfigs, setSlotConfigs] = useState([]);
+  const [loadingSlotConfig, setLoadingSlotConfig] = useState(false);
+  const [slotDrafts, setSlotDrafts] = useState({}); // { [slot]: { ...editable fields as strings } }
+  const [savingSlot, setSavingSlot] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -180,9 +189,69 @@ export function AdminDashboard() {
     }
   };
 
+  const fetchSlotConfig = async () => {
+    setLoadingSlotConfig(true);
+    try {
+      const rows = await advertisingAPI.getSlotConfig();
+      setSlotConfigs(rows);
+      // ad_slot_config genuinely has both weekly_price/monthly_price AND
+      // price_per_week/price_per_month as separate columns — not two names
+      // for the same one. Prefer weekly_price/monthly_price for display
+      // (matches estimateAdPrice / computeAdTotal's precedence), but saving
+      // writes to BOTH pairs so neither one goes stale for any other code
+      // path that might read the other pair.
+      const drafts = {};
+      rows.forEach((row) => {
+        drafts[row.slot] = {
+          max_concurrent_ads: row.max_concurrent_ads ?? '',
+          weekly: row.weekly_price ?? row.price_per_week ?? '',
+          monthly: row.monthly_price ?? row.price_per_month ?? '',
+        };
+      });
+      setSlotDrafts(drafts);
+    } catch (e) {
+      console.error('Failed to load slot config:', e);
+      toast.error('Failed to load ad slot config');
+    } finally {
+      setLoadingSlotConfig(false);
+    }
+  };
+
   useEffect(() => {
-    if (isAdmin && activeTab === 'advertising') fetchAds();
+    if (isAdmin && activeTab === 'advertising') { fetchAds(); fetchSlotConfig(); }
   }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSlotDraftChange = (slot, field, value) => {
+    setSlotDrafts((prev) => ({ ...prev, [slot]: { ...prev[slot], [field]: value } }));
+  };
+
+  const handleSaveSlotConfig = async (slot) => {
+    const draft = slotDrafts[slot];
+    if (!draft) return;
+    const maxConcurrent = Number(draft.max_concurrent_ads);
+    const weekly = Number(draft.weekly);
+    const monthly = Number(draft.monthly);
+    if (!Number.isFinite(maxConcurrent) || maxConcurrent < 0) { toast.error('Max concurrent ads must be a valid number'); return; }
+    if (!Number.isFinite(weekly) || weekly < 0) { toast.error('Weekly price must be a valid number'); return; }
+    if (!Number.isFinite(monthly) || monthly < 0) { toast.error('Monthly price must be a valid number'); return; }
+    setSavingSlot(slot);
+    try {
+      const updated = await advertisingAPI.updateSlotConfig(slot, {
+        max_concurrent_ads: maxConcurrent,
+        weekly_price: weekly,
+        price_per_week: weekly,
+        monthly_price: monthly,
+        price_per_month: monthly,
+      });
+      setSlotConfigs((prev) => prev.map((row) => (row.slot === slot ? updated : row)));
+      toast.success('Slot pricing updated');
+    } catch (e) {
+      console.error('Failed to update slot config:', e);
+      toast.error(e.message || 'Failed to update slot pricing');
+    } finally {
+      setSavingSlot(null);
+    }
+  };
 
   // approve_ad / reject_ad are SECURITY DEFINER functions that re-check the
   // caller is an admin from their own row in `users` — see the advertising
@@ -2178,6 +2247,62 @@ export function AdminDashboard() {
               </Card>
             </div>
           )}
+
+          {/* Slot Config — pricing & concurrency cap per ad placement */}
+          <div className="mt-8">
+            <h3 className="font-semibold mb-3">Slot Config</h3>
+            {loadingSlotConfig ? (
+              <Card className="p-8 text-center border-border/60"><RefreshCw className="w-5 h-5 mx-auto animate-spin text-foreground/30" /></Card>
+            ) : slotConfigs.length === 0 ? (
+              <Card className="p-6 text-center border-border/60">
+                <p className="text-sm text-foreground/55">No ad slots configured yet.</p>
+              </Card>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-3">
+                {slotConfigs.map((row) => {
+                  const draft = slotDrafts[row.slot] || {};
+                  const label = AD_SLOT_SPECS[row.slot]?.label || row.slot;
+                  return (
+                    <Card key={row.slot} className="p-4">
+                      <p className="font-semibold text-sm mb-3">{label}</p>
+                      <label className="block text-xs text-foreground/55 mb-1">Max concurrent ads</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={draft.max_concurrent_ads}
+                        onChange={(e) => handleSlotDraftChange(row.slot, 'max_concurrent_ads', e.target.value)}
+                        className="mb-3"
+                      />
+                      <label className="block text-xs text-foreground/55 mb-1">Price / week (₦)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={draft.weekly}
+                        onChange={(e) => handleSlotDraftChange(row.slot, 'weekly', e.target.value)}
+                        className="mb-3"
+                      />
+                      <label className="block text-xs text-foreground/55 mb-1">Price / month (₦)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={draft.monthly}
+                        onChange={(e) => handleSlotDraftChange(row.slot, 'monthly', e.target.value)}
+                        className="mb-3"
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={savingSlot === row.slot}
+                        onClick={() => handleSaveSlotConfig(row.slot)}
+                      >
+                        {savingSlot === row.slot ? 'Saving…' : 'Save'}
+                      </Button>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* ── Broadcasts Tab ── */}

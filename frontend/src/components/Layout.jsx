@@ -18,11 +18,22 @@ const publicNav = [
   { label: 'Contact', to: '/contact' },
 ];
 
+// advertise.rentora.com.ng gets its own, ad-only nav — see App.js's
+// hostname-based routing for how this host resolves to the same app.
+const advertiseNav = [
+  { label: 'Home', to: '/' },
+  { label: 'Placements & pricing', to: '/advertise' },
+  { label: 'My campaigns', to: '/advertise/dashboard' },
+  { label: 'Contact', to: '/contact' },
+];
+
 export function Layout({ children }) {
   const { user, logout, isAuthenticated, isAdmin, isAgent } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const isAdvertiseHost = typeof window !== 'undefined' && window.location.hostname === 'advertise.rentora.com.ng';
+  const navItems = isAdvertiseHost ? advertiseNav : publicNav;
 
   const handleLogout = () => { logout(); navigate('/'); };
   const initials = (user?.full_name || user?.email || 'U')
@@ -42,7 +53,7 @@ export function Layout({ children }) {
           </Link>
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
-            {publicNav.map(item => {
+            {navItems.map(item => {
               const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
               return (
                 <Link key={item.to} to={item.to}
@@ -57,7 +68,11 @@ export function Layout({ children }) {
             {!isAuthenticated ? (
               <>
                 <Link to="/login" className="rounded-full px-4 py-2 text-sm font-medium text-primary hover:bg-white">Log in</Link>
-                <Link to="/register" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90">Create account</Link>
+                {isAdvertiseHost ? (
+                  <Link to="/advertise/create" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90">Advertise now</Link>
+                ) : (
+                  <Link to="/register" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90">Create account</Link>
+                )}
               </>
             ) : (
               <>
@@ -71,8 +86,14 @@ export function Layout({ children }) {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/profile')}><UserIcon className="mr-2 h-4 w-4" />Profile</DropdownMenuItem>
-                  {isAgent && <DropdownMenuItem onClick={() => navigate('/agent')}><LayoutDashboard className="mr-2 h-4 w-4" />Agent dashboard</DropdownMenuItem>}
+                  {isAdvertiseHost ? (
+                    <DropdownMenuItem onClick={() => navigate('/advertise/dashboard')}><LayoutDashboard className="mr-2 h-4 w-4" />My campaigns</DropdownMenuItem>
+                  ) : (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/profile')}><UserIcon className="mr-2 h-4 w-4" />Profile</DropdownMenuItem>
+                      {isAgent && <DropdownMenuItem onClick={() => navigate('/agent')}><LayoutDashboard className="mr-2 h-4 w-4" />Agent dashboard</DropdownMenuItem>}
+                    </>
+                  )}
                   {isAdmin && <DropdownMenuItem onClick={() => navigate('/admin')}><Shield className="mr-2 h-4 w-4" />Admin</DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Log out</DropdownMenuItem>
@@ -96,15 +117,21 @@ export function Layout({ children }) {
         {open && (
           <nav className="border-t border-black/5 bg-background px-5 py-5 md:hidden">
             <div className="flex flex-col gap-1">
-              {publicNav.map(item => (
+              {navItems.map(item => (
                 <Link key={item.to} to={item.to} onClick={() => setOpen(false)}
                   className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">{item.label}</Link>
               ))}
               {isAuthenticated && (
                 <>
-                  <Link to="/notifications" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Notifications</Link>
-                  <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
-                  {isAgent && <Link to="/agent" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
+                  {isAdvertiseHost ? (
+                    <Link to="/advertise/dashboard" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">My campaigns</Link>
+                  ) : (
+                    <>
+                      <Link to="/notifications" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Notifications</Link>
+                      <Link to="/profile" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Profile</Link>
+                      {isAgent && <Link to="/agent" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Agent dashboard</Link>}
+                    </>
+                  )}
                   {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="rounded-xl px-3 py-3 text-sm font-medium hover:bg-white">Admin</Link>}
                 </>
               )}
@@ -112,7 +139,11 @@ export function Layout({ children }) {
                 {!isAuthenticated ? (
                   <>
                     <Link to="/login" onClick={() => setOpen(false)} className="rounded-full border border-primary/20 px-4 py-2.5 text-center text-sm font-medium">Log in</Link>
-                    <Link to="/register" onClick={() => setOpen(false)} className="rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Join Rentora</Link>
+                    {isAdvertiseHost ? (
+                      <Link to="/advertise/create" onClick={() => setOpen(false)} className="rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Advertise now</Link>
+                    ) : (
+                      <Link to="/register" onClick={() => setOpen(false)} className="rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Join Rentora</Link>
+                    )}
                   </>
                 ) : (
                   <button onClick={() => { setOpen(false); handleLogout(); }} className="col-span-2 rounded-full bg-primary px-4 py-2.5 text-center text-sm font-medium text-primary-foreground">Log out</button>
@@ -123,12 +154,12 @@ export function Layout({ children }) {
         )}
       </header>
 
-      <VerificationBanner />
+      {!isAdvertiseHost && <VerificationBanner />}
 
       <main className="flex-1 pb-24 md:pb-0">
         <PageMotion>{children}</PageMotion>
       </main>
-      <MobileBottomNav />
+      {!isAdvertiseHost && <MobileBottomNav />}
 
 <footer className="w-full border-t border-slate-200 bg-white py-20 md:py-28 text-slate-900">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
@@ -148,8 +179,18 @@ export function Layout({ children }) {
           <div>
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Explore</p>
             <div className="flex flex-col gap-3 text-sm text-slate-700">
-              <Link to="/browse" className="transition-colors hover:text-primary">Browse homes</Link>
-              <Link to="/compare" className="transition-colors hover:text-primary">Compare</Link>
+              {isAdvertiseHost ? (
+                <>
+                  <Link to="/advertise" className="transition-colors hover:text-primary">Placements &amp; pricing</Link>
+                  <Link to="/advertise/create" className="transition-colors hover:text-primary">Advertise now</Link>
+                  <Link to="/advertise/dashboard" className="transition-colors hover:text-primary">My campaigns</Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/browse" className="transition-colors hover:text-primary">Browse homes</Link>
+                  <Link to="/compare" className="transition-colors hover:text-primary">Compare</Link>
+                </>
+              )}
             </div>
           </div>
           <div>

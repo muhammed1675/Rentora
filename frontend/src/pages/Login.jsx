@@ -16,7 +16,10 @@ export function Login() {
   const location = useLocation();
   const { requestOtpCode, verifyOtpCode, loginWithGoogle } = useAuth();
 
-  const nextPath = new URLSearchParams(location.search).get('next') || '/browse';
+  // On the advertising subdomain, a bare /login (no explicit ?next=) should
+  // return the user to their advertiser dashboard, not the normal browse page.
+  const isAdvertiseHost = window.location.hostname === 'advertise.rentora.com.ng';
+  const nextPath = new URLSearchParams(location.search).get('next') || (isAdvertiseHost ? '/advertise/dashboard' : '/browse');
 
   // step: 'email' → enter address, 'code' → enter the 6-digit code
   const [step, setStep] = useState('email');
@@ -43,7 +46,8 @@ export function Login() {
     try {
       // Google's redirect loses our query string, so stash where to
       // return to and let AuthCallback.jsx pick it back up.
-      if (nextPath && nextPath !== '/browse') {
+      const defaultNext = isAdvertiseHost ? '/advertise/dashboard' : '/browse';
+      if (nextPath && nextPath !== defaultNext) {
         sessionStorage.setItem('rentora_post_login_next', nextPath);
       }
       await loginWithGoogle();

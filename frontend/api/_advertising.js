@@ -30,12 +30,9 @@ export function computeAdTotal(slotConfig, durationDays) {
   return Math.round(total);
 }
 
-// Value written to ads.billing_period alongside the price. The column has a
-// CHECK constraint allowing only 'week' or 'month' — NOT 'weekly' /
-// 'biweekly' / 'monthly', which previously violated that constraint and
-// caused the insert/update to be rejected by Postgres. A 14-day campaign is
-// still priced as 2x the weekly rate (see computeAdTotal) but is billed as
-// 'week' since that's the closest allowed value.
+// Database constraint: ads.billing_period IN ('week', 'month') — a 14-day
+// campaign is still billed weekly (2x), so it's still 'week'. Only a
+// 30-day campaign is 'month'. Any other label here fails the insert.
 export function billingPeriodLabel(durationDays) {
   const days = Number(durationDays);
   if (days === 7 || days === 14) return 'week';
