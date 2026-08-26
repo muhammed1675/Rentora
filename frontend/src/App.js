@@ -32,6 +32,7 @@ import Advertise from './pages/Advertise';
 import AdvertiseHome from './pages/AdvertiseHome';
 import AdvertisePricing from './pages/AdvertisePricing';
 import AdvertiserDashboard from './pages/AdvertiserDashboard';
+import AdDetails from './pages/AdDetails';
 
 // advertise.rentora.com.ng resolves to this same deployment (see Vercel
 // config) — this just tells the router which "site" it's rendering.
@@ -159,6 +160,7 @@ function AppRoutes() {
       />
       <Route path="/browse" element={<Layout><Browse /></Layout>} />
       <Route path="/property/:id" element={<Layout><PropertyDetails /></Layout>} />
+      <Route path="/ads/:id" element={<Layout><AdDetails /></Layout>} />
       <Route path="/login" element={<Layout><Login /></Layout>} />
       <Route path="/register" element={<Layout><Register /></Layout>} />
       <Route path="/payment/callback" element={<Layout><PaymentCallback /></Layout>} />
