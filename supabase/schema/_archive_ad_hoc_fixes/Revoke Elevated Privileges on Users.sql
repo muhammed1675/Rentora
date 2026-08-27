@@ -1,0 +1,3 @@
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES
+ON public.users
+FROM authenticated;

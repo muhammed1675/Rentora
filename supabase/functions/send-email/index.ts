@@ -213,6 +213,10 @@ function baseTemplate(opts: {
     .subfooter { text-align:center; padding:18px 32px 26px; background:#f7f9fb; }
     .subfooter p { color:#9aa7b5; font-size:11px; margin:0 0 6px; line-height:1.6; }
     .subfooter a { color:#7c8ba0; text-decoration:underline; }
+
+    /* ── Social row ──────────────────────────────────── */
+    .social-row { text-align:center; padding:0 32px 18px; background:#f7f9fb; }
+    .social-row a { color:#8a97a6; font-size:12px; font-weight:600; text-decoration:none; margin:0 8px; }
   </style>
 </head>
 <body>
@@ -248,6 +252,7 @@ function baseTemplate(opts: {
             <h3>Need Help?</h3>
             <p>Our support team is ready to help.</p>
             <a href="mailto:support@rentora.com.ng">Contact Support →</a>
+            <p style="margin-top:10px">+234 913 113 3832 (WhatsApp)<br />+234 908 561 8894</p>
           </td>
           <td class="footer-col" style="width:31%">
             <h3>Get the Rentora App</h3>
@@ -256,6 +261,11 @@ function baseTemplate(opts: {
           </td>
         </tr>
       </table>
+    </div>
+    <div class="social-row">
+      <a href="https://wa.me/2349131133832">WhatsApp</a>&bull;
+      <a href="https://www.instagram.com/rentora.com.ng">Instagram</a>&bull;
+      <a href="https://www.tiktok.com/@rentora.com.ng">TikTok</a>
     </div>
     <div class="subfooter">
       <p>This is an automated email. Please do not reply to this message.</p>
