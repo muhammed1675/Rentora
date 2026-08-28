@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { UserNamePopover } from '../components/UserReportPanel';
 import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
@@ -1329,7 +1330,7 @@ export function AdminDashboard() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate">{u.full_name}</p>
+                    <p className="font-semibold text-sm truncate"><UserNamePopover user={u}>{u.full_name}</UserNamePopover></p>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                       <Badge variant={u.suspended ? 'destructive' : 'outline'} className="text-xs">{u.suspended ? 'Suspended' : 'Active'}</Badge>
@@ -1368,7 +1369,7 @@ export function AdminDashboard() {
                             <User className="w-4 h-4 text-primary" />
                           )}
                         </div>
-                        {u.full_name}
+                        <UserNamePopover user={u}>{u.full_name}</UserNamePopover>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{u.email}</TableCell>
