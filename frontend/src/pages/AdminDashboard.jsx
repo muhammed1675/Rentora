@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { AccountActivityStatement } from '../components/AccountActivityStatement';
 import {
   LayoutDashboard, Users, Shield, Building2, Calendar, Receipt,
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
@@ -47,8 +48,9 @@ export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [selectedVerification, setSelectedVerification] = useState(null);
-  const [selectedAgent, setSelectedAgent] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+const [selectedAgent, setSelectedAgent] = useState(null);
+const [activityAccount, setActivityAccount] = useState(null);
+const [searchTerm, setSearchTerm] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
   const [navSearch, setNavSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, property: null, deleting: false });
@@ -1337,17 +1339,17 @@ export function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
-                      <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
-                    </Select>
-                    {u.id === user.id ? (
-                      <span className="text-xs text-muted-foreground italic px-1">You</span>
-                    ) : (
-                      <Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" className="h-8 text-xs gap-1" onClick={() => handleSuspendUser(u.id, !u.suspended)}>
-                        <Ban className="w-3 h-3" /> {u.suspended ? 'Unsuspend' : 'Suspend'}
-                      </Button>
-                    )}
+<Badge variant="outline" className="h-8 px-3 text-xs capitalize" title="Role is managed directly in Supabase">{u.role || 'user'}</Badge>
+<Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => setActivityAccount(u)}>
+<FileText className="w-3 h-3" /> Activity statement
+</Button>
+{u.id === user.id ? (
+<span className="text-xs text-muted-foreground italic px-1">You</span>
+) : (
+<Button variant={u.suspended ? 'outline' : 'destructive'} size="sm" className="h-8 text-xs gap-1" onClick={() => handleSuspendUser(u.id, !u.suspended)}>
+<Ban className="w-3 h-3" /> {u.suspended ? 'Unsuspend' : 'Suspend'}
+</Button>
+)}
                   </div>
                 </div>
               </Card>
@@ -3532,6 +3534,13 @@ export function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AccountActivityStatement
+        account={activityAccount}
+        open={!!activityAccount}
+        onOpenChange={(open) => { if (!open) setActivityAccount(null); }}
+        adminId={user?.id}
+      />
 
       {/* ── Student verification reject reason ── */}
       <Dialog open={!!studentRejectTarget} onOpenChange={(open) => { if (!open) { setStudentRejectTarget(null); setStudentRejectReason(''); } }}>
