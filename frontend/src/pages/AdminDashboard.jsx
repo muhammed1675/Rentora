@@ -1054,6 +1054,10 @@ export function AdminDashboard() {
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
               )}
             </button>
+            <Button onClick={() => navigate('/')} variant="outline" size="sm" className="gap-2 shrink-0 rounded-full border-slate-200 bg-white hover:bg-slate-50 h-9 px-3.5">
+              <Home className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-xs font-semibold">Return to home</span>
+            </Button>
             <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shrink-0 rounded-full border-slate-200 bg-white hover:bg-slate-50 h-9 px-3.5">
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline text-xs font-semibold">Refresh</span>
