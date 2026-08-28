@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapPin, Navigation, ExternalLink, Loader2 } from 'lucide-react';
 import { Card } from './ui/card';
 
@@ -73,7 +73,7 @@ export function buildMapEmbed({ link, address, location, title, coords: given })
 
 export default function PropertyLocationCard({ property }) {
   const link = property?.google_maps_link || null;
-  const linkCoords = parseLatLng(link);
+  const linkCoords = useMemo(() => parseLatLng(link), [link]);
   const [resolved, setResolved] = useState(null);
   const [resolving, setResolving] = useState(false);
 
@@ -89,7 +89,7 @@ export default function PropertyLocationCard({ property }) {
     return () => {
       active = false;
     };
-  }, [link, linkCoords?.lat, linkCoords?.lng]);
+  }, [link, linkCoords]);
 
   const coords = linkCoords || resolved;
   const embedUrl = buildMapEmbed({
