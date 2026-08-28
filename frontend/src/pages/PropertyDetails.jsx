@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import PropertyLocationCard from '../components/PropertyLocationCard';
 import { ImageWatermark } from '../components/ImageWatermark';
+import { AdSlot } from '../components/AdSlot';
 import { downloadWatermarkedImage } from '../lib/watermarkDownload';
 
 function getFavourites() {
@@ -463,6 +464,8 @@ export function PropertyDetails() {
             <h2 className="text-xl font-semibold mb-4">Description</h2>
             <p className="whitespace-pre-wrap break-words text-muted-foreground">{property.description}</p>
           </Card>
+
+          <AdSlot slot="mid_page_content" contained />
 
           <PropertyLocationCard property={property} />
 

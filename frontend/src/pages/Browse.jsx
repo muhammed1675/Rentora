@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { propertyAPI, locationAPI } from '../lib/api';
 import { PropertyCard, PropertyCardSkeleton } from '../components/PropertyCard';
+import { AdSlot } from '../components/AdSlot';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -242,7 +243,16 @@ export function Browse() {
         </div>
       ) : filteredProperties.length > 0 ? (
         <div className="results-fade-in grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProperties.map((property) => <PropertyCard key={property.id} property={property} />)}
+          {filteredProperties.map((property, i) => (
+            <Fragment key={property.id}>
+              <PropertyCard property={property} />
+              {(i + 1) % 8 === 0 && i + 1 !== filteredProperties.length && (
+                <div className="col-span-full">
+                  <AdSlot slot="in_feed_banner" contained />
+                </div>
+              )}
+            </Fragment>
+          ))}
         </div>
       ) : (
         <Card className="p-12 text-center border-border/60">
