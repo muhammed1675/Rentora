@@ -10,6 +10,13 @@ import {
 
 const money = (value) => `₦${Number(value || 0).toLocaleString('en-NG')}`;
 
+// Static preview creatives shown on the pricing page (files live in /public).
+const SLOT_PREVIEW_IMAGES = {
+  header_billboard: '/Header_billboard.png',
+  mid_page_content: '/Mid_page_content.png',
+  in_feed_banner: '/In_feed_banner.png',
+};
+
 const howItWorks = [
   { step: '01', title: 'Choose a placement', copy: 'Pick from three ad slots across the Rentora site, each with transparent weekly and monthly pricing.' },
   { step: '02', title: 'Submit your campaign', copy: 'Upload your creative, set a headline and destination link, and pick a duration.' },
@@ -32,10 +39,19 @@ function SlotPreview({ slotKey, price }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-5">
       <div
-        className="mx-auto flex w-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 text-muted-foreground"
+        className="mx-auto flex w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40 text-muted-foreground"
         style={{ aspectRatio: ratio, maxHeight: 180 }}
       >
-        <ImageIcon className="h-6 w-6" />
+        {SLOT_PREVIEW_IMAGES[slotKey] ? (
+          <img
+            src={SLOT_PREVIEW_IMAGES[slotKey]}
+            alt={`${spec.label} ad preview`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <ImageIcon className="h-6 w-6" />
+        )}
       </div>
       <p className="mt-4 font-semibold text-foreground">{spec.label}</p>
       <p className="text-xs text-muted-foreground">{spec.width}×{spec.height}px</p>
