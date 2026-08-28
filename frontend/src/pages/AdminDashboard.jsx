@@ -206,6 +206,7 @@ export function AdminDashboard() {
         drafts[row.slot] = {
           max_concurrent_ads: row.max_concurrent_ads ?? '',
           weekly: row.weekly_price ?? row.price_per_week ?? '',
+          biweekly: row.biweekly_price ?? '',
           monthly: row.monthly_price ?? row.price_per_month ?? '',
         };
       });
@@ -231,9 +232,11 @@ export function AdminDashboard() {
     if (!draft) return;
     const maxConcurrent = Number(draft.max_concurrent_ads);
     const weekly = Number(draft.weekly);
+    const biweekly = Number(draft.biweekly);
     const monthly = Number(draft.monthly);
     if (!Number.isFinite(maxConcurrent) || maxConcurrent < 0) { toast.error('Max concurrent ads must be a valid number'); return; }
     if (!Number.isFinite(weekly) || weekly < 0) { toast.error('Weekly price must be a valid number'); return; }
+    if (!Number.isFinite(biweekly) || biweekly < 0) { toast.error('14-day price must be a valid number'); return; }
     if (!Number.isFinite(monthly) || monthly < 0) { toast.error('Monthly price must be a valid number'); return; }
     setSavingSlot(slot);
     try {
@@ -241,6 +244,7 @@ export function AdminDashboard() {
         max_concurrent_ads: maxConcurrent,
         weekly_price: weekly,
         price_per_week: weekly,
+        biweekly_price: biweekly,
         monthly_price: monthly,
         price_per_month: monthly,
       });
@@ -1247,9 +1251,6 @@ export function AdminDashboard() {
                       { id: 'properties', label: 'Property approvals', count: stats?.pending_properties || 0, icon: Building2, color: 'blue' },
                       { id: 'payouts', label: 'Agent payout requests', count: withdrawalRequests.filter(r => r.status === 'pending').length, icon: ArrowDownCircle, color: 'emerald' },
                       { id: 'messages', label: 'Unread messages', count: messages.filter(m => m.status === 'unread').length, icon: MessageSquare, color: 'rose' },
-                      { id: 'student-verification', label: 'Student ID verifications', count: studentVerifications.filter(v => v.status === 'pending').length, icon: GraduationCap, color: 'indigo' },
-                      { id: 'reports', label: 'Property reports', count: reports.filter(r => r.status === 'pending').length, icon: Flag, color: 'red' },
-                      { id: 'advertising', label: 'Adverts awaiting approval', count: ads.filter(a => (a.payment_status === 'paid' || a.payment_status === 'completed') && a.status !== 'approved' && a.status !== 'active' && a.status !== 'rejected').length, icon: Megaphone, color: 'purple' },
                     ].map(row => {
                       const Icon = row.icon;
                       const active = row.count > 0;
@@ -2291,6 +2292,14 @@ export function AdminDashboard() {
                         min="0"
                         value={draft.weekly}
                         onChange={(e) => handleSlotDraftChange(row.slot, 'weekly', e.target.value)}
+                        className="mb-3"
+                      />
+                      <label className="block text-xs text-foreground/55 mb-1">Price / 14 days (₦)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={draft.biweekly}
+                        onChange={(e) => handleSlotDraftChange(row.slot, 'biweekly', e.target.value)}
                         className="mb-3"
                       />
                       <label className="block text-xs text-foreground/55 mb-1">Price / month (₦)</label>

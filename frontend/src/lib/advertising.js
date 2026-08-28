@@ -15,9 +15,10 @@ export const AD_SLOT_SPECS = {
 export const estimateAdPrice = (slotConfig, durationDays) => {
   const days = Number(durationDays);
   const weekly = Number(slotConfig?.weekly_price ?? slotConfig?.price_per_week);
+  const biweekly = Number(slotConfig?.biweekly_price);
   const monthly = Number(slotConfig?.monthly_price ?? slotConfig?.price_per_month);
   if (days === 7) return Number.isFinite(weekly) ? weekly : 0;
-  if (days === 14) return Number.isFinite(weekly) ? weekly * 2 : 0;
+  if (days === 14) return Number.isFinite(biweekly) ? biweekly : 0;
   if (days === 30) return Number.isFinite(monthly) ? monthly : 0;
   return 0;
 };

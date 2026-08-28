@@ -25,17 +25,18 @@ const howItWorks = [
 ];
 
 const faqs = [
-  { q: 'How is pricing calculated?', a: 'Each slot has its own weekly and monthly rate, shown live on this page. A 14-day campaign is billed at twice the weekly rate; a 30-day campaign uses the monthly rate.' },
+  { q: 'How is pricing calculated?', a: 'Each slot has its own weekly, 14-day, and monthly rate, shown live on this page — set directly by our team, not calculated from another price.' },
   { q: 'Do I need a separate account to advertise?', a: 'No — sign in with your existing Rentora account (the same one used for browsing or renting) to create and manage campaigns.' },
   { q: 'How long does review take?', a: 'Submitted campaigns are checked shortly after payment is confirmed. Once approved, your ad starts rotating immediately in its slot.' },
   { q: 'Can I change my creative after submitting?', a: 'Reach out via Contact and our team can help swap your creative or destination link before or during a campaign.' },
 ];
 
-function SlotPreview({ slotKey, price }) {
+function SlotPreview({ slotKey, slotRow }) {
   const spec = AD_SLOT_SPECS[slotKey];
   const ratio = spec.width / spec.height;
-  const weekly = price;
-  const monthly = price ? Math.round(price * 3.5) : null; // matches a ~30-day rate if no explicit monthly rate is returned
+  const weekly = slotRow?.weekly_price ?? slotRow?.price_per_week ?? null;
+  const biweekly = slotRow?.biweekly_price ?? null;
+  const monthly = slotRow?.monthly_price ?? slotRow?.price_per_month ?? null;
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-5">
       <div
@@ -62,7 +63,7 @@ function SlotPreview({ slotKey, price }) {
         </div>
         <div className="flex items-baseline justify-between">
           <span className="text-xs text-muted-foreground">14 days</span>
-          <span className="text-sm font-semibold text-foreground">{weekly ? money(weekly * 2) : '—'}</span>
+          <span className="text-sm font-semibold text-foreground">{biweekly ? money(biweekly) : '—'}</span>
         </div>
         <div className="flex items-baseline justify-between">
           <span className="text-xs text-muted-foreground">30 days</span>
@@ -80,10 +81,7 @@ export function AdvertisePricing() {
     advertisingAPI.getSlotConfig().then(setSlots).catch(() => {});
   }, []);
 
-  const priceFor = (slotKey) => {
-    const row = slots.find((s) => s.slot === slotKey);
-    return row?.weekly_price ?? row?.price_per_week ?? null;
-  };
+  const rowFor = (slotKey) => slots.find((s) => s.slot === slotKey) || null;
 
   return (
     <main className="min-h-screen bg-background">
@@ -107,7 +105,7 @@ export function AdvertisePricing() {
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div className="grid gap-5 sm:grid-cols-3">
             {Object.keys(AD_SLOT_SPECS).map((slotKey) => (
-              <SlotPreview key={slotKey} slotKey={slotKey} price={priceFor(slotKey)} />
+              <SlotPreview key={slotKey} slotKey={slotKey} slotRow={rowFor(slotKey)} />
             ))}
           </div>
           <div className="mt-10 flex justify-center">
