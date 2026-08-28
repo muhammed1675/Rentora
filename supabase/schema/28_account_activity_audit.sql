@@ -72,7 +72,7 @@ create or replace function public.log_account_activity(
   event_currency text default 'NGN', event_reference_id text default null,
   event_metadata jsonb default '{}'::jsonb, event_actor_id uuid default null
 ) returns uuid
-language plpgsql security invoker set search_path = public
+language plpgsql security definer set search_path = public
 as $$
 declare new_id uuid;
 begin
@@ -86,11 +86,68 @@ begin
 end;
 $$;
 
-grant execute on function public.log_account_activity(uuid,text,text,text,numeric,text,text,jsonb,uuid) to authenticated;
+revoke execute on function public.log_account_activity(uuid,text,text,text,numeric,text,text,jsonb,uuid) from public, anon, authenticated;
 
--- Backfill payment-like rows after confirming your exact table/column names.
--- Use the introspection query supplied in chat before adding those inserts.
+-- Recoverable business history from the confirmed Rentora schema.
+insert into public.account_activity_log (user_id, action, category, description, amount, currency, reference_id, created_at, metadata)
+select p.user_id, 'rent_payment', 'payment', 'Rent payment ' || coalesce(p.status, 'recorded'), p.total_amount, 'NGN', p.reference, p.created_at,
+       jsonb_build_object('source', 'property_rent_payments', 'status', p.status, 'recovered', true)
+from public.property_rent_payments p
+where p.user_id is not null
+  and not exists (select 1 from public.account_activity_log a where a.user_id = p.user_id and a.reference_id = p.reference and a.action = 'rent_payment');
+
+insert into public.account_activity_log (user_id, action, category, description, amount, currency, reference_id, created_at, metadata)
+select t.user_id, 'token_transaction', 'payment', 'Token transaction ' || coalesce(t.status, 'recorded'), t.amount, 'NGN', t.reference, t.created_at,
+       jsonb_build_object('source', 'transactions', 'status', t.status, 'recovered', true)
+from public.transactions t
+where t.user_id is not null
+  and not exists (select 1 from public.account_activity_log a where a.user_id = t.user_id and a.reference_id = t.reference and a.action = 'token_transaction');
+
+insert into public.account_activity_log (user_id, action, category, description, reference_id, created_at, metadata)
+select u.user_id, 'property_unlock', 'listing', 'Property details unlocked', u.property_id::text, u.unlocked_at,
+       jsonb_build_object('source', 'unlocks', 'recovered', true)
+from public.unlocks u
+where u.user_id is not null
+  and not exists (select 1 from public.account_activity_log a where a.user_id = u.user_id and a.reference_id = u.property_id::text and a.action = 'property_unlock');
+
 -- Never log passwords, auth tokens, identity document URLs, or full bank details.
+
+-- Forward-looking capture for core user-owned records. Details are intentionally
+-- summarized so the statement contains activity without sensitive payloads.
+create or replace function public.capture_user_activity()
+returns trigger
+language plpgsql security invoker set search_path = public
+as $$
+declare target uuid; event_category text; event_action text; event_description text;
+begin
+  target := nullif(to_jsonb(new)->>'user_id', '')::uuid;
+  if target is null then return new; end if;
+  event_category := case when tg_table_name in ('transactions','property_rent_payments') then 'payment'
+                         when tg_table_name in ('properties','unlocks','property_reviews','reviews') then 'listing'
+                         when tg_table_name in ('inspections','inspection_transactions') then 'booking'
+                         when tg_table_name like '%verification%' then 'verification' else 'account' end;
+  event_action := tg_table_name || '_' || lower(tg_op);
+  event_description := initcap(replace(tg_table_name, '_', ' ')) || ' ' || lower(tg_op);
+  perform public.log_account_activity(target, event_action, event_category, event_description, null, 'NGN', coalesce(to_jsonb(new)->>'reference', to_jsonb(new)->>'id'), jsonb_build_object('source', tg_table_name, 'operation', tg_op));
+  return new;
+exception when others then
+  raise warning 'Rentora activity capture skipped for %: %', tg_table_name, sqlerrm;
+  return new;
+end;
+$$;
+
+drop trigger if exists capture_properties_activity on public.properties;
+create trigger capture_properties_activity after insert or update on public.properties for each row execute function public.capture_user_activity();
+drop trigger if exists capture_payments_activity on public.property_rent_payments;
+create trigger capture_payments_activity after insert or update on public.property_rent_payments for each row execute function public.capture_user_activity();
+drop trigger if exists capture_transactions_activity on public.transactions;
+create trigger capture_transactions_activity after insert or update on public.transactions for each row execute function public.capture_user_activity();
+drop trigger if exists capture_unlocks_activity on public.unlocks;
+create trigger capture_unlocks_activity after insert on public.unlocks for each row execute function public.capture_user_activity();
+drop trigger if exists capture_inspections_activity on public.inspections;
+create trigger capture_inspections_activity after insert or update on public.inspections for each row execute function public.capture_user_activity();
+drop trigger if exists capture_student_verification_activity on public.student_verification_requests;
+create trigger capture_student_verification_activity after insert or update on public.student_verification_requests for each row execute function public.capture_user_activity();
 
 -- Example event categories: account, payment, listing, booking, verification,
 -- message, report, admin, security.

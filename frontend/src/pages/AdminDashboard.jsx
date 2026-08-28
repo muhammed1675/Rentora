@@ -1375,10 +1375,7 @@ const [searchTerm, setSearchTerm] = useState('');
                     </TableCell>
                     <TableCell className="text-sm">{u.email}</TableCell>
                     <TableCell>
-                      <Select value={u.role} onValueChange={(value) => handleUpdateRole(u.id, value)} disabled={u.id === user.id}>
-                        <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="agent">Agent</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
-                      </Select>
+<Badge variant="outline" className="capitalize" title="Role is managed directly in Supabase">{u.role || 'user'}</Badge>
                     </TableCell>
                     <TableCell><Badge variant={u.suspended ? 'destructive' : 'outline'}>{u.suspended ? 'Suspended' : 'Active'}</Badge></TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatLastLogin(u.last_login_at)}</TableCell>
@@ -2803,7 +2800,7 @@ const [searchTerm, setSearchTerm] = useState('');
         </div>
       </main>
 
-      {/* ── Agent Detail Dialog ── */}
+      {/* ── Agent Detail Dialog ���─ */}
       <Dialog open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
