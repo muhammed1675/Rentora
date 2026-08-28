@@ -1054,6 +1054,10 @@ export function AdminDashboard() {
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
               )}
             </button>
+            <Button onClick={() => navigate('/')} variant="outline" size="sm" className="gap-2 shrink-0 rounded-full border-slate-200 bg-white hover:bg-slate-50 h-9 px-3.5">
+              <Home className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-xs font-semibold">Return to home</span>
+            </Button>
             <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shrink-0 rounded-full border-slate-200 bg-white hover:bg-slate-50 h-9 px-3.5">
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline text-xs font-semibold">Refresh</span>
@@ -1243,6 +1247,9 @@ export function AdminDashboard() {
                       { id: 'properties', label: 'Property approvals', count: stats?.pending_properties || 0, icon: Building2, color: 'blue' },
                       { id: 'payouts', label: 'Agent payout requests', count: withdrawalRequests.filter(r => r.status === 'pending').length, icon: ArrowDownCircle, color: 'emerald' },
                       { id: 'messages', label: 'Unread messages', count: messages.filter(m => m.status === 'unread').length, icon: MessageSquare, color: 'rose' },
+                      { id: 'student-verification', label: 'Student ID verifications', count: studentVerifications.filter(v => v.status === 'pending').length, icon: GraduationCap, color: 'indigo' },
+                      { id: 'reports', label: 'Property reports', count: reports.filter(r => r.status === 'pending').length, icon: Flag, color: 'red' },
+                      { id: 'advertising', label: 'Adverts awaiting approval', count: ads.filter(a => (a.payment_status === 'paid' || a.payment_status === 'completed') && a.status !== 'approved' && a.status !== 'active' && a.status !== 'rejected').length, icon: Megaphone, color: 'purple' },
                     ].map(row => {
                       const Icon = row.icon;
                       const active = row.count > 0;
