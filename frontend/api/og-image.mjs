@@ -1,10 +1,21 @@
-// api/og-image.js — Vercel Node.js serverless function
+// api/og-image.mjs — Vercel Node.js serverless function
 //
 // WHY THIS EXISTS
 // api/og-property.js points every property's og:image at
 // `${SITE_URL}/api/og-image?id=...` (see the `cardImage` helper there), but
 // this file never existed — so that request 404'd and WhatsApp/Telegram/
 // iMessage had no image to show. This is that missing file.
+//
+// WHY THE .mjs EXTENSION (not .js like the other files in this folder)
+// @vercel/og's Node.js build (dist/index.node.js) is an ES Module. This
+// project's package.json has no "type": "module", so Vercel's Node builder
+// treats plain .js functions here as CommonJS and compiles `import` down to
+// `require()` — and you cannot require() an ESM-only file (fails with
+// ERR_REQUIRE_ESM). Naming this file .mjs forces Node to load it as a real
+// ES Module regardless of the project's default, without changing that
+// default for every other file in the app. Vercel still routes it at
+// /api/og-image (functions are routed by filename minus extension), so
+// nothing elsewhere needs to change.
 //
 // It renders a single 1200x630 PNG: the property's own first photo, with the
 // "RENTORA SKYLINE HOUSING SOLUTIONS" brand baked into the pixels (a tiled
