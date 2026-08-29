@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI, userAPI, verificationAPI, studentVerificationAPI, propertyAPI, inspectionAPI, transactionAPI, contactAPI, withdrawalAPI, balanceAPI, rentAPI, maintenanceAPI, reportAPI } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import { propertyImageSrc } from '../lib/images';
 import { sendBroadcast, sendBroadcastEmail } from '../lib/notifications';
 import { advertisingAPI, AD_SLOT_SPECS } from '../lib/advertising';
 import { Button } from '../components/ui/button';
@@ -1897,7 +1898,7 @@ export function AdminDashboard() {
                     return (
                     <Card key={p.id} className="overflow-hidden border-yellow-200">
                       <div className="flex">
-                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-24 sm:w-32 object-cover flex-shrink-0" style={{ minHeight: '100px' }} loading="lazy" decoding="async" width="800" height="600" />
+                        <img src={propertyImageSrc(p.images?.[0]) || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-24 sm:w-32 object-cover flex-shrink-0" style={{ minHeight: '100px' }} loading="lazy" decoding="async" width="800" height="600" />
                         <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '100px' }}>
                           <div>
                             <h4 className="font-semibold text-sm line-clamp-1">{p.title}</h4>
@@ -1932,7 +1933,7 @@ export function AdminDashboard() {
               {properties.map((p) => (
                 <Card key={p.id} className="overflow-hidden">
                   <div className="flex">
-                    <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-24 object-cover flex-shrink-0" style={{ minHeight: '96px' }} loading="lazy" decoding="async" width="800" height="600" />
+                    <img src={propertyImageSrc(p.images?.[0]) || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-24 object-cover flex-shrink-0" style={{ minHeight: '96px' }} loading="lazy" decoding="async" width="800" height="600" />
                     <div className="flex-1 p-3 min-w-0 flex flex-col justify-between" style={{ minHeight: '96px' }}>
                       <div>
                         <div className="flex items-start justify-between gap-1">
@@ -1957,7 +1958,7 @@ export function AdminDashboard() {
                 <TableHeader><TableRow><TableHead>Property</TableHead><TableHead>Type</TableHead><TableHead>Price</TableHead><TableHead>Agent</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                 <TableBody>{properties.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell><div className="flex items-center gap-3"><img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-12 h-12 rounded object-cover shrink-0" loading="lazy" decoding="async" width="800" height="600" /><div className="min-w-0"><p className="font-medium text-sm truncate max-w-[140px]">{p.title}</p><p className="text-xs text-muted-foreground truncate max-w-[140px]">{p.location}</p></div></div></TableCell>
+                    <TableCell><div className="flex items-center gap-3"><img src={propertyImageSrc(p.images?.[0]) || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-12 h-12 rounded object-cover shrink-0" loading="lazy" decoding="async" width="800" height="600" /><div className="min-w-0"><p className="font-medium text-sm truncate max-w-[140px]">{p.title}</p><p className="text-xs text-muted-foreground truncate max-w-[140px]">{p.location}</p></div></div></TableCell>
                     <TableCell className="capitalize text-sm">{p.property_type}</TableCell>
                     <TableCell className="text-sm whitespace-nowrap">{formatPrice(p.price)}</TableCell>
                     <TableCell className="text-sm">{p.uploaded_by_agent_name}</TableCell>
@@ -3061,7 +3062,7 @@ export function AdminDashboard() {
                   <div className="space-y-2">
                     {properties.filter(p => p.uploaded_by_agent_id === selectedAgentData.id).map(p => (
                       <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
-                        <img src={p.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-10 h-10 rounded object-cover shrink-0" loading="lazy" decoding="async" width="800" height="600" />
+                        <img src={propertyImageSrc(p.images?.[0]) || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'} alt="" className="w-10 h-10 rounded object-cover shrink-0" loading="lazy" decoding="async" width="800" height="600" />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{p.title}</p>
                           <p className="text-xs text-muted-foreground">{formatPrice(p.price)}/yr</p>
@@ -3206,8 +3207,8 @@ export function AdminDashboard() {
               {previewProperty.images?.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {previewProperty.images.slice(0, 6).map((img, i) => (
-                    <a key={i} href={img} target="_blank" rel="noreferrer">
-                      <img src={img} alt={`Photo ${i + 1}`}
+                    <a key={i} href={propertyImageSrc(img)} target="_blank" rel="noreferrer">
+                      <img src={propertyImageSrc(img)} alt={`Photo ${i + 1}`}
                         className={`w-full object-cover rounded-lg border hover:opacity-90 transition-opacity cursor-pointer ${i === 0 ? 'col-span-3 max-h-52' : 'max-h-28'}`} loading="lazy" decoding="async" width="800" height="600" />
                     </a>
                   ))}

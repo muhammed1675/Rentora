@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Navigation } from 'lucide-react';
 import { ImageWatermark } from './ImageWatermark';
+import { propertyImageSrc } from '../lib/images';
 
 export function PropertyCard({ property }) {
   const formatPrice = (price) =>
@@ -20,7 +21,7 @@ export function PropertyCard({ property }) {
       <div className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-[hsl(60_8%_90%)]">
         <Link to={`/property/${property.id}`} aria-label={`View ${property.title}`}>
           <img
-            src={property.images?.[0] || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
+            src={propertyImageSrc(property.images?.[0]) || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
             alt={property.title}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
             loading="lazy" decoding="async" width="800" height="600" />

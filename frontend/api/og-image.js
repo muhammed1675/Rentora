@@ -1,4 +1,4 @@
-// api/og-image.js — Vercel Edge Function
+// api/og-image.js — Vercel Node.js serverless function
 //
 // WHY THIS EXISTS
 // api/og-property.js points every property's og:image at
@@ -14,7 +14,27 @@
 // recipient saves or forwards it — long-pressing the WhatsApp preview,
 // screenshotting, downloading, whatever.
 //
-// THINGS THAT WILL SILENTLY BREAK THIS IF YOU EDIT IT — all three bit us
+// WHY THIS IS A NODE FUNCTION, NOT EDGE (it used to be)
+// @vercel/og's renderer (Satori → resvg) cannot reliably decode WebP images
+// — that's a known, currently-open upstream limitation, not something
+// specific to this file. Every property photo is uploaded as .webp (see
+// the property-images bucket's allowed_mime_types), so passing the photo
+// URL straight into satori's <img src> silently fails: ImageResponse
+// throws, the catch block below falls back to the no-photo card, and the
+// WhatsApp/Twitter/etc. preview shows a plain branded card with no picture
+// at all — which is exactly the bug this rewrite fixes.
+//
+// The fix: fetch the photo's bytes ourselves and decode/re-encode them to
+// PNG with `sharp` BEFORE handing anything to satori, then pass that PNG in
+// as a base64 data URI instead of a URL. `sharp` needs native bindings that
+// the Edge runtime can't load, so this function now runs on the regular
+// Node.js runtime (no `export const config = { runtime: 'edge' }`) and uses
+// the (req, res) shape, same as the other functions in this folder (see
+// og-property.js) — `@vercel/og`'s ImageResponse still works fine here,
+// since it's a standard Response object and Node 18+ can call
+// `.arrayBuffer()` on it directly.
+//
+// THINGS THAT WILL SILENTLY BREAK THIS IF YOU EDIT IT — all four bit us
 // once already, verified by actually rendering this file locally with
 // @vercel/og before shipping:
 //   1. satori (what @vercel/og uses to render) supports a narrower set of
@@ -36,16 +56,11 @@
 //   5. On any render failure we return real fallback IMAGE BYTES with a 200,
 //      never a redirect — WhatsApp's crawler does not reliably follow
 //      redirects on og:image URLs.
-//
-// Runs on the Edge runtime (required by @vercel/og's ImageResponse), so it
-// takes a Web Request and returns a Web Response — different shape from the
-// Node-style (req, res) functions elsewhere in this folder.
 
 import { ImageResponse } from '@vercel/og';
 import { createClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
 import React from 'react';
-
-export const config = { runtime: 'edge' };
 
 const SITE_URL = 'https://www.rentora.com.ng';
 const FALLBACK_IMAGE = `${SITE_URL}/rentora-og.png`;
@@ -63,17 +78,41 @@ function formatPrice(price) {
   return `NGN ${n.toLocaleString('en-NG')}`;
 }
 
-// Real 200 + image bytes, never a redirect — see note (4) above.
-async function servePngFallback() {
+function setImageHeaders(res) {
+  for (const [key, value] of Object.entries(IMAGE_HEADERS)) res.setHeader(key, value);
+}
+
+// Fetches the photo and re-encodes it as PNG via sharp, returned as a data
+// URI so satori never has to decode WebP itself (see note above). Returns
+// null (not a throw) on any failure — the caller falls back to a no-photo
+// card, which is far better than a 500.
+async function toPngDataUri(photoUrl) {
+  if (!photoUrl) return null;
   try {
-    const res = await fetch(FALLBACK_IMAGE, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) throw new Error(`fallback fetch ${res.status}`);
-    const bytes = await res.arrayBuffer();
-    return new Response(bytes, { status: 200, headers: IMAGE_HEADERS });
+    const upstream = await fetch(photoUrl, { signal: AbortSignal.timeout(8000) });
+    if (!upstream.ok) return null;
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    // .png() re-encodes regardless of source format (webp, jpeg, png, ...),
+    // so this also quietly handles any non-webp photo without extra branching.
+    const png = await sharp(bytes).resize(1200, 630, { fit: 'cover' }).png().toBuffer();
+    return `data:image/png;base64,${png.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
+// Real 200 + image bytes, never a redirect — see note (5) above.
+async function servePngFallback(res) {
+  try {
+    const upstream = await fetch(FALLBACK_IMAGE, { signal: AbortSignal.timeout(5000) });
+    if (!upstream.ok) throw new Error(`fallback fetch ${upstream.status}`);
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    setImageHeaders(res);
+    res.status(200).send(bytes);
   } catch {
     // Last resort: a plain solid-colour PNG built with ImageResponse itself,
     // no external fetch involved, so this branch basically cannot fail.
-    return new ImageResponse(
+    const imageResponse = new ImageResponse(
       React.createElement(
         'div',
         {
@@ -91,8 +130,11 @@ async function servePngFallback() {
         },
         'RENTORA'
       ),
-      { width: 1200, height: 630, headers: IMAGE_HEADERS }
+      { width: 1200, height: 630 }
     );
+    const bytes = Buffer.from(await imageResponse.arrayBuffer());
+    setImageHeaders(res);
+    res.status(200).send(bytes);
   }
 }
 
@@ -137,7 +179,8 @@ function buildWatermark() {
 
 function buildCard({ title, meta, photo, taken }) {
   const children = [
-    // Background photo (or a plain brand-navy background if we have none).
+    // Background photo (a base64 PNG data URI — see toPngDataUri above) or a
+    // plain brand-navy background if we have none.
     photo
       ? React.createElement('img', {
           key: 'bg',
@@ -241,21 +284,15 @@ function buildCard({ title, meta, photo, taken }) {
   return React.createElement('div', { style: { display: 'flex', width: '1200px', height: '630px', position: 'relative' } }, children);
 }
 
-export default async function handler(req) {
-  let id = '';
-  try {
-    const { searchParams } = new URL(req.url);
-    id = (searchParams.get('id') || '').toString().trim();
-  } catch {
-    return servePngFallback();
-  }
+export default async function handler(req, res) {
+  const id = (req.query.id || '').toString().trim();
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   let title = 'Rentora';
   let meta = 'Student Hostels & Accommodation Near LAUTECH Ogbomosho';
-  let photo = null;
+  let photoUrl = null;
   let taken = false;
 
   if (id && supabaseUrl && serviceRoleKey) {
@@ -274,31 +311,39 @@ export default async function handler(req) {
         title = property.title || 'Property';
         meta = `${propertyType}${locationName}${priceStr ? ` · ${priceStr}/year` : ''}`;
         taken = property.availability === 'unavailable';
-        if (property.images?.[0]) photo = property.images[0];
+        if (property.images?.[0]) photoUrl = property.images[0];
       }
     } catch {
       // Fall through with the generic Rentora title/meta set above.
     }
   }
 
+  // Decode/re-encode BEFORE satori ever sees the image — this is the actual
+  // fix for the blank-photo bug (see the file header comment).
+  const photo = await toPngDataUri(photoUrl);
+
   try {
-    return new ImageResponse(buildCard({ title, meta, photo, taken }), {
+    const imageResponse = new ImageResponse(buildCard({ title, meta, photo, taken }), {
       width: 1200,
       height: 630,
-      headers: IMAGE_HEADERS,
     });
+    const bytes = Buffer.from(await imageResponse.arrayBuffer());
+    setImageHeaders(res);
+    res.status(200).send(bytes);
   } catch {
-    // Rendering failed (bad/unreachable photo URL, satori quirk, etc). Try
-    // again without the photo — a branded card with no picture beats no
-    // image at all.
+    // Rendering failed (bad photo data, satori quirk, etc). Try again
+    // without the photo — a branded card with no picture beats no image
+    // at all.
     try {
-      return new ImageResponse(buildCard({ title, meta, photo: null, taken }), {
+      const imageResponse = new ImageResponse(buildCard({ title, meta, photo: null, taken }), {
         width: 1200,
         height: 630,
-        headers: IMAGE_HEADERS,
       });
+      const bytes = Buffer.from(await imageResponse.arrayBuffer());
+      setImageHeaders(res);
+      res.status(200).send(bytes);
     } catch {
-      return servePngFallback();
+      await servePngFallback(res);
     }
   }
 }

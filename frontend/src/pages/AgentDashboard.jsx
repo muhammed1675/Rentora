@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { propertyAPI, inspectionAPI, storageAPI, balanceAPI, withdrawalAPI, rentAPI, locationAPI } from '../lib/api';
 import { downloadReceiptPNG } from '../lib/receipt';
 import { supabase } from '../lib/supabase';
+import { propertyImageSrc, propertyImageSrcs } from '../lib/images';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -622,8 +623,8 @@ export function AgentDashboard() {
                     <div className="relative group flex-shrink-0 w-28 sm:w-32" style={{ minHeight: '110px' }}>
                       {property.images?.[0] ? (
                         <>
-                          <img src={property.images[0]} alt="" className="absolute inset-0 w-full h-full object-cover cursor-pointer" onClick={() => openLightbox(property.images, 0)} loading="lazy" decoding="async" width="800" height="600" />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-end justify-center pb-2 transition-all cursor-pointer" onClick={() => openLightbox(property.images, 0)}>
+                          <img src={propertyImageSrc(property.images[0])} alt="" className="absolute inset-0 w-full h-full object-cover cursor-pointer" onClick={() => openLightbox(propertyImageSrcs(property.images), 0)} loading="lazy" decoding="async" width="800" height="600" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-end justify-center pb-2 transition-all cursor-pointer" onClick={() => openLightbox(propertyImageSrcs(property.images), 0)}>
                             <span className="text-white text-xs font-medium bg-black/60 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                               <Expand className="w-3 h-3" /> View
                             </span>
