@@ -1801,38 +1801,56 @@ export const rentAPI = {
     const otherFeesTotal = otherFees.reduce((sum, fee) => sum + fee.amount, 0);
     const serviceFee = Math.round(rentAmount * 0.035);
     const totalAmount = rentAmount + agentFee + agreementFee + cautionFee + inspectionFee + documentationFee + otherFeesTotal + serviceFee;
-    const reference     = generateReference('RENT');
 
+    // If this user already has an unpaid attempt on this exact property,
+    // reuse that ONE row instead of inserting a second pending row. Two
+    // pending rows for the same rent is how a slow/late webhook on the
+    // first attempt and a second, retried attempt can BOTH later confirm
+    // as paid — charging the student twice for one property. We do still
+    // issue a brand-new Korapay reference on reuse (rather than replaying
+    // the old one) since we can't be certain of Korapay's own behavior
+    // toward re-initializing a charge against a reference it has already
+    // seen — confirm-payment.js and the webhook both look records up by
+    // `reference`, so updating it here keeps that lookup working correctly.
+    const { data: existingPending } = await supabase
+      .from('property_rent_payments')
+      .select('id')
+      .eq('property_id', propertyId)
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    const reference = generateReference('RENT');
     // 5-day auto-release window from now
     const autoRelease = new Date();
     autoRelease.setDate(autoRelease.getDate() + 5);
 
-    const { data: row, error } = await supabase
-      .from('property_rent_payments')
-      .insert({
-        property_id: propertyId,
-        user_id: user.id,
-        agent_id: property.uploaded_by_agent_id,
-        rent_amount: rentAmount,
-        agent_fee: agentFee,
-        agreement_fee: agreementFee,
-        caution_fee: cautionFee,
-        inspection_fee: inspectionFee,
-        documentation_fee: documentationFee,
-        other_fees: otherFees,
-        other_fees_total: otherFeesTotal,
-        service_fee: serviceFee,
-        total_amount: totalAmount,
-        reference,
-        status: 'pending',
-        auto_release_at: autoRelease.toISOString(),
-        // Snapshot the owner contact info at payment time for the receipt.
-        // Payout details are no longer stored — the agent is the payee.
-        owner_name: property.owner_full_name,
-        owner_phone: property.owner_phone,
-      })
-      .select()
-      .single();
+    const rowPayload = {
+      property_id: propertyId,
+      user_id: user.id,
+      agent_id: property.uploaded_by_agent_id,
+      rent_amount: rentAmount,
+      agent_fee: agentFee,
+      agreement_fee: agreementFee,
+      caution_fee: cautionFee,
+      inspection_fee: inspectionFee,
+      documentation_fee: documentationFee,
+      other_fees: otherFees,
+      other_fees_total: otherFeesTotal,
+      service_fee: serviceFee,
+      total_amount: totalAmount,
+      reference,
+      status: 'pending',
+      auto_release_at: autoRelease.toISOString(),
+      // Snapshot the owner contact info at payment time for the receipt.
+      // Payout details are no longer stored — the agent is the payee.
+      owner_name: property.owner_full_name,
+      owner_phone: property.owner_phone,
+    };
+
+    const { data: row, error } = existingPending
+      ? await supabase.from('property_rent_payments').update(rowPayload).eq('id', existingPending.id).select().single()
+      : await supabase.from('property_rent_payments').insert(rowPayload).select().single();
     if (error) throw error;
 
     return {
@@ -2034,6 +2052,33 @@ export const rentAPI = {
   },
 
   // Rent payments for the logged-in user (their held/released receipts).
+  // Resumes a rent payment that's stuck at status='pending' — used by the
+  // "Resume Payment" button on Profile, so a student doesn't have to
+  // navigate back to the property page to pick up where they left off.
+  // Issues a fresh Korapay reference on the SAME row (never inserts a
+  // second row) — see the reasoning in `initiate` above.
+  resumePayment: async (paymentId, user) => {
+    const { data: existing, error: fetchErr } = await supabase
+      .from('property_rent_payments')
+      .select('*')
+      .eq('id', paymentId)
+      .eq('user_id', user.id)
+      .single();
+    if (fetchErr || !existing) throw new Error('Payment record not found');
+    if (!['pending', 'failed'].includes(existing.status)) throw new Error('This payment is no longer pending.');
+
+    const reference = generateReference('RENT');
+    const { data: row, error } = await supabase
+      .from('property_rent_payments')
+      .update({ reference, status: 'pending' })
+      .eq('id', paymentId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    return { data: { id: row.id, reference: row.reference, amount: row.total_amount, payment_type: 'rent' } };
+  },
+
   getMyPayments: async (userId) => {
     const { data, error } = await supabase
       .from('property_rent_payments')

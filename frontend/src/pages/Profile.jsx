@@ -161,6 +161,40 @@ export function Profile() {
   const [moveInPhotoPreview, setMoveInPhotoPreview] = useState(null);
   const [confirmingMoveIn, setConfirmingMoveIn] = useState(false);
 
+  const [resumingPaymentId, setResumingPaymentId] = useState(null);
+  // Picks a stuck (pending/failed) rent payment back up right from Profile
+  // instead of sending the student back to the property page — reuses the
+  // SAME payment record with a fresh Korapay reference (see rentAPI.resumePayment),
+  // so this never creates a second, duplicate charge for the same rent.
+  const handleResumeRentPayment = async (rp) => {
+    setResumingPaymentId(rp.id);
+    try {
+      const res = await rentAPI.resumePayment(rp.id, user);
+      const { openKorapayCheckout } = await import('../lib/korapay');
+      await openKorapayCheckout({
+        reference: res.data.reference,
+        amount: res.data.amount,
+        email: user.email,
+        name: user?.full_name || user?.email,
+        narration: `Rent (held by Rentora) — ${rp.property?.title || 'property'}`,
+        onSuccess: async () => {
+          toast.success('Rent held by Rentora. Confirm move-in from your profile to release funds.');
+          setResumingPaymentId(null);
+          fetchData();
+        },
+        onFailed: () => { toast.error('Payment failed. Please try again.'); setResumingPaymentId(null); },
+        onPending: () => {
+          toast.message('Payment received — confirming with Korapay now. This page will update automatically once confirmed.');
+          setResumingPaymentId(null);
+        },
+        onClose: () => { setResumingPaymentId(null); fetchData(); },
+      });
+    } catch (error) {
+      toast.error(error.message || 'Could not resume this payment. Please try again.');
+      setResumingPaymentId(null);
+    }
+  };
+
   const [tipDialogViewing, setTipDialogViewing] = useState(null);
   const [tipAmount, setTipAmount] = useState('');
   const [sendingTip, setSendingTip] = useState(false);
@@ -512,13 +546,14 @@ export function Profile() {
                           <CheckCircle2 className="w-4 h-4" />I've moved in
                         </Button>
                       )}
-                      {(rp.status === 'pending' || rp.status === 'failed') && rp.property_id && (
+                      {(rp.status === 'pending' || rp.status === 'failed') && (
                         <Button
                           size="sm"
                           className="gap-1"
-                          onClick={() => navigate(`/property/${rp.property_id}`)}
+                          disabled={resumingPaymentId === rp.id}
+                          onClick={() => handleResumeRentPayment(rp)}
                         >
-                          <RefreshCw className="w-4 h-4" />Retry Payment
+                          <RefreshCw className="w-4 h-4" />{resumingPaymentId === rp.id ? 'Starting…' : 'Retry Payment'}
                         </Button>
                       )}
                     </div>

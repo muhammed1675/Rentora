@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { AD_SLOT_SPECS } from '../lib/advertising';
+import { AD_SLOT_SPECS, advertisingAPI } from '../lib/advertising';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -49,27 +50,6 @@ const durationLabel = (ad) => {
   return `${days} day${days === 1 ? '' : 's'}`;
 };
 
-// Expiry state for a campaign, used for both the badge tone and the label.
-const expiryInfo = (ad) => {
-  if (!ad.ends_at) return { label: 'No end date', tone: 'bg-slate-100 text-slate-600' };
-  const now = Date.now();
-  const starts = ad.starts_at ? new Date(ad.starts_at).getTime() : now;
-  const ends = new Date(ad.ends_at).getTime();
-  const daysLeft = Math.ceil((ends - now) / 86400000);
-
-  if (starts > now) {
-    return { label: `Starts ${new Date(ad.starts_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}`, tone: 'bg-slate-100 text-slate-600', date: ad.ends_at };
-  }
-  if (ends < now) {
-    const daysAgo = Math.abs(daysLeft);
-    return { label: `Expired ${daysAgo === 0 ? 'today' : `${daysAgo}d ago`}`, tone: 'bg-rose-100 text-rose-700', date: ad.ends_at };
-  }
-  if (daysLeft <= 3) {
-    return { label: daysLeft <= 0 ? 'Expires today' : `Expires in ${daysLeft}d`, tone: 'bg-amber-100 text-amber-700', date: ad.ends_at };
-  }
-  return { label: `Expires ${new Date(ad.ends_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}`, tone: 'bg-emerald-100 text-emerald-700', date: ad.ends_at };
-};
-
 const amountOf = (ad) => Number(ad.amount_paid ?? ad.price ?? 0);
 
 function MetricCard({ icon: Icon, label, value, sub, featured }) {
@@ -108,17 +88,34 @@ export function AdvertiserDashboard() {
 
   useEffect(() => { load(); }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [retryingId, setRetryingId] = useState(null);
+  // Picks back up an ad stuck at payment_status='pending' — e.g. the person
+  // closed the Korapay tab, or the amount was rejected as below the payment
+  // channel's minimum. Reuses the same ad row and the same initPayment call
+  // Advertise.jsx uses on first submit, so there's no risk of double-charging
+  // or creating a duplicate campaign (the server checks payment_status is
+  // still 'pending' before issuing a new checkout link).
+  const retryPayment = async (ad) => {
+    setRetryingId(ad.id);
+    try {
+      const payment = await advertisingAPI.initPayment(ad.id, `${window.location.origin}/payment/callback`);
+      const checkoutUrl = payment?.data?.checkout_url;
+      if (checkoutUrl) window.location.assign(checkoutUrl);
+      else if (payment?.data?.alreadyPaid) { toast.info('This advert has already been paid for.'); load(); }
+      else toast.error('Could not start payment for this advert. Please try again.');
+    } catch (error) {
+      toast.error(error.message || 'Could not start payment for this advert.');
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
   const stats = useMemo(() => {
     const totalSpend = ads.reduce((sum, ad) => sum + amountOf(ad), 0);
     const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks || 0), 0);
     const activeCount = ads.filter((ad) => ['active', 'approved'].includes(ad.status)).length;
     const pendingCount = ads.filter((ad) => ['pending', 'pending_review'].includes(ad.status)).length;
-    const expiringSoonCount = ads.filter((ad) => {
-      if (!ad.ends_at || !['active', 'approved'].includes(ad.status)) return false;
-      const daysLeft = Math.ceil((new Date(ad.ends_at).getTime() - Date.now()) / 86400000);
-      return daysLeft <= 3 && daysLeft >= 0;
-    }).length;
-    return { totalSpend, totalClicks, activeCount, pendingCount, expiringSoonCount };
+    return { totalSpend, totalClicks, activeCount, pendingCount };
   }, [ads]);
 
   const placementMix = useMemo(() => {
@@ -184,7 +181,7 @@ export function AdvertiserDashboard() {
               <MetricCard icon={BadgeDollarSign} label="Total spend" value={formatPrice(stats.totalSpend)} sub="Across all campaigns" featured />
             </div>
             <div className="xl:col-span-3">
-              <MetricCard icon={Megaphone} label="Active campaigns" value={stats.activeCount} sub={stats.expiringSoonCount > 0 ? `${stats.expiringSoonCount} expiring within 3 days` : `${ads.length} total`} />
+              <MetricCard icon={Megaphone} label="Active campaigns" value={stats.activeCount} sub={`${ads.length} total`} />
             </div>
             <div className="xl:col-span-3">
               <MetricCard icon={MousePointerClick} label="Total clicks" value={stats.totalClicks.toLocaleString('en-NG')} sub="All time" />
@@ -275,16 +272,21 @@ export function AdvertiserDashboard() {
                           </div>
                         </div>
                         <p className="mt-3 text-xs leading-5 text-muted-foreground">{statusMessage(ad)}</p>
+                        {ad.payment_status === 'pending' && (
+                          <Button
+                            size="sm"
+                            className="mt-2 h-8 w-full text-xs"
+                            disabled={retryingId === ad.id}
+                            onClick={() => retryPayment(ad)}
+                          >
+                            {retryingId === ad.id ? 'Starting payment…' : 'Retry payment'}
+                          </Button>
+                        )}
                         <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
                           <span>Duration: <span className="text-foreground">{durationLabel(ad)}</span></span>
                           <span>Amount: <span className="text-foreground">{formatPrice(amountOf(ad))}</span></span>
                           <span>Clicks: <span className="text-foreground">{ad.clicks ?? 0}</span></span>
                           <span>Created: {ad.created_at ? new Date(ad.created_at).toLocaleDateString() : '—'}</span>
-                        </div>
-                        <div className="mt-2.5 border-t border-border/50 pt-2.5">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${expiryInfo(ad).tone}`}>
-                            <Clock3 className="h-3 w-3" /> {expiryInfo(ad).label}
-                          </span>
                         </div>
                       </div>
                     ))}
@@ -292,7 +294,7 @@ export function AdvertiserDashboard() {
 
                   {/* Desktop table */}
                   <div className="hidden overflow-x-auto sm:block">
-                    <table className="w-full min-w-[820px] text-left text-xs">
+                    <table className="w-full min-w-[720px] text-left text-xs">
                       <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         <tr>
                           <th className="px-3 py-3 font-medium">Creative</th>
@@ -302,7 +304,8 @@ export function AdvertiserDashboard() {
                           <th className="px-3 py-3 font-medium">Payment</th>
                           <th className="px-3 py-3 font-medium">Status</th>
                           <th className="px-3 py-3 font-medium">Clicks</th>
-                          <th className="px-3 py-3 font-medium">Expires</th>
+                          <th className="px-3 py-3 font-medium">Created</th>
+                          <th className="px-3 py-3 font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -321,10 +324,20 @@ export function AdvertiserDashboard() {
                             <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.payment_status)}`}>{statusLabel(ad.payment_status)}</Badge></td>
                             <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.status)}`}>{statusLabel(ad.status)}</Badge></td>
                             <td className="px-3 py-3.5">{ad.clicks ?? 0}</td>
+                            <td className="px-3 py-3.5 text-muted-foreground">{ad.created_at ? new Date(ad.created_at).toLocaleDateString() : '—'}</td>
                             <td className="px-3 py-3.5">
-                              <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${expiryInfo(ad).tone}`}>
-                                <Clock3 className="h-3 w-3" /> {expiryInfo(ad).label}
-                              </span>
+                              {ad.payment_status === 'pending' ? (
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  disabled={retryingId === ad.id}
+                                  onClick={() => retryPayment(ad)}
+                                >
+                                  {retryingId === ad.id ? 'Starting…' : 'Retry payment'}
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
                             </td>
                           </tr>
                         ))}
