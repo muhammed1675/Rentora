@@ -47,10 +47,26 @@ const sendTransactionalEmail = async (payload) => {
 const notifyAdmins = async ({ title, eventLabel, summary, breakdown, actionUrl }) => {
   try {
     const { data: admins, error } = await supabase.from('users').select('email, full_name').eq('role', 'admin');
-    if (error || !admins?.length) return;
+    if (error) return;
+
+    const recipients = (admins || []).filter((a) => a.email);
+
+    // Fallback so this never silently sends to zero people — e.g. no user
+    // has role='admin' yet, or that row has no email on file. Set
+    // REACT_APP_ADMIN_ALERT_EMAIL in Vercel → Settings → Environment
+    // Variables. Only used when the DB lookup comes back empty; a real
+    // admin row is always preferred.
+    const fallbackEmail = (process.env.REACT_APP_ADMIN_ALERT_EMAIL || '').trim();
+    if (recipients.length === 0 && fallbackEmail) {
+      recipients.push({ email: fallbackEmail, full_name: 'Admin' });
+    }
+    if (recipients.length === 0) {
+      console.warn(`notifyAdmins(${title}): no admin recipients found and no REACT_APP_ADMIN_ALERT_EMAIL fallback set — email not sent.`);
+      return;
+    }
 
     await Promise.allSettled(
-      admins.filter((a) => a.email).map((admin) =>
+      recipients.map((admin) =>
         sendTransactionalEmail({
           type: 'admin_activity_alert',
           to: admin.email,
