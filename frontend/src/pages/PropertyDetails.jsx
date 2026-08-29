@@ -167,12 +167,13 @@ export function PropertyDetails() {
 
   const handleShare = async () => {
     const url = window.location.href;
-    const text = `Check out this property on Rentora: ${property?.title} — ${property?.location}`;
+    const propertyName = property?.title?.trim() || 'this property';
+    const text = `Check out this property on Rentora: ${propertyName}`;
     if (navigator.share) {
-      try { await navigator.share({ title: property?.title, text, url }); } catch {}
+      try { await navigator.share({ title: propertyName, text, url }); } catch {}
     } else {
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(`${text}\n${url}`);
         setCopied(true);
         toast.success('Link copied to clipboard!');
         setTimeout(() => setCopied(false), 3000);
