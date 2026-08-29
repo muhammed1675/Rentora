@@ -22,6 +22,28 @@ import { ImageWatermark } from '../components/ImageWatermark';
 import { AdSlot } from '../components/AdSlot';
 import { downloadWatermarkedImage } from '../lib/watermarkDownload';
 
+// Compact, reversible UUID encoding for shorter share URLs. Existing UUID URLs still work.
+function encodePropertyId(id) {
+  try {
+    const hex = id.replaceAll('-', '');
+    if (!/^[0-9a-f]{32}$/i.test(hex)) return id;
+    const bytes = Uint8Array.from(hex.match(/.{2}/g), byte => Number.parseInt(byte, 16));
+    let binary = '';
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  } catch { return id; }
+}
+
+function decodePropertyId(value) {
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) return value;
+  try {
+    const binary = atob(value.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - value.length % 4) % 4));
+    const hex = Array.from(binary, char => char.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+    if (hex.length !== 32) return value;
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  } catch { return value; }
+}
+
 function getFavourites() {
   try { return JSON.parse(localStorage.getItem('rentora_favourites') || '[]'); }
   catch { return []; }
@@ -67,7 +89,8 @@ function toggleCompare(property) {
 }
 
 export function PropertyDetails() {
-  const { id } = useParams();
+  const { id: routeId } = useParams();
+  const id = decodePropertyId(routeId);
   const navigate = useNavigate();
   const { user, isAuthenticated, refreshUser, verificationStatus } = useAuth();
   const { requireVerification } = useVerifyGate();
@@ -166,7 +189,8 @@ export function PropertyDetails() {
   };
 
   const handleShare = async () => {
-    const url = window.location.href;
+    const shareId = encodePropertyId(property?.id || id);
+    const url = `${window.location.origin}/property/${shareId}`;
     const propertyName = property?.title?.trim() || 'this property';
     const text = `Check out this property on Rentora: ${propertyName}`;
     if (navigator.share) {
