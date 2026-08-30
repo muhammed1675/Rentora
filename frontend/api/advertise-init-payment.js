@@ -157,6 +157,9 @@ export default async function handler(req, res) {
         redirect_url,
         customer: { name: ad.full_name || buyer.full_name || 'Advertiser', email: buyer.email },
         narration: `Rentora advert — ${ad.slot}`,
+        // Advertiser bears Korapay's processing fee, same policy as every
+        // other payment type — see api/korapay-init.js for the full note.
+        merchant_bears_cost: false,
       }),
     });
     if (!result.ok || result.body?.status === false) {

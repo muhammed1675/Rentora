@@ -16,6 +16,13 @@ import { paymentAPI } from './api';
  * one-time guess. The webhook remains the ultimate source of truth; this
  * is just about the ORIGINAL tab finding out what the webhook already
  * knows, instead of staying silent.
+ *
+ * Who bears Korapay's own processing fee is controlled server-side via
+ * `merchant_bears_cost: false` on the /charges/initialize request (see
+ * api/korapay-init.js and api/advertise-init-payment.js) — Korapay
+ * calculates and adds its real fee on its own hosted checkout page.
+ * Nothing needs to happen here: the `amount` passed through stays exactly
+ * the amount Rentora is owed (rent + fees + service_fee), unchanged.
  */
 export async function openKorapayCheckout({ reference, amount, email, name, phone, narration, onSuccess, onFailed, onPending, onClose }) {
   const response = await paymentAPI.initializeKorapay({
