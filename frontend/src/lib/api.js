@@ -98,6 +98,17 @@ export const locationAPI = {
 
 // ============== PROPERTY APIs ==============
 
+// Property links can now be either the UUID (old shared links, or an
+// internal id lookup) or the human-readable slug (new canonical URLs, see
+// supabase/schema/31_property_slugs.sql). Callers don't say which one they
+// were given, so detect the shape and query the right column — querying
+// the `id` (uuid) column with a non-uuid string throws a Postgres type
+// error instead of just returning zero rows.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function byIdOrSlug(query, idOrSlug) {
+  return UUID_RE.test(idOrSlug) ? query.eq('id', idOrSlug) : query.eq('slug', idOrSlug);
+}
+
 export const propertyAPI = {
   // Checks for existing listings that look like the same property —
   // similar title/location, similar price, same type, posted by a
@@ -159,25 +170,22 @@ export const propertyAPI = {
     return { data: withLocationNames(data) };
   },
 
-  getPublic: async (id) => {
-    const { data, error } = await supabase
-      .from('properties')
-      .select('*, locations(name)')
-      .eq('id', id)
-      .eq('status', 'approved')
-      .single();
+  getPublic: async (idOrSlug) => {
+    const { data, error } = await byIdOrSlug(
+      supabase.from('properties').select('*, locations(name)'),
+      idOrSlug
+    ).eq('status', 'approved').single();
     
     if (error) throw error;
     
     return { data: withLocationName(data) };
   },
 
-  getById: async (id, userId) => {
-    const { data: property, error } = await supabase
-      .from('properties')
-      .select('*, locations(name)')
-      .eq('id', id)
-      .single();
+  getById: async (idOrSlug, userId) => {
+    const { data: property, error } = await byIdOrSlug(
+      supabase.from('properties').select('*, locations(name)'),
+      idOrSlug
+    ).single();
     
     if (error) throw error;
     

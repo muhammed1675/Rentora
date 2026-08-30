@@ -40,7 +40,7 @@ function RecentCard({ item, isFav, onToggleFav }) {
   const fmt = (p) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(p);
   const TypeIcon = item.property_type === 'hostel' ? Home : Building;
   return (
-    <div onClick={() => navigate(`/property/${item.id}`)} className="shrink-0 w-48 rounded-xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-md transition-shadow group">
+    <div onClick={() => navigate(`/property/${item.slug || item.id}`)} className="shrink-0 w-48 rounded-xl border border-border bg-card overflow-hidden cursor-pointer hover:shadow-md transition-shadow group">
       <div className="relative h-28 bg-muted overflow-hidden">
         {item.image
           ? <img src={propertyImageSrc(item.image)} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" width="800" height="600" />

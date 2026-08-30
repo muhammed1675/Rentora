@@ -19,7 +19,7 @@ export function PropertyCard({ property }) {
   return (
     <article className="group min-w-0" data-testid={`property-card-${property.id}`}>
       <div className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-[hsl(60_8%_90%)]">
-        <Link to={`/property/${property.id}`} aria-label={`View ${property.title}`}>
+        <Link to={`/property/${property.slug || property.id}`} aria-label={`View ${property.title}`}>
           <img
             src={propertyImageSrc(property.images?.[0]) || 'https://images.pexels.com/photos/3754595/pexels-photo-3754595.jpeg?auto=compress&cs=tinysrgb&w=800'}
             alt={property.title}
@@ -39,7 +39,7 @@ export function PropertyCard({ property }) {
       <div className="px-1 pb-2 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Link to={`/property/${property.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-primary line-clamp-1">
+            <Link to={`/property/${property.slug || property.id}`} className="font-heading text-lg font-semibold text-foreground hover:text-primary line-clamp-1">
               {property.title}
             </Link>
             <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground line-clamp-1">

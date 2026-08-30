@@ -73,6 +73,15 @@ import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import React from 'react';
 
+// Property links can now be either the UUID or the human-readable slug
+// (see supabase/schema/31_property_slugs.sql). og-property.js always
+// passes the real UUID here, but this checks both anyway so a direct
+// /api/og-image?id=<slug> call also works.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function byIdOrSlug(query, idOrSlug) {
+  return UUID_RE.test(idOrSlug) ? query.eq('id', idOrSlug) : query.eq('slug', idOrSlug);
+}
+
 const SITE_URL = 'https://www.rentora.com.ng';
 const FALLBACK_IMAGE = `${SITE_URL}/rentora-og.png`;
 const BRAND = 'RENTORA';

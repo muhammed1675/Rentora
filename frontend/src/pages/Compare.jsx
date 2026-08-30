@@ -123,7 +123,7 @@ export function Compare() {
                     <Button
                       size="sm"
                       className="w-full mt-3"
-                      onClick={() => navigate(`/property/${item.id}`)}
+                      onClick={() => navigate(`/property/${item.slug || item.id}`)}
                     >
                       View Property
                     </Button>

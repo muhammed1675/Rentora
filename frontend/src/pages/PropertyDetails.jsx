@@ -40,7 +40,7 @@ function trackRecentlyViewed(property) {
     const existing = JSON.parse(localStorage.getItem(key) || '[]');
     const filtered = existing.filter(p => p.id !== property.id);
     const updated = [{
-      id: property.id, title: property.title, location: property.location,
+      id: property.id, slug: property.slug, title: property.title, location: property.location,
       price: property.price, image: property.images?.[0] || null,
       property_type: property.property_type,
     }, ...filtered].slice(0, 10);
@@ -61,13 +61,13 @@ function toggleCompare(property) {
     return { added: false, full: false };
   }
   if (list.length >= 2) return { added: false, full: true };
-  list.push({ id: property.id, title: property.title, location: property.location, price: property.price, image: property.images?.[0] || null, property_type: property.property_type });
+  list.push({ id: property.id, slug: property.slug, title: property.title, location: property.location, price: property.price, image: property.images?.[0] || null, property_type: property.property_type });
   localStorage.setItem('rentora_compare', JSON.stringify(list));
   return { added: true, full: false };
 }
 
 export function PropertyDetails() {
-  const { id } = useParams();
+  const { id: routeParam } = useParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, refreshUser, verificationStatus } = useAuth();
   const { requireVerification } = useVerifyGate();
@@ -107,7 +107,7 @@ export function PropertyDetails() {
 
     setSubmittingReport(true);
     try {
-      await reportAPI.submit({ property_id: id, reason: reportReason, details: reportDetails.trim() }, user);
+      await reportAPI.submit({ property_id: property?.id, reason: reportReason, details: reportDetails.trim() }, user);
       toast.success('Thanks — our team will review this listing.');
       setShowReportDialog(false);
       setReportReason('');
@@ -125,27 +125,36 @@ export function PropertyDetails() {
 
   useEffect(() => {
     fetchProperty();
-  }, [id, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [routeParam, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProperty = async () => {
     setLoading(true);
     try {
       let response;
       if (isAuthenticated && user) {
-        response = await propertyAPI.getById(id, user.id);
+        response = await propertyAPI.getById(routeParam, user.id);
       } else {
-        response = await propertyAPI.getPublic(id);
+        response = await propertyAPI.getPublic(routeParam);
       }
       setProperty(response.data);
+      // Human-readable link, e.g. /property/chidinma-lodge-adenike — swap a
+      // shared UUID link (or a stale slug from before a title edit) to the
+      // current canonical slug so the address bar and any future re-share
+      // use the short form. og-property.js / og-image.mjs and the DB lookup
+      // above already accept either form, so this is cosmetic, not required
+      // for the page to work.
+      if (response.data?.slug && response.data.slug !== routeParam) {
+        navigate(`/property/${response.data.slug}`, { replace: true });
+      }
       trackRecentlyViewed(response.data);
-      setIsFavourited(getFavourites().includes(id));
-      setInCompare(getCompareList().some(p => p.id === id));
+      setIsFavourited(getFavourites().includes(response.data.id));
+      setInCompare(getCompareList().some(p => p.id === response.data.id));
       try {
-        const sim = await propertyAPI.getSimilar(id, response.data.property_type, response.data.location);
+        const sim = await propertyAPI.getSimilar(response.data.id, response.data.property_type, response.data.location);
         setSimilarProperties(sim.data || []);
       } catch {}
       try {
-        const rev = await reviewAPI.getByProperty(id);
+        const rev = await reviewAPI.getByProperty(response.data.id);
         setReviews(rev.data || []);
       } catch {}
     } catch (error) {
@@ -160,16 +169,21 @@ export function PropertyDetails() {
   
 
   const handleFavourite = () => {
-    const added = toggleFavourite(id);
+    const added = toggleFavourite(property?.id);
     setIsFavourited(added);
     toast.success(added ? '❤️ Added to favourites' : 'Removed from favourites');
   };
 
   const handleShare = async () => {
     const url = window.location.href;
-    const text = `Check out this property on Rentora: ${property?.title} — ${property?.location}`;
+    // Deliberately no separate `text` caption here: WhatsApp (and most
+    // share targets) already builds a rich preview card from the page's
+    // own Open Graph tags (see api/og-property.js) — the property photo,
+    // title, price, and location. Sending a caption on top of that just
+    // repeats the same information as a second line of plain text above
+    // the card, which is what made shared links look cluttered.
     if (navigator.share) {
-      try { await navigator.share({ title: property?.title, text, url }); } catch {}
+      try { await navigator.share({ title: property?.title, url }); } catch {}
     } else {
       try {
         await navigator.clipboard.writeText(url);
@@ -222,11 +236,11 @@ export function PropertyDetails() {
     if (!reviewComment.trim()) { toast.error('Please write a comment'); return; }
     setSubmittingReview(true);
     try {
-      await reviewAPI.submit({ property_id: id, rating: reviewRating, comment: reviewComment.trim() }, user);
+      await reviewAPI.submit({ property_id: property?.id, rating: reviewRating, comment: reviewComment.trim() }, user);
       toast.success('Review submitted!');
       setReviewRating(0);
       setReviewComment('');
-      const rev = await reviewAPI.getByProperty(id);
+      const rev = await reviewAPI.getByProperty(property?.id);
       setReviews(rev.data || []);
     } catch (error) {
       toast.error(error.message || 'Failed to submit review');
@@ -242,7 +256,7 @@ export function PropertyDetails() {
     setRequestingInspection(true);
     try {
       const result = await inspectionAPI.request({
-        property_id: id,
+        property_id: property?.id,
         inspection_date: inspectionDate,
         email: inspectionEmail,
         phone_number: inspectionPhone,
@@ -294,7 +308,7 @@ export function PropertyDetails() {
     if (property?.availability === 'unavailable') { toast.error('This property is no longer available'); return; }
     setPayingRent(true);
     try {
-      const res = await rentAPI.initiate(id, user);
+      const res = await rentAPI.initiate(property?.id, user);
       const { openKorapayCheckout } = await import('../lib/korapay');
       await openKorapayCheckout({
         reference: res.data.reference,

@@ -36,6 +36,17 @@ const cardImage = (id) => `${SITE_URL}/api/og-image?id=${encodeURIComponent(id)}
 const FALLBACK_TITLE = 'Rentora — Student Hostels & Accommodation Near LAUTECH Ogbomosho';
 const FALLBACK_DESCRIPTION = "Find verified hostels, self-contains, and apartments near LAUTECH, Ogbomosho. Browse listings, view agent contacts, and book free property viewings — all in one place.";
 
+// Property links can now be either the UUID (old shared links) or the
+// human-readable slug (new canonical URLs, see
+// supabase/schema/31_property_slugs.sql). This function receives whatever
+// segment was in the URL, so it has to detect which one it got — querying
+// the `id` (uuid) column with a non-uuid string throws a Postgres type
+// error instead of just returning zero rows.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function byIdOrSlug(query, idOrSlug) {
+  return UUID_RE.test(idOrSlug) ? query.eq('id', idOrSlug) : query.eq('slug', idOrSlug);
+}
+
 function escapeHtml(str = '') {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -92,31 +103,35 @@ function renderPage(res, { pageUrl, title, description, image }) {
 }
 
 export default async function handler(req, res) {
-  const id = (req.query.id || '').toString().trim();
-  const pageUrl = id ? `${SITE_URL}/property/${encodeURIComponent(id)}` : SITE_URL;
+  const routeParam = (req.query.id || '').toString().trim();
+  const fallbackPageUrl = routeParam ? `${SITE_URL}/property/${encodeURIComponent(routeParam)}` : SITE_URL;
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   const fallback = () => renderPage(res, {
-    pageUrl,
+    pageUrl: fallbackPageUrl,
     title: FALLBACK_TITLE,
     description: FALLBACK_DESCRIPTION,
     image: FALLBACK_IMAGE,
   });
 
-  if (!id || !supabaseUrl || !serviceRoleKey) return fallback();
+  if (!routeParam || !supabaseUrl || !serviceRoleKey) return fallback();
 
   try {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const { data: property, error } = await supabase
-      .from('properties')
-      .select('title, price, property_type, address, status, availability, images, locations(name)')
-      .eq('id', id)
-      .maybeSingle();
+    const { data: property, error } = await byIdOrSlug(
+      supabase
+        .from('properties')
+        .select('id, slug, title, price, property_type, address, status, availability, images, locations(name)'),
+      routeParam
+    ).maybeSingle();
 
     if (error || !property || property.status !== 'approved') return fallback();
 
+    // Prefer the canonical slug URL for og:url/canonical even if this
+    // particular crawl came in on the old UUID link.
+    const pageUrl = `${SITE_URL}/property/${encodeURIComponent(property.slug || property.id)}`;
     const locationName = property.locations?.name || property.address || 'Ogbomosho';
     const priceStr = formatPrice(property.price);
     const taken = property.availability === 'unavailable';
@@ -125,7 +140,9 @@ export default async function handler(req, res) {
     const description = `${propertyType}near LAUTECH in ${locationName}${priceStr ? ` — ${priceStr}/year` : ''}${taken ? ' (Taken)' : ''}. View photos and details on Rentora.`;
     // Always point at the rendered card so the preview shows the property
     // photo + details with the Rentora Skyline Housing Solutions banner.
-    const image = cardImage(id);
+    // Pass the real id (not whatever the URL had) since og-image.mjs looks
+    // this property up again itself.
+    const image = cardImage(property.id);
 
     return renderPage(res, { pageUrl, title, description, image });
   } catch (err) {
