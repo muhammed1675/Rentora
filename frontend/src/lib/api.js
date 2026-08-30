@@ -644,12 +644,21 @@ export const inspectionAPI = {
       }
     }
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('inspections')
       .update(updateData)
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
     
     if (error) throw error;
+    // RLS can block an UPDATE by silently matching zero rows instead of
+    // returning an error (this is exactly how the agent "Done" button used
+    // to silently no-op — see 32_agent_inspection_completion.sql). Checking
+    // the returned row here turns that into a real, visible error instead
+    // of a false "success".
+    if (!updated || updated.length === 0) {
+      throw new Error('This viewing could not be updated — you may not have permission to change it.');
+    }
     return { data: { message: 'Viewing request updated' } };
   }
 };
