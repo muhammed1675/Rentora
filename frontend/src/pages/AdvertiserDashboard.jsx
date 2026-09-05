@@ -25,6 +25,7 @@ const statusBadge = (status) => ({
   failed: 'bg-rose-100 text-rose-700',
   paid: 'bg-emerald-100 text-emerald-700',
   completed: 'bg-slate-100 text-slate-600',
+  cancelled: 'bg-slate-100 text-slate-600',
 }[status] || 'bg-slate-100 text-slate-600');
 
 const statusLabel = (status) => ({
@@ -34,6 +35,7 @@ const statusLabel = (status) => ({
   active: 'Live',
   rejected: 'Rejected',
   failed: 'Payment failed',
+  cancelled: 'Cancelled',
 }[status] || status || 'Unknown');
 
 const statusMessage = (ad) => {
@@ -57,7 +59,7 @@ const EXPIRING_SOON_WINDOW_DAYS = 3;
 // is running normally, is about to run out, or has already ended — derived
 // purely from starts_at/ends_at so it stays correct without any cron job.
 const getExpiryInfo = (ad) => {
-  if (!ad.ends_at) return null;
+  if (!ad.ends_at || ad.status === 'cancelled') return null;
   const now = new Date();
   const ends = new Date(ad.ends_at);
   const starts = ad.starts_at ? new Date(ad.starts_at) : null;
@@ -182,6 +184,24 @@ export function AdvertiserDashboard() {
         },
       },
     });
+  };
+
+  const [cancellingId, setCancellingId] = useState(null);
+  // Archives an already-ended campaign so it stops being counted as
+  // "expired" — nothing flips status automatically once ends_at passes,
+  // so without this an old campaign would nag on the dashboard forever.
+  const cancelAd = async (ad) => {
+    setCancellingId(ad.id);
+    try {
+      const { error } = await supabase.rpc('cancel_own_ad', { p_ad_id: ad.id });
+      if (error) throw error;
+      toast.success('Campaign cancelled.');
+      load();
+    } catch (error) {
+      toast.error(error.message || 'Could not cancel this campaign.');
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const stats = useMemo(() => {
@@ -384,14 +404,25 @@ export function AdvertiserDashboard() {
                           </Button>
                         )}
                         {getExpiryInfo(ad)?.key === 'expired' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="mt-2 h-8 w-full gap-1.5 text-xs"
-                            onClick={() => runAgain(ad)}
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" /> Run again
-                          </Button>
+                          <div className="mt-2 flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 flex-1 gap-1.5 text-xs"
+                              onClick={() => runAgain(ad)}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" /> Run again
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 flex-1 text-xs text-rose-600 hover:text-rose-700"
+                              disabled={cancellingId === ad.id}
+                              onClick={() => cancelAd(ad)}
+                            >
+                              {cancellingId === ad.id ? 'Cancelling…' : 'Cancel'}
+                            </Button>
+                          </div>
                         )}
                         <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
                           <span>Duration: <span className="text-foreground">{durationLabel(ad)}</span></span>
@@ -458,14 +489,25 @@ export function AdvertiserDashboard() {
                                   {retryingId === ad.id ? 'Starting…' : 'Retry payment'}
                                 </Button>
                               ) : getExpiryInfo(ad)?.key === 'expired' ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 gap-1.5 text-xs"
-                                  onClick={() => runAgain(ad)}
-                                >
-                                  <RefreshCw className="h-3.5 w-3.5" /> Run again
-                                </Button>
+                                <div className="flex gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 gap-1.5 text-xs"
+                                    onClick={() => runAgain(ad)}
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" /> Run again
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs text-rose-600 hover:text-rose-700"
+                                    disabled={cancellingId === ad.id}
+                                    onClick={() => cancelAd(ad)}
+                                  >
+                                    {cancellingId === ad.id ? 'Cancelling…' : 'Cancel'}
+                                  </Button>
+                                </div>
                               ) : (
                                 <span className="text-muted-foreground">—</span>
                               )}
