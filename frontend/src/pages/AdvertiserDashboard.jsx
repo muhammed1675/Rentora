@@ -50,6 +50,57 @@ const durationLabel = (ad) => {
   return `${days} day${days === 1 ? '' : 's'}`;
 };
 
+const MS_DAY = 86400000;
+const EXPIRING_SOON_WINDOW_DAYS = 3;
+
+// Tells the advertiser at a glance whether a campaign hasn't started yet,
+// is running normally, is about to run out, or has already ended — derived
+// purely from starts_at/ends_at so it stays correct without any cron job.
+const getExpiryInfo = (ad) => {
+  if (!ad.ends_at) return null;
+  const now = new Date();
+  const ends = new Date(ad.ends_at);
+  const starts = ad.starts_at ? new Date(ad.starts_at) : null;
+  const isLive = ['approved', 'active'].includes(ad.status);
+
+  if (starts && now < starts) {
+    const daysToStart = Math.max(1, Math.ceil((starts - now) / MS_DAY));
+    return {
+      key: 'scheduled',
+      label: 'Scheduled',
+      badgeClass: 'bg-sky-100 text-sky-700',
+      detail: `Starts in ${daysToStart} day${daysToStart === 1 ? '' : 's'}`,
+    };
+  }
+
+  if (now > ends) {
+    const daysAgo = Math.floor((now - ends) / MS_DAY);
+    return {
+      key: 'expired',
+      label: 'Expired',
+      badgeClass: 'bg-rose-100 text-rose-700',
+      detail: daysAgo <= 0 ? 'Expired today' : `Expired ${daysAgo} day${daysAgo === 1 ? '' : 's'} ago`,
+    };
+  }
+
+  const daysLeft = Math.ceil((ends - now) / MS_DAY);
+  if (isLive && daysLeft <= EXPIRING_SOON_WINDOW_DAYS) {
+    return {
+      key: 'expiring',
+      label: 'Expiring soon',
+      badgeClass: 'bg-amber-100 text-amber-700',
+      detail: daysLeft <= 0 ? 'Expires today' : `Expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
+    };
+  }
+
+  return {
+    key: 'healthy',
+    label: 'Active',
+    badgeClass: 'bg-emerald-100 text-emerald-700',
+    detail: `Runs until ${ends.toLocaleDateString()}`,
+  };
+};
+
 const amountOf = (ad) => Number(ad.amount_paid ?? ad.price ?? 0);
 
 function MetricCard({ icon: Icon, label, value, sub, featured }) {
@@ -115,7 +166,9 @@ export function AdvertiserDashboard() {
     const totalClicks = ads.reduce((sum, ad) => sum + (ad.clicks || 0), 0);
     const activeCount = ads.filter((ad) => ['active', 'approved'].includes(ad.status)).length;
     const pendingCount = ads.filter((ad) => ['pending', 'pending_review'].includes(ad.status)).length;
-    return { totalSpend, totalClicks, activeCount, pendingCount };
+    const expiringSoonCount = ads.filter((ad) => getExpiryInfo(ad)?.key === 'expiring').length;
+    const expiredCount = ads.filter((ad) => getExpiryInfo(ad)?.key === 'expired').length;
+    return { totalSpend, totalClicks, activeCount, pendingCount, expiringSoonCount, expiredCount };
   }, [ads]);
 
   const placementMix = useMemo(() => {
@@ -175,6 +228,25 @@ export function AdvertiserDashboard() {
             </Link>
           </Card>
         ) : (
+          <>
+          {(stats.expiringSoonCount > 0 || stats.expiredCount > 0) && (
+            <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Clock3 className="h-4 w-4 shrink-0" />
+              <span>
+                {stats.expiringSoonCount > 0 && (
+                  <>
+                    {stats.expiringSoonCount} campaign{stats.expiringSoonCount === 1 ? '' : 's'} expiring within {EXPIRING_SOON_WINDOW_DAYS} days
+                  </>
+                )}
+                {stats.expiringSoonCount > 0 && stats.expiredCount > 0 && ' · '}
+                {stats.expiredCount > 0 && (
+                  <>
+                    {stats.expiredCount} campaign{stats.expiredCount === 1 ? '' : 's'} expired
+                  </>
+                )}
+              </span>
+            </div>
+          )}
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
             {/* Metric cards */}
             <div className="xl:col-span-3">
@@ -268,10 +340,16 @@ export function AdvertiserDashboard() {
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               <Badge className={`border-0 text-[10px] ${statusBadge(ad.status)}`}>{statusLabel(ad.status)}</Badge>
                               <Badge className={`border-0 text-[10px] ${statusBadge(ad.payment_status)}`}>{statusLabel(ad.payment_status)}</Badge>
+                              {getExpiryInfo(ad) && (
+                                <Badge className={`border-0 text-[10px] ${getExpiryInfo(ad).badgeClass}`}>{getExpiryInfo(ad).label}</Badge>
+                              )}
                             </div>
                           </div>
                         </div>
                         <p className="mt-3 text-xs leading-5 text-muted-foreground">{statusMessage(ad)}</p>
+                        {getExpiryInfo(ad) && (
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">{getExpiryInfo(ad).detail}</p>
+                        )}
                         {ad.payment_status === 'pending' && (
                           <Button
                             size="sm"
@@ -300,6 +378,7 @@ export function AdvertiserDashboard() {
                           <th className="px-3 py-3 font-medium">Creative</th>
                           <th className="px-3 py-3 font-medium">Slot</th>
                           <th className="px-3 py-3 font-medium">Duration</th>
+                          <th className="px-3 py-3 font-medium">Expiry</th>
                           <th className="px-3 py-3 font-medium">Amount</th>
                           <th className="px-3 py-3 font-medium">Payment</th>
                           <th className="px-3 py-3 font-medium">Status</th>
@@ -320,6 +399,16 @@ export function AdvertiserDashboard() {
                             </td>
                             <td className="px-3 py-3.5 font-medium text-foreground">{AD_SLOT_SPECS[ad.slot]?.label || ad.slot}</td>
                             <td className="px-3 py-3.5">{durationLabel(ad)}</td>
+                            <td className="px-3 py-3.5">
+                              {getExpiryInfo(ad) ? (
+                                <div>
+                                  <Badge className={`border-0 text-[10px] ${getExpiryInfo(ad).badgeClass}`}>{getExpiryInfo(ad).label}</Badge>
+                                  <p className="mt-1 text-[11px] text-muted-foreground">{getExpiryInfo(ad).detail}</p>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
                             <td className="px-3 py-3.5 font-medium text-foreground">{formatPrice(amountOf(ad))}</td>
                             <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.payment_status)}`}>{statusLabel(ad.payment_status)}</Badge></td>
                             <td className="px-3 py-3.5"><Badge className={`border-0 ${statusBadge(ad.status)}`}>{statusLabel(ad.status)}</Badge></td>
@@ -348,6 +437,7 @@ export function AdvertiserDashboard() {
               </Card>
             </div>
           </div>
+          </>
         )}
       </div>
     </main>
