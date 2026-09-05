@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, ImagePlus, Loader2, Megaphone, ShieldCheck, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { advertisingAPI, AD_SLOT_SPECS, estimateAdPrice, normalizeWhatsApp, safeExternalUrl, validateCreative } from '../lib/advertising';
@@ -9,8 +9,22 @@ const money = (value) => `₦${Number(value || 0).toLocaleString('en-NG')}`;
 export default function Advertise() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // "Run again" on the dashboard sends an expired ad's details here via
+  // router state so the advertiser doesn't retype everything — only the
+  // creative image can't carry over (it's a File the browser never kept),
+  // so that field is left for them to re-attach.
+  const prefill = location.state?.prefill || null;
   const [slots, setSlots] = useState([]);
-  const [form, setForm] = useState({ slot: '', durationDays: 7, advertiserName: user?.full_name || '', whatsapp: '', destinationUrl: '', headline: '', description: '' });
+  const [form, setForm] = useState({
+    slot: prefill?.slot || '',
+    durationDays: prefill?.durationDays || 7,
+    advertiserName: prefill?.advertiserName || user?.full_name || '',
+    whatsapp: prefill?.whatsapp || '',
+    destinationUrl: prefill?.destinationUrl || '',
+    headline: prefill?.headline || '',
+    description: prefill?.description || '',
+  });
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [dragActive, setDragActive] = useState(false);
@@ -90,6 +104,12 @@ export default function Advertise() {
               <h2 className="text-2xl font-bold text-slate-900">Create your campaign</h2>
               <p className="mt-1 text-sm text-slate-500">Pay securely, then your ad goes live after a quick admin review.</p>
             </div>
+
+            {prefill && (
+              <div className="mb-6 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+                We've filled this in from your previous campaign — just re-attach your ad image below and submit to run it again.
+              </div>
+            )}
 
             <div className="grid gap-5 sm:grid-cols-2">
               <label className="text-sm font-semibold text-slate-700">

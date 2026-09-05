@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BadgeDollarSign, Megaphone, MousePointerClick, Clock3,
   Plus, RefreshCw, ImageIcon,
@@ -103,6 +103,10 @@ const getExpiryInfo = (ad) => {
 
 const amountOf = (ad) => Number(ad.amount_paid ?? ad.price ?? 0);
 
+// ad_text is stored as "headline — description" (see createPendingAd), so
+// splitting on the same separator recovers the headline half for prefill.
+const headlineOf = (ad) => (ad.ad_text ? ad.ad_text.split(' — ')[0] : '');
+
 function MetricCard({ icon: Icon, label, value, sub, featured }) {
   return (
     <Card className={`overflow-hidden border-0 shadow-sm ${featured ? 'bg-primary text-primary-foreground' : 'bg-white'}`}>
@@ -122,6 +126,7 @@ function MetricCard({ icon: Icon, label, value, sub, featured }) {
 
 export function AdvertiserDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -159,6 +164,24 @@ export function AdvertiserDashboard() {
     } finally {
       setRetryingId(null);
     }
+  };
+
+  // Sends everything we still know about an expired campaign to the create
+  // form so the advertiser only has to re-attach the creative image (the
+  // one thing that can't survive as router state) and pay again.
+  const runAgain = (ad) => {
+    navigate('/advertise/create', {
+      state: {
+        prefill: {
+          slot: ad.slot,
+          advertiserName: ad.full_name || '',
+          whatsapp: ad.whatsapp_number || '',
+          destinationUrl: ad.link_url || '',
+          headline: headlineOf(ad),
+          description: ad.message_body || '',
+        },
+      },
+    });
   };
 
   const stats = useMemo(() => {
@@ -241,7 +264,7 @@ export function AdvertiserDashboard() {
                 {stats.expiringSoonCount > 0 && stats.expiredCount > 0 && ' · '}
                 {stats.expiredCount > 0 && (
                   <>
-                    {stats.expiredCount} campaign{stats.expiredCount === 1 ? '' : 's'} expired
+                    {stats.expiredCount} campaign{stats.expiredCount === 1 ? '' : 's'} expired — hit "Run again" below to relaunch
                   </>
                 )}
               </span>
@@ -360,6 +383,16 @@ export function AdvertiserDashboard() {
                             {retryingId === ad.id ? 'Starting payment…' : 'Retry payment'}
                           </Button>
                         )}
+                        {getExpiryInfo(ad)?.key === 'expired' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 h-8 w-full gap-1.5 text-xs"
+                            onClick={() => runAgain(ad)}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" /> Run again
+                          </Button>
+                        )}
                         <div className="mt-3 grid grid-cols-2 gap-y-1 text-xs text-muted-foreground">
                           <span>Duration: <span className="text-foreground">{durationLabel(ad)}</span></span>
                           <span>Amount: <span className="text-foreground">{formatPrice(amountOf(ad))}</span></span>
@@ -423,6 +456,15 @@ export function AdvertiserDashboard() {
                                   onClick={() => retryPayment(ad)}
                                 >
                                   {retryingId === ad.id ? 'Starting…' : 'Retry payment'}
+                                </Button>
+                              ) : getExpiryInfo(ad)?.key === 'expired' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 gap-1.5 text-xs"
+                                  onClick={() => runAgain(ad)}
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5" /> Run again
                                 </Button>
                               ) : (
                                 <span className="text-muted-foreground">—</span>
