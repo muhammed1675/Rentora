@@ -1128,6 +1128,28 @@ export const userAPI = {
 // ============== ADMIN APIs ==============
 
 export const adminAPI = {
+  // Platform-wide audit log (see supabase/schema/34_audit_log.sql).
+  // Filters are all optional and combine with AND. RLS restricts SELECT
+  // to admins already, so this simply reflects whatever the caller passes.
+  getAuditLog: async ({ category, eventType, actorId, targetType, targetId, search, page = 0, pageSize = 50 } = {}) => {
+    let query = supabase
+      .from('audit_log')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+
+    if (category) query = query.eq('category', category);
+    if (eventType) query = query.eq('event_type', eventType);
+    if (actorId) query = query.eq('actor_id', actorId);
+    if (targetType) query = query.eq('target_type', targetType);
+    if (targetId) query = query.eq('target_id', targetId);
+    if (search) query = query.or(`actor_email.ilike.%${search}%,event_type.ilike.%${search}%,description.ilike.%${search}%`);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+    return { data: data || [], count: count || 0 };
+  },
+
   getStats: async () => {
     const [
       { count: totalUsers },

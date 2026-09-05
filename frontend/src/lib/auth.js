@@ -157,7 +157,17 @@ export function AuthProvider({ children }) {
         token: code.trim(),
         type: 'email',
       });
-      if (error) throw new Error(parseAuthError(error));
+      if (error) {
+        // Best-effort — a failed OTP attempt happens before a session
+        // exists, so this must never block showing the real error back.
+        supabase.rpc('log_audit_event', {
+          p_event_type: 'auth.login_failed',
+          p_category: 'auth',
+          p_description: `Failed OTP verification for ${email}`,
+          p_metadata: { email, reason: error.message },
+        }).then(null, () => {});
+        throw new Error(parseAuthError(error));
+      }
 
       const authUser = data?.user;
       if (!authUser) throw new Error('Could not complete sign-in. Please try again.');
@@ -361,6 +371,16 @@ export function AuthProvider({ children }) {
 
   // ── Logout ───────────────────────────────────────────────────
   const logout = async () => {
+    // Log while still authenticated — must fire before signOut() clears
+    // the session, and must never block the actual sign-out.
+    try {
+      await supabase.rpc('log_audit_event', {
+        p_event_type: 'auth.logout',
+        p_category: 'auth',
+      });
+    } catch (e) {
+      console.warn('log_audit_event(logout) failed (non-critical):', e.message);
+    }
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

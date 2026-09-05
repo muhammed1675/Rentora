@@ -22,7 +22,7 @@ import {
   CheckCircle2, XCircle, Eye, Ban, UserCheck, TrendingUp,
   Search, RefreshCw, Trash2, AlertTriangle, User, FileText,
   MessageSquare, Mail, Inbox, MailOpen, UserCog, Copy, Phone, CreditCard, Clock, Wallet, ArrowDownCircle, Lock, Home,
-  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send
+  Menu, X, ChevronRight, CalendarCheck, Flag, GraduationCap, FileImage, Megaphone, Send, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -45,6 +45,14 @@ export function AdminDashboard() {
   const [properties, setProperties] = useState([]);
   const [viewings, setInspections] = useState([]);
   const [transactions, setTransactions] = useState({ inspection_transactions: [] });
+  const [auditLog, setAuditLog] = useState([]);
+  const [auditLogCount, setAuditLogCount] = useState(0);
+  const [loadingAuditLog, setLoadingAuditLog] = useState(false);
+  const [auditCategoryFilter, setAuditCategoryFilter] = useState('all');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditPage, setAuditPage] = useState(0);
+  const [expandedAuditRow, setExpandedAuditRow] = useState(null);
+  const AUDIT_PAGE_SIZE = 50;
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -173,6 +181,29 @@ export function AdminDashboard() {
   useEffect(() => {
     if (isAdmin && activeTab === 'broadcasts') fetchBroadcasts();
   }, [isAdmin, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchAuditLog = async () => {
+    setLoadingAuditLog(true);
+    try {
+      const { data, count } = await adminAPI.getAuditLog({
+        category: auditCategoryFilter === 'all' ? undefined : auditCategoryFilter,
+        search: auditSearch.trim() || undefined,
+        page: auditPage,
+        pageSize: AUDIT_PAGE_SIZE,
+      });
+      setAuditLog(data);
+      setAuditLogCount(count);
+    } catch (e) {
+      console.error('Failed to load audit log:', e);
+      toast.error('Could not load audit log');
+    } finally {
+      setLoadingAuditLog(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'audit-log') fetchAuditLog();
+  }, [isAdmin, activeTab, auditCategoryFilter, auditPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchAds = async () => {
     setLoadingAds(true);
@@ -877,6 +908,7 @@ export function AdminDashboard() {
     { id: 'reports', label: 'Reports', icon: Flag, count: reports.filter(r => r.status === 'pending').length, urgent: true },
     { id: 'advertising', label: 'Adverts', icon: Megaphone, count: ads.filter(a => (a.payment_status === 'paid' || a.payment_status === 'completed') && a.status !== 'approved' && a.status !== 'active' && a.status !== 'rejected').length, urgent: true },
     { id: 'broadcasts', label: 'Broadcasts', icon: Megaphone },
+    { id: 'audit-log', label: 'Audit Log', icon: History },
   ];
 
   const navQuery = navSearch.trim().toLowerCase();
@@ -2798,6 +2830,113 @@ export function AdminDashboard() {
               </div>
             </div>
           </Card>
+        </TabsContent>
+
+        {/* ── Audit Log Tab ── */}
+        <TabsContent value="audit-log">
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Select value={auditCategoryFilter} onValueChange={(v) => { setAuditCategoryFilter(v); setAuditPage(0); }}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    <SelectItem value="auth">Auth</SelectItem>
+                    <SelectItem value="admin">Admin actions</SelectItem>
+                    <SelectItem value="financial">Financial</SelectItem>
+                    <SelectItem value="user_action">User actions</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { setAuditPage(0); fetchAuditLog(); } }}
+                    placeholder="Search by email, event type, or description…"
+                    className="pl-9"
+                  />
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setAuditPage(0); fetchAuditLog(); }}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
+                </Button>
+              </div>
+            </Card>
+
+            {loadingAuditLog ? (
+              <Card className="p-12 text-center border-border/60"><RefreshCw className="w-6 h-6 mx-auto animate-spin text-foreground/30" /></Card>
+            ) : auditLog.length === 0 ? (
+              <Card className="p-12 text-center border-border/60">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                  <History className="w-7 h-7 text-foreground/30" />
+                </div>
+                <h3 className="font-semibold">No Activity Found</h3>
+                <p className="text-sm text-foreground/55 mt-1">Try a different filter or search term.</p>
+              </Card>
+            ) : (
+              <>
+                <Card className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Actor</TableHead>
+                        <TableHead>Event</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Target</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {auditLog.map((row) => (
+                        <>
+                          <TableRow
+                            key={row.id}
+                            className="cursor-pointer hover:bg-muted/40"
+                            onClick={() => setExpandedAuditRow(expandedAuditRow === row.id ? null : row.id)}
+                          >
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</TableCell>
+                            <TableCell className="text-sm">
+                              {row.actor_email || <span className="text-muted-foreground italic">system</span>}
+                              {row.actor_role && <span className="text-xs text-muted-foreground ml-1">({row.actor_role})</span>}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{row.event_type}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                row.category === 'financial' ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                : row.category === 'admin' ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                                : row.category === 'auth' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-100'
+                              }>{row.category}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{row.target_type || '—'}</TableCell>
+                            <TableCell className="text-xs text-primary">{expandedAuditRow === row.id ? 'Hide' : 'Details'}</TableCell>
+                          </TableRow>
+                          {expandedAuditRow === row.id && (
+                            <TableRow key={`${row.id}-detail`}>
+                              <TableCell colSpan={6} className="bg-muted/30">
+                                <pre className="text-xs whitespace-pre-wrap break-all">{JSON.stringify({ description: row.description, target_id: row.target_id, ip_address: row.ip_address, user_agent: row.user_agent, metadata: row.metadata }, null, 2)}</pre>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>
+                    Showing {auditPage * AUDIT_PAGE_SIZE + 1}–{Math.min((auditPage + 1) * AUDIT_PAGE_SIZE, auditLogCount)} of {auditLogCount}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={auditPage === 0} onClick={() => setAuditPage((p) => Math.max(0, p - 1))}>Previous</Button>
+                    <Button variant="outline" size="sm" disabled={(auditPage + 1) * AUDIT_PAGE_SIZE >= auditLogCount} onClick={() => setAuditPage((p) => p + 1)}>Next</Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </TabsContent>
           </Tabs>
         </div>
