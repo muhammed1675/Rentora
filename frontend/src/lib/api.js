@@ -1579,7 +1579,7 @@ export const balanceAPI = {
         .eq('viewing.agent_id', agentId),
       supabase
         .from('property_rent_payments')
-        .select('id, rent_amount, agent_fee, caution_fee, released_at, property:properties(title)')
+        .select('id, rent_amount, agent_fee, caution_fee, agreement_fee, documentation_fee, inspection_fee, other_fees_total, released_at, property:properties(title)')
         .eq('agent_id', agentId)
         .eq('status', 'released'),
       supabase
@@ -1598,14 +1598,17 @@ export const balanceAPI = {
       date: tx.created_at,
     }));
 
-    // Rent, agent fee, and caution fee are all released to the agent as one
-    // payout — service fee is Rentora's cut and is never part of this.
+    // Rent, agent fee, caution fee, and every other agent-set fee (agreement,
+    // documentation, other fees) are all released to the agent as one payout —
+    // service fee is Rentora's cut and is never part of this.
     const rentRows = (rentRes.data || []).map((rp) => ({
       id: `rent_${rp.id}`,
       type: 'rent_agent_fee',
       label: 'Rent Released',
       property_title: rp.property?.title || 'Property',
-      amount: Number(rp.rent_amount || 0) + Number(rp.agent_fee || 0) + Number(rp.caution_fee || 0),
+      amount: Number(rp.rent_amount || 0) + Number(rp.agent_fee || 0) + Number(rp.caution_fee || 0)
+        + Number(rp.agreement_fee || 0) + Number(rp.documentation_fee || 0)
+        + Number(rp.inspection_fee || 0) + Number(rp.other_fees_total || 0),
       date: rp.released_at,
     }));
 
@@ -2038,6 +2041,10 @@ export const rentAPI = {
               rent_amount: row.rent_amount,
               agent_fee: row.agent_fee,
               caution_fee: row.caution_fee,
+              agreement_fee: row.agreement_fee,
+              inspection_fee: row.inspection_fee,
+              documentation_fee: row.documentation_fee,
+              other_fees_total: row.other_fees_total,
               reference: row.reference,
             },
           });
